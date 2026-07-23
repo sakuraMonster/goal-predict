@@ -1,0 +1,270 @@
+<h2>单场详情页 v3 — 底座与预测分离</h2>
+<p class="subtitle">左侧：预测底座（雷达/交锋/赔率）· 右侧：预测输出（双模型双板块）· 底部：报告摘要</p>
+
+<div class="mockup" style="margin-top: 28px;">
+  <div class="mockup-header">全新布局：对阵概要 → 左底座 + 右预测 → 底部报告</div>
+  <div class="mockup-body" style="padding:0;background:#f5f0e8;color:#3d3628;font-family:Georgia,'Noto Serif SC',serif;">
+    
+    <!-- Top bar -->
+    <div style="display:flex;align-items:center;gap:12px;padding:10px 20px;background:#ede6d9;border-bottom:1px solid #d9cebc;font-family:system-ui,'Inter',sans-serif;font-size:12px;color:#6b5e4a;">
+      <span style="font-size:14px;">←</span> 返回赛事列表
+      <span style="margin-left:auto;">模型 v2.4.1 · 更新于 14:30</span>
+    </div>
+
+    <!-- Match header -->
+    <div style="padding:18px 24px 14px;text-align:center;border-bottom:1px solid #e5dccb;">
+      <div style="font-family:system-ui,'Inter',sans-serif;font-size:12px;color:#937b5c;letter-spacing:0.5px;">英超联赛 · 第 23 轮 · 2026-07-23 22:00 · 老特拉福德 · 竞彩编号 001</div>
+      <div style="display:flex;align-items:center;justify-content:center;gap:24px;margin-top:10px;">
+        <div style="text-align:center;">
+          <div style="width:48px;height:48px;background:#e5dccb;border-radius:50%;margin:0 auto 8px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#6b5e4a;">队徽</div>
+          <div style="font-size:18px;font-weight:700;">曼联</div>
+          <div style="font-family:system-ui,'Inter',sans-serif;font-size:10px;color:#937b5c;">英超第 4</div>
+        </div>
+        <div style="font-family:system-ui,'Inter',sans-serif;font-size:11px;color:#937b5c;text-align:center;">
+          <div style="font-size:24px;font-weight:700;color:#3d3628;margin-bottom:4px;">VS</div>
+          <div style="background:#fff;padding:3px 8px;border-radius:3px;border:1px solid #e5dccb;font-size:10px;">让球: -1</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="width:48px;height:48px;background:#e5dccb;border-radius:50%;margin:0 auto 8px;display:flex;align-items:center;justify-content:center;font-size:10px;color:#6b5e4a;">队徽</div>
+          <div style="font-size:18px;font-weight:700;">利物浦</div>
+          <div style="font-family:system-ui,'Inter',sans-serif;font-size:10px;color:#937b5c;">英超第 1</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Main content: Left (底座) + Right (预测) -->
+    <div style="display:flex;border-bottom:1px solid #e5dccb;">
+      
+      <!-- ===== 左侧：预测底座 (较大宽度) ===== -->
+      <div style="flex:1.15;padding:14px;border-right:1px solid #e5dccb;">
+        <div style="font-size:11px;color:#937b5c;font-family:system-ui,'Inter',sans-serif;letter-spacing:0.5px;margin-bottom:10px;text-transform:uppercase;">预测数据底座</div>
+        
+        <!-- 雷达图 (大) -->
+        <div style="background:#fff;border-radius:6px;padding:14px;border:1px solid #e5dccb;margin-bottom:10px;">
+          <div style="font-size:13px;font-weight:700;margin-bottom:8px;display:flex;justify-content:space-between;align-items:center;">
+            <span>球队战力雷达对比</span>
+            <span style="font-size:10px;color:#937b5c;font-weight:400;display:flex;gap:10px;">
+              <span style="color:#2d5a3b;">■ 曼联</span>
+              <span style="color:#8b5a2c;">■ 利物浦</span>
+            </span>
+          </div>
+          <div style="height:160px;background:#f9f6ef;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#c4b99a;font-family:system-ui,'Inter',sans-serif;font-size:11px;">
+            六维雷达图占位<br>进攻 · 防守 · 控球 · xG · 近期状态 · 阵容完整度
+          </div>
+          <div style="display:flex;gap:12px;margin-top:10px;font-family:system-ui,'Inter',sans-serif;font-size:10px;color:#6b5e4a;">
+            <div style="flex:1;background:#f9f6ef;border-radius:4px;padding:6px;text-align:center;">
+              <span style="color:#2d5a3b;font-weight:600;">攻</span> 曼联 1.8球/场
+            </div>
+            <div style="flex:1;background:#f9f6ef;border-radius:4px;padding:6px;text-align:center;">
+              <span style="color:#8b5a2c;font-weight:600;">防</span> 利物浦 0.7失/场
+            </div>
+            <div style="flex:1;background:#f9f6ef;border-radius:4px;padding:6px;text-align:center;">
+              <span style="color:#2d5a3b;font-weight:600;">xG</span> 曼联 1.62
+            </div>
+            <div style="flex:1;background:#f9f6ef;border-radius:4px;padding:6px;text-align:center;">
+              <span style="color:#8b5a2c;font-weight:600;">xGA</span> 利物浦 0.89
+            </div>
+          </div>
+        </div>
+
+        <!-- 近期交锋 + 近期状态 并排 -->
+        <div style="display:flex;gap:10px;margin-bottom:10px;">
+          <div style="flex:1;background:#fff;border-radius:6px;padding:12px;border:1px solid #e5dccb;">
+            <div style="font-size:12px;font-weight:700;margin-bottom:6px;">近期交锋 <span style="font-family:system-ui,'Inter',sans-serif;font-size:9px;color:#937b5c;font-weight:400;">近6场 曼联2胜2平2负</span></div>
+            <div style="font-family:system-ui,'Inter',sans-serif;font-size:10px;">
+              <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f4f0e3;">2026-03 <span style="font-weight:600;">利物浦 2:1 曼联</span><span style="color:#8b5a2c;">客负</span></div>
+              <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f4f0e3;">2025-11 <span style="font-weight:600;">曼联 1:1 利物浦</span><span style="color:#c4b99a;">平</span></div>
+              <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #f4f0e3;">2025-04 <span style="font-weight:600;">曼联 2:0 利物浦</span><span style="color:#2d5a3b;">主胜</span></div>
+              <div style="display:flex;justify-content:space-between;padding:3px 0;">2024-12 <span style="font-weight:600;color:#888;">利物浦 0:0 曼联</span><span style="color:#c4b99a;">平</span></div>
+            </div>
+          </div>
+          <div style="flex:1;background:#fff;border-radius:6px;padding:12px;border:1px solid #e5dccb;">
+            <div style="font-size:12px;font-weight:700;margin-bottom:6px;">近期状态</div>
+            <div style="font-family:system-ui,'Inter',sans-serif;font-size:10px;">
+              <div style="margin-bottom:6px;"><span style="font-weight:600;color:#2d5a3b;">曼联</span> <span style="color:#6b5e4a;">近6场</span> <span style="background:#2d5a3b;color:#fff;padding:1px 4px;border-radius:2px;font-size:9px;">W</span><span style="background:#2d5a3b;color:#fff;padding:1px 4px;border-radius:2px;font-size:9px;margin-left:1px;">W</span><span style="background:#c4b99a;color:#fff;padding:1px 4px;border-radius:2px;font-size:9px;margin-left:1px;">D</span><span style="background:#2d5a3b;color:#fff;padding:1px 4px;border-radius:2px;font-size:9px;margin-left:1px;">W</span><span style="background:#8b5a2c;color:#fff;padding:1px 4px;border-radius:2px;font-size:9px;margin-left:1px;">L</span><span style="background:#2d5a3b;color:#fff;padding:1px 4px;border-radius:2px;font-size:9px;margin-left:1px;">W</span></div>
+              <div><span style="font-weight:600;color:#8b5a2c;">利物浦</span> <span style="color:#6b5e4a;">近6场</span> <span style="background:#2d5a3b;color:#fff;padding:1px 4px;border-radius:2px;font-size:9px;">W</span><span style="background:#c4b99a;color:#fff;padding:1px 4px;border-radius:2px;font-size:9px;margin-left:1px;">D</span><span style="background:#c4b99a;color:#fff;padding:1px 4px;border-radius:2px;font-size:9px;margin-left:1px;">D</span><span style="background:#2d5a3b;color:#fff;padding:1px 4px;border-radius:2px;font-size:9px;margin-left:1px;">W</span><span style="background:#8b5a2c;color:#fff;padding:1px 4px;border-radius:2px;font-size:9px;margin-left:1px;">L</span><span style="background:#c4b99a;color:#fff;padding:1px 4px;border-radius:2px;font-size:9px;margin-left:1px;">D</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 赔率变动趋势 -->
+        <div style="background:#fff;border-radius:6px;padding:14px;border:1px solid #e5dccb;">
+          <div style="font-size:13px;font-weight:700;margin-bottom:8px;">赔率变动趋势</div>
+          <div style="font-family:system-ui,'Inter',sans-serif;font-size:10px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+              <span style="width:28px;color:#937b5c;font-size:10px;">欧赔</span>
+              <span style="width:50px;color:#6b5e4a;">主胜</span>
+              <div style="flex:1;height:32px;background:#f9f6ef;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#c4b99a;">2.10 → 2.05 ↓ 趋势图</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+              <span style="width:28px;"></span>
+              <span style="width:50px;color:#6b5e4a;">平局</span>
+              <div style="flex:1;height:32px;background:#f9f6ef;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#c4b99a;">3.40 → 3.50 ↑ 趋势图</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+              <span style="width:28px;"></span>
+              <span style="width:50px;color:#6b5e4a;">客胜</span>
+              <div style="flex:1;height:32px;background:#f9f6ef;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#c4b99a;">3.60 → 3.55 ↓ 趋势图</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;">
+              <span style="width:28px;color:#937b5c;font-size:10px;">亚盘</span>
+              <span style="width:50px;color:#6b5e4a;">-0.5</span>
+              <div style="flex:1;height:32px;background:#f9f6ef;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#c4b99a;">0.92 → 0.88 ↓ 趋势图</div>
+            </div>
+            <div style="margin-top:8px;font-size:10px;color:#c77600;">赔率离散度 0.12 · 市场分歧明显</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== 右侧：预测输出 (两个板块) ===== -->
+      <div style="flex:0.85;padding:14px;">
+        <div style="font-size:11px;color:#937b5c;font-family:system-ui,'Inter',sans-serif;letter-spacing:0.5px;margin-bottom:10px;text-transform:uppercase;">模型预测输出</div>
+
+        <!-- 板块一：Model A → 胜平负 + 让胜平负 -->
+        <div style="background:#fff;border-radius:6px;padding:14px;border:1px solid #e5dccb;margin-bottom:10px;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+            <span style="background:#2d5a3b;color:#fff;font-size:9px;padding:2px 6px;border-radius:3px;font-family:system-ui,sans-serif;">模型 A</span>
+            <span style="font-size:13px;font-weight:700;">胜平负 & 让胜平负</span>
+            <span style="font-family:system-ui,'Inter',sans-serif;font-size:9px;color:#937b5c;margin-left:auto;">LightGBM 多任务</span>
+          </div>
+
+          <!-- 胜平负 -->
+          <div style="margin-bottom:10px;">
+            <div style="font-size:11px;font-weight:600;color:#6b5e4a;margin-bottom:6px;">胜平负</div>
+            <div style="display:flex;gap:6px;font-family:system-ui,'Inter',sans-serif;">
+              <div style="flex:1;text-align:center;background:#f4f0e3;border-radius:5px;padding:10px 4px;border:2px solid #2d5a3b;">
+                <div style="font-size:24px;font-weight:700;color:#2d5a3b;">42.3%</div>
+                <div style="font-size:11px;color:#6b5e4a;margin-top:2px;">主胜</div>
+                <div style="font-size:9px;color:#937b5c;">赔率隐含 47.6%</div>
+              </div>
+              <div style="flex:1;text-align:center;background:#f9f6ef;border-radius:5px;padding:10px 4px;">
+                <div style="font-size:24px;font-weight:600;color:#3d3628;">27.8%</div>
+                <div style="font-size:11px;color:#6b5e4a;margin-top:2px;">平局</div>
+                <div style="font-size:9px;color:#937b5c;">赔率隐含 29.4%</div>
+              </div>
+              <div style="flex:1;text-align:center;background:#f9f6ef;border-radius:5px;padding:10px 4px;">
+                <div style="font-size:24px;font-weight:600;color:#3d3628;">29.9%</div>
+                <div style="font-size:11px;color:#6b5e4a;margin-top:2px;">客胜</div>
+                <div style="font-size:9px;color:#937b5c;">赔率隐含 27.8%</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:6px;margin-top:6px;font-size:10px;">
+              <div style="flex:1;height:3px;background:#e5dccb;border-radius:2px;overflow:hidden;"><div style="width:42%;height:100%;background:#2d5a3b;"></div></div>
+              <div style="flex:1;height:3px;background:#e5dccb;border-radius:2px;overflow:hidden;"><div style="width:28%;height:100%;background:#c4b99a;"></div></div>
+              <div style="flex:1;height:3px;background:#e5dccb;border-radius:2px;overflow:hidden;"><div style="width:30%;height:100%;background:#8b7a5c;"></div></div>
+            </div>
+          </div>
+
+          <!-- 分隔 -->
+          <div style="border-top:1px dashed #e5dccb;margin:8px 0;"></div>
+
+          <!-- 让胜平负 -->
+          <div>
+            <div style="font-size:11px;font-weight:600;color:#6b5e4a;margin-bottom:6px;">让球胜平负 <span style="font-size:10px;color:#937b5c;font-weight:400;">曼联 -1球</span></div>
+            <div style="display:flex;gap:6px;font-family:system-ui,'Inter',sans-serif;">
+              <div style="flex:1;text-align:center;background:#f9f6ef;border-radius:5px;padding:8px 4px;">
+                <div style="font-size:20px;font-weight:600;color:#3d3628;">18.5%</div>
+                <div style="font-size:10px;color:#6b5e4a;">让胜</div>
+              </div>
+              <div style="flex:1;text-align:center;background:#f4f0e3;border-radius:5px;padding:8px 4px;border:2px solid #8b7a5c;">
+                <div style="font-size:20px;font-weight:700;color:#8b7a5c;">35.2%</div>
+                <div style="font-size:10px;color:#6b5e4a;">让平</div>
+              </div>
+              <div style="flex:1;text-align:center;background:#f9f6ef;border-radius:5px;padding:8px 4px;">
+                <div style="font-size:20px;font-weight:600;color:#3d3628;">46.3%</div>
+                <div style="font-size:10px;color:#6b5e4a;">让负</div>
+              </div>
+            </div>
+            <div style="display:flex;gap:6px;margin-top:6px;font-size:10px;">
+              <div style="flex:1;height:3px;background:#e5dccb;border-radius:2px;overflow:hidden;"><div style="width:19%;height:100%;background:#2d5a3b;"></div></div>
+              <div style="flex:1;height:3px;background:#e5dccb;border-radius:2px;overflow:hidden;"><div style="width:35%;height:100%;background:#c4b99a;"></div></div>
+              <div style="flex:1;height:3px;background:#e5dccb;border-radius:2px;overflow:hidden;"><div style="width:46%;height:100%;background:#8b5a2c;"></div></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 板块二：Model B → 进球数 + 比分 -->
+        <div style="background:#fff;border-radius:6px;padding:14px;border:1px solid #e5dccb;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+            <span style="background:#8b5a2c;color:#fff;font-size:9px;padding:2px 6px;border-radius:3px;font-family:system-ui,sans-serif;">模型 B</span>
+            <span style="font-size:13px;font-weight:700;">进球数 & 比分推导</span>
+            <span style="font-family:system-ui,'Inter',sans-serif;font-size:9px;color:#937b5c;margin-left:auto;">Poisson 回归</span>
+          </div>
+
+          <!-- 进球数 -->
+          <div style="margin-bottom:10px;">
+            <div style="font-size:11px;font-weight:600;color:#6b5e4a;margin-bottom:6px;">总进球数分布</div>
+            <div style="font-family:system-ui,'Inter',sans-serif;font-size:10px;">
+              <div style="display:flex;align-items:center;gap:4px;margin-bottom:3px;"><span style="width:28px;color:#6b5e4a;">0球</span><div style="flex:1;height:5px;background:#e5dccb;border-radius:2px;overflow:hidden;"><div style="width:6%;height:100%;background:#c4b99a;"></div></div><span style="width:22px;text-align:right;color:#937b5c;">6%</span></div>
+              <div style="display:flex;align-items:center;gap:4px;margin-bottom:3px;"><span style="width:28px;color:#6b5e4a;">1球</span><div style="flex:1;height:5px;background:#e5dccb;border-radius:2px;overflow:hidden;"><div style="width:17%;height:100%;background:#c4b99a;"></div></div><span style="width:22px;text-align:right;color:#937b5c;">17%</span></div>
+              <div style="display:flex;align-items:center;gap:4px;margin-bottom:3px;"><span style="width:28px;color:#6b5e4a;">2球</span><div style="flex:1;height:5px;background:#e5dccb;border-radius:2px;overflow:hidden;"><div style="width:24%;height:100%;background:#c4b99a;"></div></div><span style="width:22px;text-align:right;color:#937b5c;">24%</span></div>
+              <div style="display:flex;align-items:center;gap:4px;margin-bottom:3px;"><span style="width:28px;color:#2d5a3b;font-weight:600;">3球</span><div style="flex:1;height:5px;background:#e5dccb;border-radius:2px;overflow:hidden;"><div style="width:22%;height:100%;background:#2d5a3b;"></div></div><span style="width:22px;text-align:right;color:#2d5a3b;font-weight:600;">22%</span></div>
+              <div style="display:flex;align-items:center;gap:4px;"><span style="width:28px;color:#6b5e4a;">4+球</span><div style="flex:1;height:5px;background:#e5dccb;border-radius:2px;overflow:hidden;"><div style="width:31%;height:100%;background:#8b7a5c;"></div></div><span style="width:22px;text-align:right;color:#937b5c;">31%</span></div>
+            </div>
+            <div style="margin-top:6px;font-family:system-ui,'Inter',sans-serif;font-size:11px;color:#6b5e4a;text-align:center;">
+              预期总进球 <span style="font-weight:700;color:#3d3628;font-size:16px;">2.8</span> 球 &nbsp;·&nbsp; 大 2.5 概率 <span style="font-weight:600;color:#2d5a3b;">58%</span>
+            </div>
+          </div>
+
+          <!-- 分隔 -->
+          <div style="border-top:1px dashed #e5dccb;margin:8px 0;"></div>
+
+          <!-- 比分推导 -->
+          <div>
+            <div style="font-size:11px;font-weight:600;color:#6b5e4a;margin-bottom:6px;">参考比分 Top5 <span style="font-size:9px;color:#937b5c;font-weight:400;">模型A + 模型B 联合推导</span></div>
+            <div style="font-family:system-ui,'Inter',sans-serif;">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;background:#f4f0e3;border-radius:4px;margin-bottom:3px;font-size:12px;"><span style="font-weight:700;color:#2d5a3b;">2 : 1</span><span style="font-weight:600;color:#2d5a3b;">16.2%</span><span style="font-size:9px;color:#937b5c;">主胜</span></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;margin-bottom:3px;font-size:12px;"><span style="font-weight:600;color:#3d3628;">1 : 1</span><span style="color:#3d3628;">11.8%</span><span style="font-size:9px;color:#937b5c;">平局</span></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;margin-bottom:3px;font-size:12px;"><span style="font-weight:600;color:#3d3628;">1 : 2</span><span style="color:#3d3628;">9.3%</span><span style="font-size:9px;color:#937b5c;">客胜</span></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;margin-bottom:3px;font-size:12px;"><span style="font-weight:600;color:#3d3628;">2 : 0</span><span style="color:#3d3628;">7.5%</span><span style="font-size:9px;color:#937b5c;">主胜</span></div>
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:5px 8px;font-size:12px;"><span style="font-weight:600;color:#3d3628;">0 : 0</span><span style="color:#3d3628;">5.1%</span><span style="font-size:9px;color:#937b5c;">平局</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 底部：预测报告摘要 -->
+    <div style="padding:14px 20px;background:#f9f6ef;border-top:1px solid #e5dccb;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <span style="font-size:14px;font-weight:700;">本场预测报告摘要</span>
+        <span style="font-family:system-ui,'Inter',sans-serif;font-size:10px;color:#937b5c;">基于模型 v2.4.1 · 2026-07-23 09:00</span>
+      </div>
+      <div style="background:#fff;border-radius:6px;border:1px solid #e5dccb;padding:14px;font-size:13px;line-height:1.9;">
+        <div style="padding:8px 12px;background:#f4f0e3;border-radius:4px;margin-bottom:10px;border-left:3px solid #2d5a3b;">
+          <span style="font-weight:700;color:#2d5a3b;">综合预测：</span>曼联略占优势，但利物浦客场竞争力强，冷门风险较高，建议谨慎参考。
+        </div>
+        <div style="display:flex;gap:10px;margin-bottom:10px;font-family:system-ui,'Inter',sans-serif;">
+          <div style="flex:1;background:#f9f6ef;border-radius:4px;padding:8px;text-align:center;"><div style="font-size:9px;color:#937b5c;">胜平负</div><div style="font-size:14px;font-weight:700;color:#2d5a3b;">主胜 42.3%</div></div>
+          <div style="flex:1;background:#f9f6ef;border-radius:4px;padding:8px;text-align:center;"><div style="font-size:9px;color:#937b5c;">让球(-1)</div><div style="font-size:14px;font-weight:700;color:#8b5a2c;">让负 46.3%</div></div>
+          <div style="flex:1;background:#f9f6ef;border-radius:4px;padding:8px;text-align:center;"><div style="font-size:9px;color:#937b5c;">总进球</div><div style="font-size:14px;font-weight:700;color:#3d3628;">2.8 球</div></div>
+          <div style="flex:1;background:#f9f6ef;border-radius:4px;padding:8px;text-align:center;"><div style="font-size:9px;color:#937b5c;">参考比分</div><div style="font-size:14px;font-weight:700;color:#2d5a3b;">2:1 · 16.2%</div></div>
+        </div>
+        <div style="padding:6px 10px;background:#fff8ee;border-radius:4px;border:1px solid #f0d9a0;font-family:system-ui,'Inter',sans-serif;font-size:10px;display:flex;align-items:center;gap:6px;color:#8a6200;">
+          <span style="font-size:13px;">⚠</span> 赔率离散度偏高（0.12），本场标记为冷门预警。模型置信度 71%，建议结合临场信息判断。
+        </div>
+      </div>
+      <div style="display:flex;justify-content:flex-end;gap:6px;margin-top:10px;font-family:system-ui,'Inter',sans-serif;">
+        <button style="background:#fff;border:1px solid #d9cebc;color:#3d3628;padding:5px 12px;border-radius:4px;font-size:10px;">复制报告</button>
+        <button style="background:#2d5a3b;border:1px solid #2d5a3b;color:#fff;padding:5px 12px;border-radius:4px;font-size:10px;">导出本场 PDF</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="options" style="margin-top:24px;">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>左底座 + 右预测 · 双板块（当前方案）</h3>
+      <p>左侧大区展示数据底座（雷达/交锋/赔率），右侧分模型A（胜平负+让球）和模型B（进球+比分）两个独立板块。信息流从证据到结论，逻辑清晰</p>
+    </div>
+  </div>
+  <div class="option" data-choice="b" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>上底座 + 下预测</h3>
+      <p>上半屏展示数据底座，下半屏展示预测结果。纵向信息流，适合移动端，但 PC 端需大量滚动</p>
+    </div>
+  </div>
+</div>

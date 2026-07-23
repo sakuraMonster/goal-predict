@@ -1,0 +1,164 @@
+<h2>球队名称映射管理</h2>
+<p class="subtitle">三层匹配中 L3 人工确认的操作界面，数据清洗闭环关键环节</p>
+
+<div class="mockup" style="margin-top: 28px;">
+  <div class="mockup-header">结构：统计概览 → 待确认队列 → 已确认映射表</div>
+  <div class="mockup-body" style="padding:0;background:#f5f0e8;color:#3d3628;font-family:Georgia,'Noto Serif SC',serif;">
+    
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:#ede6d9;border-bottom:1px solid #d9cebc;">
+      <span style="font-weight:700;font-size:16px;letter-spacing:1px;">球队映射管理</span>
+      <span style="font-family:system-ui,'Inter',sans-serif;font-size:12px;color:#6b5e4a;">赛季 2025-2026</span>
+    </div>
+
+    <!-- Stats -->
+    <div style="display:flex;gap:12px;padding:14px 20px;border-bottom:1px solid #e5dccb;">
+      <div style="flex:1;background:#fff;border-radius:6px;padding:12px;border:1px solid #e5dccb;text-align:center;font-family:system-ui,'Inter',sans-serif;">
+        <div style="font-size:10px;color:#937b5c;">总需映射</div>
+        <div style="font-size:22px;font-weight:700;color:#3d3628;">186</div>
+        <div style="font-size:10px;color:#6b5e4a;">球队</div>
+      </div>
+      <div style="flex:1;background:#fff;border-radius:6px;padding:12px;border:1px solid #e5dccb;text-align:center;font-family:system-ui,'Inter',sans-serif;">
+        <div style="font-size:10px;color:#937b5c;">已自动匹配</div>
+        <div style="font-size:22px;font-weight:700;color:#2d5a3b;">158</div>
+        <div style="font-size:10px;color:#6b5e4a;">L1+L2 · 84.9%</div>
+      </div>
+      <div style="flex:1;background:#fff;border-radius:6px;padding:12px;border:1px solid #e5dccb;text-align:center;font-family:system-ui,'Inter',sans-serif;">
+        <div style="font-size:10px;color:#937b5c;">待人工确认</div>
+        <div style="font-size:22px;font-weight:700;color:#c77600;">28</div>
+        <div style="font-size:10px;color:#6b5e4a;">L3 · 15.1%</div>
+      </div>
+      <div style="flex:2;background:#fff;border-radius:6px;padding:12px;border:1px solid #e5dccb;font-family:system-ui,'Inter',sans-serif;">
+        <div style="font-size:10px;color:#937b5c;margin-bottom:4px;">联赛筛选</div>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;font-size:10px;">
+          <span style="background:#f4f0e3;color:#2d5a3b;padding:3px 8px;border-radius:3px;border:1px solid #d9cebc;">英超</span>
+          <span style="background:#f9f6ef;color:#6b5e4a;padding:3px 8px;border-radius:3px;border:1px solid #e5dccb;">西甲</span>
+          <span style="background:#f9f6ef;color:#6b5e4a;padding:3px 8px;border-radius:3px;border:1px solid #e5dccb;">德甲</span>
+          <span style="background:#f9f6ef;color:#6b5e4a;padding:3px 8px;border-radius:3px;border:1px solid #e5dccb;">日职</span>
+          <span style="background:#f9f6ef;color:#6b5e4a;padding:3px 8px;border-radius:3px;border:1px solid #e5dccb;">法甲</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Pending queue header -->
+    <div style="padding:14px 20px 8px;display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <span style="font-size:14px;font-weight:700;">待确认映射</span>
+        <span style="font-family:system-ui,'Inter',sans-serif;font-size:10px;color:#937b5c;margin-left:8px;">28 条待处理</span>
+      </div>
+      <div style="font-family:system-ui,'Inter',sans-serif;display:flex;gap:8px;">
+        <input class="mock-input" placeholder="搜索球队名..." style="font-size:11px;padding:4px 10px;width:160px;">
+        <button class="mock-button" style="font-size:11px;padding:4px 12px;">搜索 SportMonks</button>
+      </div>
+    </div>
+
+    <!-- Pending items -->
+    <div style="padding:0 20px 14px;display:flex;gap:12px;flex-wrap:wrap;">
+      <!-- Item 1 -->
+      <div style="width:48%;background:#fff;border-radius:6px;border:1px solid #e5dccb;padding:12px;font-family:system-ui,'Inter',sans-serif;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <div>
+            <span style="font-size:10px;color:#937b5c;">英超 · 来源 500.com</span>
+            <div style="font-size:14px;font-weight:700;color:#3d3628;margin-top:2px;">托特纳姆热刺</div>
+          </div>
+          <span style="background:#fff3e0;color:#c77600;padding:2px 8px;border-radius:3px;font-size:9px;">L3 待确认</span>
+        </div>
+        <div style="font-size:10px;color:#6b5e4a;margin-bottom:6px;">模糊匹配候选（编辑距离排序）：</div>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <div style="display:flex;align-items:center;padding:5px 8px;background:#f4f0e3;border-radius:4px;border:2px solid #2d5a3b;justify-content:space-between;">
+            <span style="font-weight:600;color:#2d5a3b;">Tottenham Hotspur</span>
+            <span style="font-size:10px;color:#937b5c;">相似度 92% · SportMonks #183</span>
+            <button style="background:#2d5a3b;color:#fff;border:none;border-radius:3px;padding:3px 10px;font-size:10px;">确认匹配</button>
+          </div>
+          <div style="display:flex;align-items:center;padding:5px 8px;background:#f9f6ef;border-radius:4px;justify-content:space-between;">
+            <span style="color:#3d3628;">Tottenham</span>
+            <span style="font-size:10px;color:#937b5c;">相似度 68%</span>
+            <button style="background:#fff;color:#3d3628;border:1px solid #d9cebc;border-radius:3px;padding:3px 10px;font-size:10px;">选择此项</button>
+          </div>
+        </div>
+        <div style="margin-top:8px;display:flex;gap:8px;justify-content:flex-end;">
+          <button style="background:#fff;color:#6b5e4a;border:1px solid #d9cebc;border-radius:3px;padding:3px 10px;font-size:10px;">手动搜索</button>
+          <button style="background:#fff;color:#c77600;border:1px solid #f0d9a0;border-radius:3px;padding:3px 10px;font-size:10px;">标记忽略</button>
+        </div>
+      </div>
+      <!-- Item 2 -->
+      <div style="width:48%;background:#fff;border-radius:6px;border:1px solid #e5dccb;padding:12px;font-family:system-ui,'Inter',sans-serif;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <div>
+            <span style="font-size:10px;color:#937b5c;">日职 · 来源 500.com</span>
+            <div style="font-size:14px;font-weight:700;color:#3d3628;margin-top:2px;">大阪钢巴</div>
+          </div>
+          <span style="background:#fff3e0;color:#c77600;padding:2px 8px;border-radius:3px;font-size:9px;">L3 待确认</span>
+        </div>
+        <div style="font-size:10px;color:#6b5e4a;margin-bottom:6px;">模糊匹配候选（编辑距离排序）：</div>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <div style="display:flex;align-items:center;padding:5px 8px;background:#f4f0e3;border-radius:4px;border:2px solid #2d5a3b;justify-content:space-between;">
+            <span style="font-weight:600;color:#2d5a3b;">Gamba Osaka</span>
+            <span style="font-size:10px;color:#937b5c;">相似度 88% · SportMonks #3124</span>
+            <button style="background:#2d5a3b;color:#fff;border:none;border-radius:3px;padding:3px 10px;font-size:10px;">确认匹配</button>
+          </div>
+          <div style="display:flex;align-items:center;padding:5px 8px;background:#f9f6ef;border-radius:4px;justify-content:space-between;">
+            <span style="color:#3d3628;">Cerezo Osaka</span>
+            <span style="font-size:10px;color:#937b5c;">相似度 45%</span>
+            <button style="background:#fff;color:#3d3628;border:1px solid #d9cebc;border-radius:3px;padding:3px 10px;font-size:10px;">选择此项</button>
+          </div>
+        </div>
+        <div style="margin-top:8px;display:flex;gap:8px;justify-content:flex-end;">
+          <button style="background:#fff;color:#6b5e4a;border:1px solid #d9cebc;border-radius:3px;padding:3px 10px;font-size:10px;">手动搜索</button>
+          <button style="background:#fff;color:#c77600;border:1px solid #f0d9a0;border-radius:3px;padding:3px 10px;font-size:10px;">标记忽略</button>
+        </div>
+      </div>
+      <!-- Item 3 -->
+      <div style="width:48%;background:#fff;border-radius:6px;border:1px solid #e5dccb;padding:12px;font-family:system-ui,'Inter',sans-serif;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+          <div>
+            <span style="font-size:10px;color:#937b5c;">西甲 · 来源 500.com</span>
+            <div style="font-size:14px;font-weight:700;color:#3d3628;margin-top:2px;">皇家贝蒂斯</div>
+          </div>
+          <span style="background:#fff3e0;color:#c77600;padding:2px 8px;border-radius:3px;font-size:9px;">L3 待确认</span>
+        </div>
+        <div style="font-size:10px;color:#6b5e4a;margin-bottom:6px;">模糊匹配候选（编辑距离排序）：</div>
+        <div style="display:flex;flex-direction:column;gap:4px;">
+          <div style="display:flex;align-items:center;padding:5px 8px;background:#f4f0e3;border-radius:4px;border:2px solid #2d5a3b;justify-content:space-between;">
+            <span style="font-weight:600;color:#2d5a3b;">Real Betis</span>
+            <span style="font-size:10px;color:#937b5c;">相似度 95% · SportMonks #527</span>
+            <button style="background:#2d5a3b;color:#fff;border:none;border-radius:3px;padding:3px 10px;font-size:10px;">确认匹配</button>
+          </div>
+        </div>
+        <div style="margin-top:8px;display:flex;gap:8px;justify-content:flex-end;">
+          <button style="background:#fff;color:#6b5e4a;border:1px solid #d9cebc;border-radius:3px;padding:3px 10px;font-size:10px;">手动搜索</button>
+          <button style="background:#fff;color:#c77600;border:1px solid #f0d9a0;border-radius:3px;padding:3px 10px;font-size:10px;">标记忽略</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Confirmed mappings table -->
+    <div style="padding:0 20px 14px;">
+      <div style="font-size:14px;font-weight:700;margin-bottom:8px;">已确认映射 <span style="font-family:system-ui,'Inter',sans-serif;font-size:9px;color:#937b5c;font-weight:400;">158 条</span></div>
+      <div style="background:#fff;border-radius:6px;border:1px solid #e5dccb;overflow:hidden;font-family:system-ui,'Inter',sans-serif;font-size:11px;">
+        <div style="display:flex;background:#f9f6ef;border-bottom:1px solid #e5dccb;font-weight:600;font-size:10px;color:#6b5e4a;">
+          <span style="padding:6px 12px;width:60px;">联赛</span>
+          <span style="padding:6px 0;width:130px;">中文名 (500.com)</span>
+          <span style="padding:6px 0;flex:1;">英文名 (SportMonks)</span>
+          <span style="padding:6px 0;width:70px;text-align:center;">匹配方式</span>
+          <span style="padding:6px 0;width:80px;text-align:center;">赛季</span>
+          <span style="padding:6px 0;width:60px;text-align:center;">操作</span>
+        </div>
+        <div style="display:flex;align-items:center;border-bottom:1px solid #f4f0e3;"><span style="padding:6px 12px;width:60px;color:#937b5c;">英超</span><span style="padding:6px 0;width:130px;">曼彻斯特城</span><span style="padding:6px 0;flex:1;">Manchester City</span><span style="padding:6px 0;width:70px;text-align:center;"><span style="background:#e8f0e0;color:#2d5a3b;padding:1px 6px;border-radius:2px;font-size:9px;">L1 精确</span></span><span style="padding:6px 0;width:80px;text-align:center;color:#6b5e4a;">2025-26</span><span style="padding:6px 0;width:60px;text-align:center;color:#937b5c;font-size:10px;">编辑</span></div>
+        <div style="display:flex;align-items:center;border-bottom:1px solid #f4f0e3;"><span style="padding:6px 12px;width:60px;color:#937b5c;">英超</span><span style="padding:6px 0;width:130px;">曼彻斯特联</span><span style="padding:6px 0;flex:1;">Manchester United</span><span style="padding:6px 0;width:70px;text-align:center;"><span style="background:#e8f0e0;color:#2d5a3b;padding:1px 6px;border-radius:2px;font-size:9px;">L1 精确</span></span><span style="padding:6px 0;width:80px;text-align:center;color:#6b5e4a;">2025-26</span><span style="padding:6px 0;width:60px;text-align:center;color:#937b5c;font-size:10px;">编辑</span></div>
+        <div style="display:flex;align-items:center;border-bottom:1px solid #f4f0e3;"><span style="padding:6px 12px;width:60px;color:#937b5c;">西甲</span><span style="padding:6px 0;width:130px;">皇家马德里</span><span style="padding:6px 0;flex:1;">Real Madrid</span><span style="padding:6px 0;width:70px;text-align:center;"><span style="background:#e8f0e0;color:#2d5a3b;padding:1px 6px;border-radius:2px;font-size:9px;">L1 精确</span></span><span style="padding:6px 0;width:80px;text-align:center;color:#6b5e4a;">2025-26</span><span style="padding:6px 0;width:60px;text-align:center;color:#937b5c;font-size:10px;">编辑</span></div>
+        <div style="display:flex;align-items:center;border-bottom:1px solid #f4f0e3;"><span style="padding:6px 12px;width:60px;color:#937b5c;">西甲</span><span style="padding:6px 0;width:130px;">巴塞罗那</span><span style="padding:6px 0;flex:1;">Barcelona</span><span style="padding:6px 0;width:70px;text-align:center;"><span style="background:#f4f0e3;color:#8b7a5c;padding:1px 6px;border-radius:2px;font-size:9px;">L2 模糊</span></span><span style="padding:6px 0;width:80px;text-align:center;color:#6b5e4a;">2025-26</span><span style="padding:6px 0;width:60px;text-align:center;color:#937b5c;font-size:10px;">编辑</span></div>
+        <div style="display:flex;align-items:center;"><span style="padding:6px 12px;width:60px;color:#937b5c;">日职</span><span style="padding:6px 0;width:130px;">浦和红钻</span><span style="padding:6px 0;flex:1;">Urawa Red Diamonds</span><span style="padding:6px 0;width:70px;text-align:center;"><span style="background:#fff3e0;color:#c77600;padding:1px 6px;border-radius:2px;font-size:9px;">L3 人工</span></span><span style="padding:6px 0;width:80px;text-align:center;color:#6b5e4a;">2025-26</span><span style="padding:6px 0;width:60px;text-align:center;color:#937b5c;font-size:10px;">编辑</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="options" style="margin-top:24px;">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>确认此设计</h3>
+      <p>概览统计 + 联赛快捷筛选 + 待确认卡片队列（候选列表+操作按钮）+ 已确认映射表</p>
+    </div>
+  </div>
+</div>

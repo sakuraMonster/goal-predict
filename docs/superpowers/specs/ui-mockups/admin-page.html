@@ -1,0 +1,136 @@
+<h2>系统管理</h2>
+<p class="subtitle">数据同步状态监控 + 手动触发 + 日志查看</p>
+
+<div class="mockup" style="margin-top: 28px;">
+  <div class="mockup-header">结构：任务状态面板 → 手动操作区 → 最近日志</div>
+  <div class="mockup-body" style="padding:0;background:#f5f0e8;color:#3d3628;font-family:Georgia,'Noto Serif SC',serif;">
+    
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:#ede6d9;border-bottom:1px solid #d9cebc;">
+      <span style="font-weight:700;font-size:16px;letter-spacing:1px;">系统管理</span>
+      <span style="font-family:system-ui,'Inter',sans-serif;font-size:12px;color:#6b5e4a;">服务运行中 · 上次重启 2026-07-22</span>
+    </div>
+
+    <!-- Task status cards -->
+    <div style="padding:14px 20px;border-bottom:1px solid #e5dccb;">
+      <div style="font-size:13px;font-weight:700;margin-bottom:10px;">定时任务状态</div>
+      <div style="display:flex;gap:12px;">
+        <div style="flex:1;background:#fff;border-radius:6px;padding:12px;border:1px solid #e5dccb;font-family:system-ui,'Inter',sans-serif;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <span style="width:8px;height:8px;background:#2d5a3b;border-radius:50%;"></span>
+            <span style="font-weight:600;font-size:12px;color:#3d3628;">赛程同步</span>
+            <span style="margin-left:auto;font-size:10px;color:#937b5c;">每日 09:00 / 12:00</span>
+          </div>
+          <div style="font-size:10px;color:#6b5e4a;line-height:1.8;">
+            上次执行：<span style="color:#2d5a3b;">2026-07-23 09:00 · 成功</span><br>
+            下次执行：2026-07-23 12:00<br>
+            同步场次：12 场 · 耗时 23s
+          </div>
+        </div>
+        <div style="flex:1;background:#fff;border-radius:6px;padding:12px;border:1px solid #e5dccb;font-family:system-ui,'Inter',sans-serif;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <span style="width:8px;height:8px;background:#2d5a3b;border-radius:50%;"></span>
+            <span style="font-weight:600;font-size:12px;color:#3d3628;">赔率更新</span>
+            <span style="margin-left:auto;font-size:10px;color:#937b5c;">09:00 / 14:00 / 18:00</span>
+          </div>
+          <div style="font-size:10px;color:#6b5e4a;line-height:1.8;">
+            上次执行：<span style="color:#2d5a3b;">2026-07-23 09:00 · 成功</span><br>
+            下次执行：2026-07-23 14:00<br>
+            更新场次：12 场 · 耗时 41s
+          </div>
+        </div>
+        <div style="flex:1;background:#fff;border-radius:6px;padding:12px;border:1px solid #e5dccb;font-family:system-ui,'Inter',sans-serif;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <span style="width:8px;height:8px;background:#c4b99a;border-radius:50%;"></span>
+            <span style="font-weight:600;font-size:12px;color:#3d3628;">球队信息更新</span>
+            <span style="margin-left:auto;font-size:10px;color:#937b5c;">每日 03:00</span>
+          </div>
+          <div style="font-size:10px;color:#6b5e4a;line-height:1.8;">
+            上次执行：<span style="color:#2d5a3b;">2026-07-23 03:00 · 成功</span><br>
+            下次执行：2026-07-24 03:00<br>
+            更新球队：48 支 · 耗时 156s
+          </div>
+        </div>
+        <div style="flex:1;background:#fff;border-radius:6px;padding:12px;border:1px solid #e5dccb;font-family:system-ui,'Inter',sans-serif;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <span style="width:8px;height:8px;background:#c4b99a;border-radius:50%;"></span>
+            <span style="font-weight:600;font-size:12px;color:#3d3628;">模型重训练</span>
+            <span style="margin-left:auto;font-size:10px;color:#937b5c;">每周一 04:00</span>
+          </div>
+          <div style="font-size:10px;color:#6b5e4a;line-height:1.8;">
+            上次执行：<span style="color:#2d5a3b;">2026-07-21 04:00 · 成功</span><br>
+            下次执行：2026-07-28 04:00<br>
+            新增数据：248 场 · 耗时 320s
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Manual actions -->
+    <div style="padding:14px 20px;border-bottom:1px solid #e5dccb;">
+      <div style="font-size:13px;font-weight:700;margin-bottom:10px;">手动操作</div>
+      <div style="display:flex;gap:10px;font-family:system-ui,'Inter',sans-serif;">
+        <button style="flex:1;background:#fff;border:1px solid #d9cebc;border-radius:6px;padding:12px;text-align:center;color:#3d3628;">
+          <div style="font-size:13px;font-weight:600;margin-bottom:2px;">立即同步赛程</div>
+          <div style="font-size:10px;color:#937b5c;">拉取当日+未来3日竞彩赛事</div>
+        </button>
+        <button style="flex:1;background:#fff;border:1px solid #d9cebc;border-radius:6px;padding:12px;text-align:center;color:#3d3628;">
+          <div style="font-size:13px;font-weight:600;margin-bottom:2px;">立即刷新赔率</div>
+          <div style="font-size:10px;color:#937b5c;">同步欧赔/亚盘最新变动</div>
+        </button>
+        <button style="flex:1;background:#fff;border:1px solid #d9cebc;border-radius:6px;padding:12px;text-align:center;color:#3d3628;">
+          <div style="font-size:13px;font-weight:600;margin-bottom:2px;">更新球队信息</div>
+          <div style="font-size:10px;color:#937b5c;">伤病/阵容/积分排名全量刷新</div>
+        </button>
+        <button style="flex:1;background:#fff;border:1px solid #d9cebc;border-radius:6px;padding:12px;text-align:center;color:#3d3628;">
+          <div style="font-size:13px;font-weight:600;margin-bottom:2px;">触发模型重训练</div>
+          <div style="font-size:10px;color:#937b5c;">使用最新数据重新训练</div>
+        </button>
+      </div>
+    </div>
+
+    <!-- Recent logs -->
+    <div style="padding:14px 20px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <span style="font-size:13px;font-weight:700;">最近日志</span>
+        <span style="font-family:system-ui,'Inter',sans-serif;font-size:10px;color:#937b5c;">仅显示最近 48 小时</span>
+      </div>
+      <div style="background:#fff;border-radius:6px;border:1px solid #e5dccb;overflow:hidden;font-family:system-ui,'Inter',sans-serif;font-size:10px;">
+        <div style="padding:6px 14px;border-bottom:1px solid #f4f0e3;display:flex;align-items:center;gap:10px;">
+          <span style="color:#2d5a3b;font-weight:600;">&#10003;</span>
+          <span style="width:100px;color:#937b5c;">09:00:23</span>
+          <span style="color:#3d3628;">[赛程同步] 成功拉取 12 场赛事，新增 2 场，更新 3 场</span>
+        </div>
+        <div style="padding:6px 14px;border-bottom:1px solid #f4f0e3;display:flex;align-items:center;gap:10px;">
+          <span style="color:#2d5a3b;font-weight:600;">&#10003;</span>
+          <span style="width:100px;color:#937b5c;">09:00:45</span>
+          <span style="color:#3d3628;">[赔率更新] 12 场赔率已刷新，快照数 36</span>
+        </div>
+        <div style="padding:6px 14px;border-bottom:1px solid #f4f0e3;display:flex;align-items:center;gap:10px;">
+          <span style="color:#2d5a3b;font-weight:600;">&#10003;</span>
+          <span style="width:100px;color:#937b5c;">03:02:18</span>
+          <span style="color:#3d3628;">[球队信息] 48 支球队数据已更新，伤病变更 12 条</span>
+        </div>
+        <div style="padding:6px 14px;border-bottom:1px solid #f4f0e3;display:flex;align-items:center;gap:10px;">
+          <span style="color:#c77600;font-weight:600;">&#9888;</span>
+          <span style="width:100px;color:#937b5c;">07-22 12:00</span>
+          <span style="color:#c77600;">[赛程同步] 500.com 请求超时，重试 2/3 成功</span>
+        </div>
+        <div style="padding:6px 14px;display:flex;align-items:center;gap:10px;">
+          <span style="color:#c77600;font-weight:600;">&#9888;</span>
+          <span style="width:100px;color:#937b5c;">07-21 18:00</span>
+          <span style="color:#c77600;">[赔率更新] 3 场赛事赔率数据为空（早盘未开），已跳过</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="options" style="margin-top:24px;">
+  <div class="option" data-choice="a" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>确认此设计</h3>
+      <p>四任务状态卡片 + 四手动触发按钮 + 操作日志流，紧凑一屏展示</p>
+    </div>
+  </div>
+</div>

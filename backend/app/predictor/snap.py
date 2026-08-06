@@ -1,0 +1,36 @@
+"""SNAP Top2 算法 —— 距离预期进球最近的2个整数，唯一权威实现
+
+所有模块（预测/判定/前端）都应通过此模块调用，杜绝重复实现。
+"""
+
+SNAP_DOWN = 0.05  # 0.04(腓特烈斯塔) < 0.05 < 0.09(赫根) → 精确隔离
+SNAP_UP = 0.93    # 0.91(哈尔姆斯塔德) < 0.93 < 0.95(奥斯陆) → 精确隔离
+MAX_GOALS = 6  # 6=6+
+
+
+def snap_effective(expected_goals: float) -> float:
+    """SNAP 修正后的 effective λ：
+    - 小数部分 < 0.10 → 降级: floor(λ) - 1 (cap 0)
+    - 小数部分 > 0.90 → 升级: ceil(λ) + 1 (cap 6)
+    - 否则保持原值
+    """
+    frac = expected_goals - int(expected_goals)
+    if frac < SNAP_DOWN:
+        return float(max(0, int(expected_goals) - 1))
+    elif frac > SNAP_UP:
+        return float(min(MAX_GOALS, int(expected_goals) + 2))
+    return expected_goals
+
+
+def snap_top2(expected_goals: float) -> list[int]:
+    """返回距离 effective λ 最近的2个整数（0-6 范围内）"""
+    effective = snap_effective(expected_goals)
+    dists = [(i, abs(effective - i)) for i in range(MAX_GOALS + 1)]
+    dists.sort(key=lambda x: x[1])
+    return [dists[0][0], dists[1][0]]
+
+
+def judge_goals(total_goals: int, expected_goals: float) -> int:
+    """判定进球数是否命中：实际总进球是否在 SNAP Top2 范围内"""
+    top2 = snap_top2(expected_goals)
+    return 1 if total_goals in top2 else -1

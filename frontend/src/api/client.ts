@@ -2,7 +2,7 @@ import axios from "axios";
 
 const api = axios.create({
   baseURL: "/api",
-  timeout: 10000,
+  timeout: 30000,
   headers: { "Content-Type": "application/json" },
 });
 
@@ -15,6 +15,64 @@ export interface MatchSummary {
   status: string;
 }
 
+export interface KeyFactorItem {
+  feature: string;
+  value: string;
+  impact: string;
+  importance?: number;
+  contribution?: number;
+}
+
+export interface ModelAAnalysis {
+  method: string;
+  pred_direction: string;
+  pred_prob: number;
+  reasoning: string;
+  top_features: KeyFactorItem[];
+  other_features: KeyFactorItem[];
+  full_probs: Record<string, number>;
+}
+
+export interface ModelBAnalysis {
+  method: string;
+  lambda: number;
+  over_2_5_prob: number;
+  reasoning: string;
+  push_factors: KeyFactorItem[];
+  pull_factors: KeyFactorItem[];
+  goal_distribution: number[];
+}
+
+export interface KeyFactors {
+  model_a: ModelAAnalysis;
+  model_b: ModelBAnalysis;
+  joint_analysis: string;
+}
+
+export interface ColdCorrection {
+  model_original: { home: number; draw: number; away: number };
+  market_implied: { home: number; draw: number; away: number };
+  blend_ratio: { model: number; market: number };
+  reason: string;
+}
+
+export interface ModelCDetail {
+  goal_line: number;
+  calib: number;
+  strength_adj: number;
+  form_adj: number;
+  drop_adj: number;
+  lambda_raw: number;
+  low_score_applied: boolean;
+  low_score_factor: number | null;
+  home_goals_avg: number;
+  away_goals_avg: number;
+  home_gf_avg_6: number;
+  away_gf_avg_6: number;
+  goal_drop: number;
+  league_name: string | null;
+}
+
 export interface PredictionData {
   home_prob: number;
   draw_prob: number;
@@ -23,13 +81,28 @@ export interface PredictionData {
   handicap_draw_prob: number;
   handicap_away_prob: number;
   expected_goals: number;
+  expected_goals_c?: number;       // Model C 市场基线预测
+  snap_top2_c?: number[];          // Model C SNAP
+  model_c_detail?: ModelCDetail;   // Model C 计算明细
   over_2_5_prob: number;
   goal_distribution: number[];
   score_top5_json: Array<{ score: string; prob: number; result: string }>;
   confidence_level: string;
   is_cold_match: boolean;
+  cold_correction: ColdCorrection | null;
   summary_text: string;
+  key_factors: KeyFactors | null;
   model_version: string;
+  risk_warning?: string[];  // V4.12: 数据质量警告列表
+  // 赛果
+  actual_home_score?: number;
+  actual_away_score?: number;
+  actual_total_goals?: number;
+  actual_score?: string;
+  result_spf?: number;
+  result_hcp?: number;
+  result_goals?: number;
+  result_score?: number;
 }
 
 export const getMatches = (params?: { date?: string; league_id?: number }) =>
@@ -42,7 +115,7 @@ export const getMatchDates = () =>
   api.get("/matches/dates").then((r) => r.data);
 
 export const getLeagues = (date?: string) =>
-  api.get("/matches/leagues", { params: { date } }).then((r) => r.data);
+  api.get("/matches/leagues", { params: date ? { date } : {} }).then((r) => r.data);
 
 export const getOddsHistory = (matchId: number) =>
   api.get(`/matches/${matchId}/odds-history`).then((r) => r.data);
@@ -59,11 +132,20 @@ export const getTeamRadar = (teamId: number) =>
 export const getTeamForm = (teamId: number) =>
   api.get(`/teams/${teamId}/form`).then((r) => r.data);
 
-export const getDailyReport = () =>
-  api.get("/reports/daily").then((r) => r.data);
+export const getMatchTeamComparison = (matchId: number) =>
+  api.get(`/teams/match/${matchId}/comparison`).then((r) => r.data);
 
-export const getDailySummary = () =>
-  api.get("/reports/daily/summary").then((r) => r.data);
+export const getDailyReport = (date?: string) =>
+  api.get("/reports/daily", { params: date ? { date } : {} }).then((r) => r.data);
+
+export const getReportRange = (params: { date_from: string; date_to: string; league_id?: number }) =>
+  api.get("/reports/range", { params }).then((r) => r.data);
+
+export const getDailySummary = (date?: string) =>
+  api.get("/reports/daily/summary", { params: date ? { date } : {} }).then((r) => r.data);
+
+export const updateResults = (date?: string) =>
+  api.post("/reports/update-results", null, { params: date ? { date } : {} }).then((r) => r.data);
 
 export const getReviewSummary = (days: number = 30) =>
   api.get("/predictions/review/summary", { params: { days } }).then((r) => r.data);
@@ -71,7 +153,43 @@ export const getReviewSummary = (days: number = 30) =>
 export const getReviewTrend = (days: number = 30) =>
   api.get("/predictions/review/trend", { params: { days } }).then((r) => r.data);
 
+export const getDailyReview = (date?: string) =>
+  api.get("/predictions/review/daily", { params: date ? { date } : {} }).then((r) => r.data);
+
 export const getPnL = (days: number = 30) =>
   api.get("/predictions/pnl", { params: { days } }).then((r) => r.data);
+
+export const getMappingStats = (type: string = "team") =>
+  api.get("/mappings/stats", { params: { type } }).then((r) => r.data);
+
+export const getLeagueMappings = (search?: string, status?: string) =>
+  api.get("/mappings/leagues", { params: { ...(search ? { search } : {}), ...(status ? { status } : {}) } }).then((r) => r.data);
+
+export const getTeamMappings = (leagueId?: number, search?: string, status?: string) =>
+  api.get("/mappings/teams", { params: { ...(leagueId ? { league_id: leagueId } : {}), ...(search ? { search } : {}), ...(status ? { status } : {}) } }).then((r) => r.data);
+
+export const getPendingMappings = (type: string = "team") =>
+  api.get("/mappings/pending", { params: { type } }).then((r) => r.data);
+
+export const confirmMapping = (payload: { type: string; id: number; name_zh?: string; name_en?: string; sportmonks_id?: number }) =>
+  api.post("/mappings/confirm", payload).then((r) => r.data);
+
+export const addAlias = (payload: { type: string; id: number; alias_name: string; source?: string }) =>
+  api.post("/mappings/add-alias", payload).then((r) => r.data);
+
+export const batchMatch = () =>
+  api.post("/mappings/batch-match").then((r) => r.data);
+
+export const predictModelC = () =>
+  api.post("/admin/predict-model-c").then((r) => r.data);
+
+export const syncOdds = () =>
+  api.post("/admin/sync-odds").then((r) => r.data);
+
+export const updateTeams = () =>
+  api.post("/admin/update-teams").then((r) => r.data);
+
+export const repredictModelB = (date: string) =>
+  api.post("/admin/repredict-model-b", null, { params: { date } }).then((r) => r.data);
 
 export default api;

@@ -3,18 +3,21 @@ import { getMatches, getMatchDates, getLeagues } from "../api/client";
 import MatchCard from "../components/MatchCard";
 import EmptyState from "../components/EmptyState";
 import SkeletonCard from "../components/Skeleton";
+import ErrorState from "../components/ErrorState";
 
 export default function Dashboard() {
   const [matches, setMatches] = useState<any[]>([]);
   const [dates, setDates] = useState<any[]>([]);
   const [leagues, setLeagues] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
   const [selectedLeague, setSelectedLeague] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<"all" | "cold" | "hot">("all");
 
   const fetchData = useCallback(() => {
     setLoading(true);
+    setError(null);
     const params: any = {};
     if (selectedDate) params.date = selectedDate;
     if (selectedLeague) params.league_id = selectedLeague;
@@ -28,9 +31,23 @@ export default function Dashboard() {
       if (m.status === "fulfilled") setMatches(m.value.data || []);
       if (d.status === "fulfilled") {
         setDates(d.value.data || []);
-        if (d.value.data?.length && !selectedDate) setSelectedDate(d.value.data[0].date);
+        // 默认选中今天或最近的未来日期
+        if (!selectedDate && d.value.data?.length) {
+          const today = new Date().toISOString().slice(0, 10);
+          const todayItem = d.value.data.find((item: any) => item.date === today);
+          const futureDates = d.value.data.filter((item: any) => !item.is_past);
+          if (todayItem) {
+            setSelectedDate(todayItem.date);
+          } else if (futureDates.length > 0) {
+            setSelectedDate(futureDates[0].date);
+          } else {
+            setSelectedDate(d.value.data[d.value.data.length - 1].date);
+          }
+        }
       }
       if (l.status === "fulfilled") setLeagues(l.value.data || []);
+    }).catch(() => {
+      setError("加载失败");
     }).finally(() => setLoading(false));
   }, [selectedDate, selectedLeague]);
 
@@ -42,22 +59,57 @@ export default function Dashboard() {
     ? matches.filter((m: any) => m.is_hot_match)
     : matches;
 
+  if (error) return <ErrorState message={error} onRetry={fetchData} />;
+
   return (
     <div className="flex">
-      <aside className="w-[150px] bg-parchment-light border-r border-border p-3.5 font-body text-xs text-ink-muted leading-loose flex-shrink-0">
+      <aside className="w-[150px] bg-parchment-light border-r border-border p-3.5 font-body text-xs text-ink-muted leading-loose flex-shrink-0 overflow-y-auto max-h-[calc(100vh-100px)]">
         <div className="font-semibold text-ink mb-1">日期</div>
-        {dates.map((d: any) => (
-          <div
-            key={d.date}
-            className={`cursor-pointer ${d.date === selectedDate ? "text-moss font-semibold" : ""}`}
-            onClick={() => setSelectedDate(d.date)}
-          >
-            {d.date.slice(5)} ({d.count}场)
-          </div>
-        ))}
+
+        {/* 日期快捷输入 */}
+        <div className="mb-2">
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className="w-full border border-border rounded px-1.5 py-1 text-[11px] bg-white text-ink focus:outline-none focus:border-moss"
+          />
+        </div>
+
+        {/* 历史日期（有赛事的） */}
+        {dates.filter((d: any) => d.is_past).length > 0 && (
+          <>
+            <div className="text-[10px] text-ink-muted/60 mb-0.5 mt-1">历史</div>
+            {dates.filter((d: any) => d.is_past).slice(-7).map((d: any) => (
+              <div
+                key={d.date}
+                className={`cursor-pointer hover:text-moss transition-colors ${d.date === selectedDate ? "text-moss font-semibold" : ""}`}
+                onClick={() => setSelectedDate(d.date)}
+              >
+                {d.date.slice(5)} ({d.count}场)
+              </div>
+            ))}
+          </>
+        )}
+
+        {/* 未来日期 */}
+        {dates.filter((d: any) => !d.is_past).length > 0 && (
+          <>
+            <div className="text-[10px] text-ink-muted/60 mb-0.5 mt-1">未来</div>
+            {dates.filter((d: any) => !d.is_past).map((d: any) => (
+              <div
+                key={d.date}
+                className={`cursor-pointer hover:text-moss transition-colors ${d.date === selectedDate ? "text-moss font-semibold" : ""}`}
+                onClick={() => setSelectedDate(d.date)}
+              >
+                {d.date.slice(5)} ({d.count}场)
+              </div>
+            ))}
+          </>
+        )}
         <div className="mt-3 font-semibold text-ink mb-1">联赛</div>
         <div
-          className={`cursor-pointer ${!selectedLeague ? "text-moss font-semibold" : ""}`}
+          className={`cursor-pointer hover:text-moss transition-colors ${!selectedLeague ? "text-moss font-semibold" : ""}`}
           onClick={() => setSelectedLeague(null)}
         >
           全部
@@ -65,7 +117,8 @@ export default function Dashboard() {
         {leagues.map((l: any) => (
           <div
             key={l.id}
-            className={`cursor-pointer hover:text-moss ${l.id === selectedLeague ? "text-moss font-semibold" : ""}`}
+            className={`cursor-pointer hover:text-moss truncate ${l.id === selectedLeague ? "text-moss font-semibold" : ""}`}
+            title={l.name}
             onClick={() => setSelectedLeague(l.id === selectedLeague ? null : l.id)}
           >
             {l.name}{l.count !== undefined ? ` (${l.count})` : ""}
@@ -87,7 +140,7 @@ export default function Dashboard() {
               </span>
             ))}
           </div>
-          <span className="font-body text-[10px] text-ink-light">共 {filteredMatches.length} 场</span>
+          <span className="font-body text-xs text-ink-light">共 {filteredMatches.length} 场</span>
           <button
             onClick={fetchData}
             disabled={loading}
@@ -103,44 +156,31 @@ export default function Dashboard() {
           </div>
         ) : matches.length === 0 ? (
           <EmptyState
-            onNextDay={() => {
+            message="当日无竞彩赛事"
+            description="暂无竞彩足球开售赛事，请选择其他日期查看"
+            actionLabel="查看明日"
+            onAction={() => {
               const idx = dates.findIndex((d: any) => d.date === selectedDate);
               if (idx >= 0 && idx < dates.length - 1) setSelectedDate(dates[idx + 1].date);
             }}
           />
         ) : filteredMatches.length === 0 ? (
           activeTab === "cold" ? (
-            <div className="flex items-center justify-center py-20">
-              <div className="text-center bg-white rounded-lg p-10 border border-border max-w-md">
-                <div className="text-5xl mb-3 opacity-30">☐</div>
-                <div className="text-base font-bold text-ink mb-2">暂无冷门预警赛事</div>
-                <div className="font-body text-xs text-ink-light leading-relaxed">
-                  当前筛选日期内的赛事模型置信度较高<br />暂无冷门预警触发
-                </div>
-                <div className="mt-4">
-                  <button onClick={() => setActiveTab("all")} className="bg-moss text-white px-3.5 py-1.5 rounded text-[11px]">
-                    查看全部赛事
-                  </button>
-                </div>
-              </div>
-            </div>
+            <EmptyState
+              message="暂无冷门预警赛事"
+              description="当前筛选日期内的赛事模型置信度较高，暂无冷门预警触发"
+              actionLabel="查看全部赛事"
+              onAction={() => setActiveTab("all")}
+            />
           ) : activeTab === "hot" ? (
-            <div className="flex items-center justify-center py-20">
-              <div className="text-center bg-white rounded-lg p-10 border border-border max-w-md">
-                <div className="text-5xl mb-3 opacity-30">☐</div>
-                <div className="text-base font-bold text-ink mb-2">暂无热门推荐赛事</div>
-                <div className="font-body text-xs text-ink-light leading-relaxed">
-                  当前暂无模型与市场共识高度一致的赛事<br />建议扩大日期范围查看
-                </div>
-                <div className="mt-4">
-                  <button onClick={() => setActiveTab("all")} className="bg-moss text-white px-3.5 py-1.5 rounded text-[11px]">
-                    查看全部赛事
-                  </button>
-                </div>
-              </div>
-            </div>
+            <EmptyState
+              message="暂无热门推荐赛事"
+              description="当前暂无模型与市场共识高度一致的赛事，建议扩大日期范围查看"
+              actionLabel="查看全部赛事"
+              onAction={() => setActiveTab("all")}
+            />
           ) : (
-            <EmptyState />
+            <EmptyState message="当日无竞彩赛事" description="暂无竞彩足球开售赛事，请选择其他日期查看" />
           )
         ) : (
           <div className="grid grid-cols-3 gap-3">

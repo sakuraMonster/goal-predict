@@ -17,7 +17,7 @@ async def get_redis() -> redis.Redis:
     """获取 Redis 连接（单例）"""
     global _redis_client
     if _redis_client is None:
-        _redis_client = redis.from_url(REDIS_URL, decode_responses=True)
+        _redis_client = redis.from_url(REDIS_URL, decode_responses=True, protocol=2)
     return _redis_client
 
 

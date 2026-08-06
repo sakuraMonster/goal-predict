@@ -1,0 +1,4397 @@
+{
+  "generated_at": "2026-07-28T08:50:18.266701+00:00",
+  "scope": "sporttery-team-alias-seed",
+  "league_count": 13,
+  "leagues": [
+    {
+      "key": "veikkausliiga",
+      "label": "芬超",
+      "target_league_name": "Veikkausliiga",
+      "alias_count": 2,
+      "aliases": [
+        {
+          "league_key": "veikkausliiga",
+          "league_label": "芬超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 592,
+          "source_team_name_zh": "拉赫蒂",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=592",
+          "sportmonks_team_id": 3420,
+          "sportmonks_team_name": "",
+          "sportmonks_short_code": "",
+          "confidence_score": 0.95,
+          "confidence_gap": 0.95,
+          "matched_signals": [
+            "old_seed_exact_match"
+          ],
+          "match_method": "bridged",
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "veikkausliiga",
+          "league_label": "芬超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 594,
+          "source_team_name_zh": "玛丽港",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=594",
+          "sportmonks_team_id": 850,
+          "sportmonks_team_name": "",
+          "sportmonks_short_code": "",
+          "confidence_score": 0.95,
+          "confidence_gap": 0.95,
+          "matched_signals": [
+            "old_seed_exact_match"
+          ],
+          "match_method": "bridged",
+          "status": "seed_confirmed"
+        }
+      ]
+    },
+    {
+      "key": "premier_league",
+      "label": "英超",
+      "target_league_name": "Premier League",
+      "alias_count": 20,
+      "aliases": [
+        {
+          "league_key": "premier_league",
+          "league_label": "英超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1011,
+          "source_team_name_zh": "利物浦",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1011",
+          "sportmonks_team_id": 8,
+          "sportmonks_team_name": "Liverpool",
+          "sportmonks_short_code": "LIV",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Liverpool"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "premier_league",
+          "league_label": "英超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1361,
+          "source_team_name_zh": "布伦特福德",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1361",
+          "sportmonks_team_id": 236,
+          "sportmonks_team_name": "Brentford",
+          "sportmonks_short_code": "BRE",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Brentford"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "premier_league",
+          "league_label": "英超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1314,
+          "source_team_name_zh": "伊普斯维奇",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1314",
+          "sportmonks_team_id": 116,
+          "sportmonks_team_name": "Ipswich Town",
+          "sportmonks_short_code": "IPS",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:ipswich town"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "premier_league",
+          "league_label": "英超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1238,
+          "source_team_name_zh": "托特纳姆热刺",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1238",
+          "sportmonks_team_id": 6,
+          "sportmonks_team_name": "Tottenham Hotspur",
+          "sportmonks_short_code": "TOT",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Tottenham Hotspur"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "premier_league",
+          "league_label": "英超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1173,
+          "source_team_name_zh": "切尔西",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1173",
+          "sportmonks_team_id": 18,
+          "sportmonks_team_name": "Chelsea",
+          "sportmonks_short_code": "CHE",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:chelsea"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "premier_league",
+          "league_label": "英超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1142,
+          "source_team_name_zh": "诺丁汉森林",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1142",
+          "sportmonks_team_id": 63,
+          "sportmonks_team_name": "Nottingham Forest",
+          "sportmonks_short_code": "NFO",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Nottingham Forest"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "premier_league",
+          "league_label": "英超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1137,
+          "source_team_name_zh": "纽卡斯尔联",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1137",
+          "sportmonks_team_id": 20,
+          "sportmonks_team_name": "Newcastle United",
+          "sportmonks_short_code": "NEW",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.447,
+          "matched_signals": [
+            "alias_exact:newcastle united"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "premier_league",
+          "league_label": "英超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1075,
+          "source_team_name_zh": "曼彻斯特联",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1075",
+          "sportmonks_team_id": 14,
+          "sportmonks_team_name": "Manchester United",
+          "sportmonks_short_code": "MUN",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.447,
+          "matched_signals": [
+            "alias_exact:Manchester United"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "premier_league",
+          "league_label": "英超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1072,
+          "source_team_name_zh": "曼彻斯特城",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1072",
+          "sportmonks_team_id": 9,
+          "sportmonks_team_name": "Manchester City",
+          "sportmonks_short_code": "MCI",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.447,
+          "matched_signals": [
+            "alias_exact:Manchester City"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "premier_league",
+          "league_label": "英超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1015,
+          "source_team_name_zh": "利兹联",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1015",
+          "sportmonks_team_id": 71,
+          "sportmonks_team_name": "Leeds United",
+          "sportmonks_short_code": "LEE",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.447,
+          "matched_signals": [
+            "alias_exact:Leeds United"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "premier_league",
+          "league_label": "英超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 466,
+          "source_team_name_zh": "桑德兰",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=466",
+          "sportmonks_team_id": 3,
+          "sportmonks_team_name": "Sunderland",
+          "sportmonks_short_code": "SUN",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Sunderland"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "premier_league",
+          "league_label": "英超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 930,
+          "source_team_name_zh": "考文垂",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=930",
+          "sportmonks_team_id": 117,
+          "sportmonks_team_name": "Coventry City",
+          "sportmonks_short_code": "CVC",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.447,
+          "matched_signals": [
+            "alias_exact:coventry city"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "premier_league",
+          "league_label": "英超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 872,
+          "source_team_name_zh": "赫尔城",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=872",
+          "sportmonks_team_id": 22,
+          "sportmonks_team_name": "Hull City",
+          "sportmonks_short_code": "HUL",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.447,
+          "matched_signals": [
+            "alias_exact:Hull City"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "premier_league",
+          "league_label": "英超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 811,
+          "source_team_name_zh": "富勒姆",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=811",
+          "sportmonks_team_id": 11,
+          "sportmonks_team_name": "Fulham",
+          "sportmonks_short_code": "FUL",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Fulham"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "premier_league",
+          "league_label": "英超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 721,
+          "source_team_name_zh": "布赖顿",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=721",
+          "sportmonks_team_id": 78,
+          "sportmonks_team_name": "Brighton & Hove Albion",
+          "sportmonks_short_code": "BHA",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Brighton & Hove Albion"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "premier_league",
+          "league_label": "英超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 667,
+          "source_team_name_zh": "伯恩茅斯",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=667",
+          "sportmonks_team_id": 52,
+          "sportmonks_team_name": "AFC Bournemouth",
+          "sportmonks_short_code": "BOU",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:AFC Bournemouth"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "premier_league",
+          "league_label": "英超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 565,
+          "source_team_name_zh": "埃弗顿",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=565",
+          "sportmonks_team_id": 13,
+          "sportmonks_team_name": "Everton",
+          "sportmonks_short_code": "EVE",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Everton"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "premier_league",
+          "league_label": "英超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 555,
+          "source_team_name_zh": "阿斯顿维拉",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=555",
+          "sportmonks_team_id": 15,
+          "sportmonks_team_name": "Aston Villa",
+          "sportmonks_short_code": "AVL",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Aston Villa"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "premier_league",
+          "league_label": "英超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 554,
+          "source_team_name_zh": "阿森纳",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=554",
+          "sportmonks_team_id": 19,
+          "sportmonks_team_name": "Arsenal",
+          "sportmonks_short_code": "ARS",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Arsenal"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "premier_league",
+          "league_label": "英超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 516,
+          "source_team_name_zh": "水晶宫",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=516",
+          "sportmonks_team_id": 51,
+          "sportmonks_team_name": "Crystal Palace",
+          "sportmonks_short_code": "CRY",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Crystal Palace"
+          ],
+          "status": "seed_confirmed"
+        }
+      ]
+    },
+    {
+      "key": "la_liga",
+      "label": "西甲",
+      "target_league_name": "La Liga",
+      "alias_count": 20,
+      "aliases": [
+        {
+          "league_key": "la_liga",
+          "league_label": "西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 690,
+          "source_team_name_zh": "毕尔巴鄂竞技",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=690",
+          "sportmonks_team_id": 13258,
+          "sportmonks_team_name": "Athletic Club",
+          "sportmonks_short_code": "ATH",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:athletic club"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "la_liga",
+          "league_label": "西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1283,
+          "source_team_name_zh": "西班牙人",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1283",
+          "sportmonks_team_id": 528,
+          "sportmonks_team_name": "Espanyol",
+          "sportmonks_short_code": "ESY",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Espanyol"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "la_liga",
+          "league_label": "西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1243,
+          "source_team_name_zh": "巴伦西亚",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1243",
+          "sportmonks_team_id": 214,
+          "sportmonks_team_name": "Valencia",
+          "sportmonks_short_code": "VAL",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Valencia"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "la_liga",
+          "league_label": "西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1056,
+          "source_team_name_zh": "马拉加",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1056",
+          "sportmonks_team_id": 126,
+          "sportmonks_team_name": "Málaga",
+          "sportmonks_short_code": "MLA",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Malaga"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "la_liga",
+          "league_label": "西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1046,
+          "source_team_name_zh": "马德里竞技",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1046",
+          "sportmonks_team_id": 7980,
+          "sportmonks_team_name": "Atlético de Madrid",
+          "sportmonks_short_code": "ATM",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.447,
+          "matched_signals": [
+            "alias_exact:Atletico de Madrid"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "la_liga",
+          "league_label": "西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 985,
+          "source_team_name_zh": "莱万特",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=985",
+          "sportmonks_team_id": 3457,
+          "sportmonks_team_name": "Levante",
+          "sportmonks_short_code": "LVT",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Levante"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "la_liga",
+          "league_label": "西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 959,
+          "source_team_name_zh": "拉科鲁尼亚",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=959",
+          "sportmonks_team_id": 429,
+          "sportmonks_team_name": "Deportivo La Coruña",
+          "sportmonks_short_code": "COR",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.468,
+          "matched_signals": [
+            "alias_exact:Deportivo La Coruna"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "la_liga",
+          "league_label": "西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 885,
+          "source_team_name_zh": "皇家社会",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=885",
+          "sportmonks_team_id": 594,
+          "sportmonks_team_name": "Real Sociedad",
+          "sportmonks_short_code": "RSO",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.447,
+          "matched_signals": [
+            "alias_exact:Real Sociedad"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "la_liga",
+          "league_label": "西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 883,
+          "source_team_name_zh": "皇家马德里",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=883",
+          "sportmonks_team_id": 3468,
+          "sportmonks_team_name": "Real Madrid",
+          "sportmonks_short_code": "RMA",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.447,
+          "matched_signals": [
+            "alias_exact:Real Madrid"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "la_liga",
+          "league_label": "西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 838,
+          "source_team_name_zh": "赫塔费",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=838",
+          "sportmonks_team_id": 106,
+          "sportmonks_team_name": "Getafe",
+          "sportmonks_short_code": "GET",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Getafe"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "la_liga",
+          "league_label": "西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 457,
+          "source_team_name_zh": "维戈塞尔塔",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=457",
+          "sportmonks_team_id": 36,
+          "sportmonks_team_name": "Celta de Vigo",
+          "sportmonks_short_code": "CEL",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.48,
+          "matched_signals": [
+            "alias_exact:celta de vigo"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "la_liga",
+          "league_label": "西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 683,
+          "source_team_name_zh": "比利亚雷亚尔",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=683",
+          "sportmonks_team_id": 3477,
+          "sportmonks_team_name": "Villarreal",
+          "sportmonks_short_code": "VIL",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Villarreal"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "la_liga",
+          "league_label": "西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 673,
+          "source_team_name_zh": "皇家贝蒂斯",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=673",
+          "sportmonks_team_id": 485,
+          "sportmonks_team_name": "Real Betis",
+          "sportmonks_short_code": "BET",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.447,
+          "matched_signals": [
+            "alias_exact:Real Betis"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "la_liga",
+          "league_label": "西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 653,
+          "source_team_name_zh": "巴塞罗那",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=653",
+          "sportmonks_team_id": 83,
+          "sportmonks_team_name": "FC Barcelona",
+          "sportmonks_short_code": "BAR",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:fc barcelona"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "la_liga",
+          "league_label": "西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 650,
+          "source_team_name_zh": "巴列卡诺",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=650",
+          "sportmonks_team_id": 377,
+          "sportmonks_team_name": "Rayo Vallecano",
+          "sportmonks_short_code": "RAY",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Rayo Vallecano"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "la_liga",
+          "league_label": "西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 622,
+          "source_team_name_zh": "奥萨苏纳",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=622",
+          "sportmonks_team_id": 459,
+          "sportmonks_team_name": "Osasuna",
+          "sportmonks_short_code": "OSA",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Osasuna"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "la_liga",
+          "league_label": "西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 564,
+          "source_team_name_zh": "埃尔切",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=564",
+          "sportmonks_team_id": 1099,
+          "sportmonks_team_name": "Elche",
+          "sportmonks_short_code": "ELC",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Elche"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "la_liga",
+          "league_label": "西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 542,
+          "source_team_name_zh": "阿拉维斯",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=542",
+          "sportmonks_team_id": 2975,
+          "sportmonks_team_name": "Deportivo Alavés",
+          "sportmonks_short_code": "ALA",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.468,
+          "matched_signals": [
+            "alias_exact:deportivo alaves"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "la_liga",
+          "league_label": "西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 471,
+          "source_team_name_zh": "桑坦德竞技",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=471",
+          "sportmonks_team_id": 9818,
+          "sportmonks_team_name": "Racing Santander",
+          "sportmonks_short_code": "RAC",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.48,
+          "matched_signals": [
+            "alias_exact:racing santander"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "la_liga",
+          "league_label": "西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 464,
+          "source_team_name_zh": "塞维利亚",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=464",
+          "sportmonks_team_id": 676,
+          "sportmonks_team_name": "Sevilla",
+          "sportmonks_short_code": "SEV",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Sevilla"
+          ],
+          "status": "seed_confirmed"
+        }
+      ]
+    },
+    {
+      "key": "bundesliga",
+      "label": "德甲",
+      "target_league_name": "Bundesliga",
+      "alias_count": 18,
+      "aliases": [
+        {
+          "league_key": "bundesliga",
+          "league_label": "德甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 986,
+          "source_team_name_zh": "勒沃库森",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=986",
+          "sportmonks_team_id": 3321,
+          "sportmonks_team_name": "Bayer 04 Leverkusen",
+          "sportmonks_short_code": "B04",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.468,
+          "matched_signals": [
+            "alias_exact:bayer 04 leverkusen"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "bundesliga",
+          "league_label": "德甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1923,
+          "source_team_name_zh": "奥格斯堡",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1923",
+          "sportmonks_team_id": 90,
+          "sportmonks_team_name": "FC Augsburg",
+          "sportmonks_short_code": "FCA",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.447,
+          "matched_signals": [
+            "alias_exact:fc augsburg"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "bundesliga",
+          "league_label": "德甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1922,
+          "source_team_name_zh": "帕德博恩",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1922",
+          "sportmonks_team_id": 2642,
+          "sportmonks_team_name": "Paderborn",
+          "sportmonks_short_code": "PAD",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.468,
+          "matched_signals": [
+            "alias_exact:paderborn"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "bundesliga",
+          "league_label": "德甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1869,
+          "source_team_name_zh": "霍芬海姆",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1869",
+          "sportmonks_team_id": 2726,
+          "sportmonks_team_name": "TSG Hoffenheim",
+          "sportmonks_short_code": "TSG",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:tsg hoffenheim"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "bundesliga",
+          "league_label": "德甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1862,
+          "source_team_name_zh": "埃沃斯堡",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1862",
+          "sportmonks_team_id": 3588,
+          "sportmonks_team_name": "Elversberg",
+          "sportmonks_short_code": "ELV",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.447,
+          "matched_signals": [
+            "alias_exact:elversberg"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "bundesliga",
+          "league_label": "德甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1334,
+          "source_team_name_zh": "云达不莱梅",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1334",
+          "sportmonks_team_id": 82,
+          "sportmonks_team_name": "Werder Bremen",
+          "sportmonks_short_code": "SVW",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Werder Bremen"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "bundesliga",
+          "league_label": "德甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1195,
+          "source_team_name_zh": "斯图加特",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1195",
+          "sportmonks_team_id": 3319,
+          "sportmonks_team_name": "VfB Stuttgart",
+          "sportmonks_short_code": "VFB",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:VfB Stuttgart"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "bundesliga",
+          "league_label": "德甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1089,
+          "source_team_name_zh": "门兴格拉德巴赫",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1089",
+          "sportmonks_team_id": 683,
+          "sportmonks_team_name": "Borussia Mönchengladbach",
+          "sportmonks_short_code": "BMG",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.447,
+          "matched_signals": [
+            "alias_exact:borussia monchengladbach"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "bundesliga",
+          "league_label": "德甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1088,
+          "source_team_name_zh": "美因茨",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1088",
+          "sportmonks_team_id": 794,
+          "sportmonks_team_name": "FSV Mainz 05",
+          "sportmonks_short_code": "M05",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:fsv mainz 05"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "bundesliga",
+          "league_label": "德甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 478,
+          "source_team_name_zh": "沙尔克04",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=478",
+          "sportmonks_team_id": 67,
+          "sportmonks_team_name": "Schalke 04",
+          "sportmonks_short_code": "S04",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.34,
+          "matched_signals": [
+            "alias_exact:Schalke 04"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "bundesliga",
+          "league_label": "德甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 970,
+          "source_team_name_zh": "莱比锡红牛",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=970",
+          "sportmonks_team_id": 277,
+          "sportmonks_team_name": "RB Leipzig",
+          "sportmonks_short_code": "RBL",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:RB Leipzig"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "bundesliga",
+          "league_label": "德甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 932,
+          "source_team_name_zh": "科隆",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=932",
+          "sportmonks_team_id": 3320,
+          "sportmonks_team_name": "FC Köln",
+          "sportmonks_short_code": "KOE",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.447,
+          "matched_signals": [
+            "alias_exact:fc koln"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "bundesliga",
+          "league_label": "德甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 860,
+          "source_team_name_zh": "汉堡",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=860",
+          "sportmonks_team_id": 2708,
+          "sportmonks_team_name": "Hamburger SV",
+          "sportmonks_short_code": "HSV",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:hamburger sv"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "bundesliga",
+          "league_label": "德甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 804,
+          "source_team_name_zh": "弗赖堡",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=804",
+          "sportmonks_team_id": 3543,
+          "sportmonks_team_name": "SC Freiburg",
+          "sportmonks_short_code": "SCF",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:SC Freiburg"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "bundesliga",
+          "league_label": "德甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 791,
+          "source_team_name_zh": "法兰克福",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=791",
+          "sportmonks_team_id": 366,
+          "sportmonks_team_name": "Eintracht Frankfurt",
+          "sportmonks_short_code": "SGE",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Eintracht Frankfurt"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "bundesliga",
+          "league_label": "德甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 786,
+          "source_team_name_zh": "多特蒙德",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=786",
+          "sportmonks_team_id": 68,
+          "sportmonks_team_name": "Borussia Dortmund",
+          "sportmonks_short_code": "BVB",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.447,
+          "matched_signals": [
+            "alias_exact:Borussia Dortmund"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "bundesliga",
+          "league_label": "德甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 664,
+          "source_team_name_zh": "拜仁慕尼黑",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=664",
+          "sportmonks_team_id": 503,
+          "sportmonks_team_name": "FC Bayern München",
+          "sportmonks_short_code": "FCB",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.447,
+          "matched_signals": [
+            "alias_exact:fc bayern munchen"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "bundesliga",
+          "league_label": "德甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 660,
+          "source_team_name_zh": "柏林联合",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=660",
+          "sportmonks_team_id": 1079,
+          "sportmonks_team_name": "FC Union Berlin",
+          "sportmonks_short_code": "FCU",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.468,
+          "matched_signals": [
+            "alias_exact:fc union berlin"
+          ],
+          "status": "seed_confirmed"
+        }
+      ]
+    },
+    {
+      "key": "serie_a",
+      "label": "意甲",
+      "target_league_name": "Serie A",
+      "alias_count": 20,
+      "aliases": [
+        {
+          "league_key": "serie_a",
+          "league_label": "意甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1032,
+          "source_team_name_zh": "罗马",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1032",
+          "sportmonks_team_id": 37,
+          "sportmonks_team_name": "Roma",
+          "sportmonks_short_code": "ROM",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:roma"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "serie_a",
+          "league_label": "意甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 3656,
+          "source_team_name_zh": "萨索洛",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=3656",
+          "sportmonks_team_id": 2714,
+          "sportmonks_team_name": "Sassuolo",
+          "sportmonks_short_code": "SAS",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:sassuolo"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "serie_a",
+          "league_label": "意甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 2000,
+          "source_team_name_zh": "弗洛西诺内",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=2000",
+          "sportmonks_team_id": 4070,
+          "sportmonks_team_name": "Frosinone",
+          "sportmonks_short_code": "FRO",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Frosinone"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "serie_a",
+          "league_label": "意甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1330,
+          "source_team_name_zh": "尤文图斯",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1330",
+          "sportmonks_team_id": 625,
+          "sportmonks_team_name": "Juventus",
+          "sportmonks_short_code": "JUV",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Juventus"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "serie_a",
+          "league_label": "意甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1308,
+          "source_team_name_zh": "亚特兰大",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1308",
+          "sportmonks_team_id": 708,
+          "sportmonks_team_name": "Atalanta",
+          "sportmonks_short_code": "ATA",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Atalanta"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "serie_a",
+          "league_label": "意甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1276,
+          "source_team_name_zh": "乌迪内斯",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1276",
+          "sportmonks_team_id": 346,
+          "sportmonks_team_name": "Udinese",
+          "sportmonks_short_code": "UDI",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Udinese"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "serie_a",
+          "league_label": "意甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1249,
+          "source_team_name_zh": "威尼斯",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1249",
+          "sportmonks_team_id": 267,
+          "sportmonks_team_name": "Venezia",
+          "sportmonks_short_code": "VEN",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Venezia"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "serie_a",
+          "league_label": "意甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1179,
+          "source_team_name_zh": "热那亚",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1179",
+          "sportmonks_team_id": 102,
+          "sportmonks_team_name": "Genoa",
+          "sportmonks_short_code": "GEN",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Genoa"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "serie_a",
+          "league_label": "意甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1149,
+          "source_team_name_zh": "帕尔马",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1149",
+          "sportmonks_team_id": 398,
+          "sportmonks_team_name": "Parma",
+          "sportmonks_short_code": "PRM",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Parma"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "serie_a",
+          "league_label": "意甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1125,
+          "source_team_name_zh": "那不勒斯",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1125",
+          "sportmonks_team_id": 597,
+          "sportmonks_team_name": "Napoli",
+          "sportmonks_short_code": "NAP",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Napoli"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "serie_a",
+          "league_label": "意甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 210,
+          "source_team_name_zh": "AC米兰",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=210",
+          "sportmonks_team_id": 113,
+          "sportmonks_team_name": "AC Milan",
+          "sportmonks_short_code": "MIL",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:AC Milan"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "serie_a",
+          "league_label": "意甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 972,
+          "source_team_name_zh": "莱切",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=972",
+          "sportmonks_team_id": 7790,
+          "sportmonks_team_name": "Lecce",
+          "sportmonks_short_code": "LEC",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Lecce"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "serie_a",
+          "league_label": "意甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 964,
+          "source_team_name_zh": "拉齐奥",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=964",
+          "sportmonks_team_id": 43,
+          "sportmonks_team_name": "Lazio",
+          "sportmonks_short_code": "LAZ",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Lazio"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "serie_a",
+          "league_label": "意甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 935,
+          "source_team_name_zh": "科莫",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=935",
+          "sportmonks_team_id": 268,
+          "sportmonks_team_name": "Como",
+          "sportmonks_short_code": "COM",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Como"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "serie_a",
+          "league_label": "意甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 917,
+          "source_team_name_zh": "卡利亚里",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=917",
+          "sportmonks_team_id": 585,
+          "sportmonks_team_name": "Cagliari",
+          "sportmonks_short_code": "CAG",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Cagliari"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "serie_a",
+          "league_label": "意甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 846,
+          "source_team_name_zh": "国际米兰",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=846",
+          "sportmonks_team_id": 2930,
+          "sportmonks_team_name": "Inter",
+          "sportmonks_short_code": "INT",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.447,
+          "matched_signals": [
+            "alias_exact:inter"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "serie_a",
+          "league_label": "意甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 803,
+          "source_team_name_zh": "佛罗伦萨",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=803",
+          "sportmonks_team_id": 109,
+          "sportmonks_team_name": "Fiorentina",
+          "sportmonks_short_code": "FIO",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Fiorentina"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "serie_a",
+          "league_label": "意甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 776,
+          "source_team_name_zh": "都灵",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=776",
+          "sportmonks_team_id": 613,
+          "sportmonks_team_name": "Torino",
+          "sportmonks_short_code": "TOR",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Torino"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "serie_a",
+          "league_label": "意甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 707,
+          "source_team_name_zh": "博洛尼亚",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=707",
+          "sportmonks_team_id": 8513,
+          "sportmonks_team_name": "Bologna",
+          "sportmonks_short_code": "BOL",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Bologna"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "serie_a",
+          "league_label": "意甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 346,
+          "source_team_name_zh": "蒙扎",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=346",
+          "sportmonks_team_id": 1628,
+          "sportmonks_team_name": "Monza",
+          "sportmonks_short_code": "MON",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Monza"
+          ],
+          "status": "seed_confirmed"
+        }
+      ]
+    },
+    {
+      "key": "ligue_1",
+      "label": "法甲",
+      "target_league_name": "Ligue 1",
+      "alias_count": 18,
+      "aliases": [
+        {
+          "league_key": "ligue_1",
+          "league_label": "法甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1064,
+          "source_team_name_zh": "马赛",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1064",
+          "sportmonks_team_id": 44,
+          "sportmonks_team_name": "Olympique Marseille",
+          "sportmonks_short_code": "OM",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.447,
+          "matched_signals": [
+            "alias_exact:olympique marseille"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "ligue_1",
+          "league_label": "法甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 4599,
+          "source_team_name_zh": "巴黎FC",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=4599",
+          "sportmonks_team_id": 4508,
+          "sportmonks_team_name": "Paris",
+          "sportmonks_short_code": "PFC",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.34,
+          "matched_signals": [
+            "alias_exact:paris"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "ligue_1",
+          "league_label": "法甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1593,
+          "source_team_name_zh": "布雷斯特",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1593",
+          "sportmonks_team_id": 266,
+          "sportmonks_team_name": "Brest",
+          "sportmonks_short_code": "B29",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:brest"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "ligue_1",
+          "league_label": "法甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1233,
+          "source_team_name_zh": "图卢兹",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1233",
+          "sportmonks_team_id": 289,
+          "sportmonks_team_name": "Toulouse",
+          "sportmonks_short_code": "TOU",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Toulouse"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "ligue_1",
+          "league_label": "法甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1225,
+          "source_team_name_zh": "特鲁瓦",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1225",
+          "sportmonks_team_id": 7047,
+          "sportmonks_team_name": "Troyes",
+          "sportmonks_short_code": "TRO",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:troyes"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "ligue_1",
+          "league_label": "法甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1194,
+          "source_team_name_zh": "斯特拉斯堡",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1194",
+          "sportmonks_team_id": 686,
+          "sportmonks_team_name": "Strasbourg",
+          "sportmonks_short_code": "STR",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Strasbourg"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "ligue_1",
+          "league_label": "法甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1146,
+          "source_team_name_zh": "欧塞尔",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1146",
+          "sportmonks_team_id": 3682,
+          "sportmonks_team_name": "Auxerre",
+          "sportmonks_short_code": "AUX",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Auxerre"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "ligue_1",
+          "league_label": "法甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1134,
+          "source_team_name_zh": "尼斯",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1134",
+          "sportmonks_team_id": 450,
+          "sportmonks_team_name": "Nice",
+          "sportmonks_short_code": "NCE",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Nice"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "ligue_1",
+          "league_label": "法甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1105,
+          "source_team_name_zh": "摩纳哥",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1105",
+          "sportmonks_team_id": 6789,
+          "sportmonks_team_name": "Monaco",
+          "sportmonks_short_code": "ASM",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Monaco"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "ligue_1",
+          "league_label": "法甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 597,
+          "source_team_name_zh": "昂热",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=597",
+          "sportmonks_team_id": 776,
+          "sportmonks_team_name": "Angers SCO",
+          "sportmonks_short_code": "ANG",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Angers SCO"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "ligue_1",
+          "league_label": "法甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 998,
+          "source_team_name_zh": "里尔",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=998",
+          "sportmonks_team_id": 690,
+          "sportmonks_team_name": "LOSC Lille",
+          "sportmonks_short_code": "LOSC",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:losc lille"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "ligue_1",
+          "league_label": "法甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 997,
+          "source_team_name_zh": "里昂",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=997",
+          "sportmonks_team_id": 79,
+          "sportmonks_team_name": "Olympique Lyonnais",
+          "sportmonks_short_code": "LYO",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.447,
+          "matched_signals": [
+            "alias_exact:olympique lyonnais"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "ligue_1",
+          "league_label": "法甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 990,
+          "source_team_name_zh": "雷恩",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=990",
+          "sportmonks_team_id": 598,
+          "sportmonks_team_name": "Rennes",
+          "sportmonks_short_code": "REN",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:rennes"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "ligue_1",
+          "league_label": "法甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 984,
+          "source_team_name_zh": "勒芒",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=984",
+          "sportmonks_team_id": 7758,
+          "sportmonks_team_name": "Le Mans",
+          "sportmonks_short_code": "MAN",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.447,
+          "matched_signals": [
+            "alias_exact:Le Mans"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "ligue_1",
+          "league_label": "法甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 982,
+          "source_team_name_zh": "勒阿弗尔",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=982",
+          "sportmonks_team_id": 1055,
+          "sportmonks_team_name": "Le Havre",
+          "sportmonks_short_code": "LEH",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.447,
+          "matched_signals": [
+            "alias_exact:Le Havre"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "ligue_1",
+          "league_label": "法甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 980,
+          "source_team_name_zh": "洛里昂",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=980",
+          "sportmonks_team_id": 9257,
+          "sportmonks_team_name": "Lorient",
+          "sportmonks_short_code": "LOR",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Lorient"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "ligue_1",
+          "league_label": "法甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 979,
+          "source_team_name_zh": "朗斯",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=979",
+          "sportmonks_team_id": 271,
+          "sportmonks_team_name": "Lens",
+          "sportmonks_short_code": "LEN",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Lens"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "ligue_1",
+          "league_label": "法甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 647,
+          "source_team_name_zh": "巴黎圣日耳曼",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=647",
+          "sportmonks_team_id": 591,
+          "sportmonks_team_name": "Paris Saint Germain",
+          "sportmonks_short_code": "PSG",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.22,
+          "matched_signals": [
+            "alias_exact:Paris Saint Germain"
+          ],
+          "status": "seed_confirmed"
+        }
+      ]
+    },
+    {
+      "key": "k_league_1",
+      "label": "韩K",
+      "target_league_name": "K League 1",
+      "alias_count": 12,
+      "aliases": [
+        {
+          "league_key": "k_league_1",
+          "league_label": "韩K",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1603,
+          "source_team_name_zh": "蔚山现代",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1603",
+          "sportmonks_team_id": 5839,
+          "sportmonks_team_name": "Ulsan HD",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.5,
+          "confidence_gap": 0.5,
+          "matched_signals": [
+            "token_overlap:Ulsan Hyundai Horang-i:ulsan"
+          ],
+          "status": "seed_manual_confirmed"
+        },
+        {
+          "league_key": "k_league_1",
+          "league_label": "韩K",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1606,
+          "source_team_name_zh": "首尔FC",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1606",
+          "sportmonks_team_id": 672,
+          "sportmonks_team_name": "Seoul",
+          "sportmonks_short_code": "FCS",
+          "confidence_score": 0.76,
+          "confidence_gap": 0.76,
+          "matched_signals": [
+            "alias_substring:FC Seoul"
+          ],
+          "status": "seed_manual_confirmed"
+        },
+        {
+          "league_key": "k_league_1",
+          "league_label": "韩K",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1608,
+          "source_team_name_zh": "浦项制铁",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1608",
+          "sportmonks_team_id": 1506,
+          "sportmonks_team_name": "Pohang Steelers",
+          "sportmonks_short_code": "POH",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Pohang Steelers"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "k_league_1",
+          "league_label": "韩K",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1609,
+          "source_team_name_zh": "全北现代",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1609",
+          "sportmonks_team_id": 3339,
+          "sportmonks_team_name": "Jeonbuk Motors",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.64,
+          "confidence_gap": 0.64,
+          "matched_signals": [
+            "alias_tokens_subset:jeonbuk"
+          ],
+          "status": "seed_manual_confirmed"
+        },
+        {
+          "league_key": "k_league_1",
+          "league_label": "韩K",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1611,
+          "source_team_name_zh": "大田市民",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1611",
+          "sportmonks_team_id": 5664,
+          "sportmonks_team_name": "Daejeon Citizen",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Daejeon Citizen"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "k_league_1",
+          "league_label": "韩K",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1612,
+          "source_team_name_zh": "仁川联合",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1612",
+          "sportmonks_team_id": 6922,
+          "sportmonks_team_name": "Incheon United",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.76,
+          "confidence_gap": 0.248,
+          "matched_signals": [
+            "alias_substring:Incheon United FC"
+          ],
+          "status": "seed_manual_confirmed"
+        },
+        {
+          "league_key": "k_league_1",
+          "league_label": "韩K",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1615,
+          "source_team_name_zh": "金泉尚武",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1615",
+          "sportmonks_team_id": 3901,
+          "sportmonks_team_name": "Gimcheon Sangmu",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:gimcheon sangmu"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "k_league_1",
+          "league_label": "韩K",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 3410,
+          "source_team_name_zh": "济州联队",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=3410",
+          "sportmonks_team_id": 8034,
+          "sportmonks_team_name": "Jeju United",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.76,
+          "confidence_gap": 0.248,
+          "matched_signals": [
+            "alias_substring:Jeju United FC"
+          ],
+          "status": "seed_manual_confirmed"
+        },
+        {
+          "league_key": "k_league_1",
+          "league_label": "韩K",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 4544,
+          "source_team_name_zh": "安养FC",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=4544",
+          "sportmonks_team_id": 8032,
+          "sportmonks_team_name": "Anyang",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:anyang"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "k_league_1",
+          "league_label": "韩K",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 5739,
+          "source_team_name_zh": "江原FC",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=5739",
+          "sportmonks_team_id": 7273,
+          "sportmonks_team_name": "Gangwon",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:gangwon"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "k_league_1",
+          "league_label": "韩K",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 6477,
+          "source_team_name_zh": "光州FC",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=6477",
+          "sportmonks_team_id": 4370,
+          "sportmonks_team_name": "Gwangju",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:gwangju"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "k_league_1",
+          "league_label": "韩K",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 7075,
+          "source_team_name_zh": "富川FC",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=7075",
+          "sportmonks_team_id": 7361,
+          "sportmonks_team_name": "Bucheon 1995",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.617,
+          "confidence_gap": 0.617,
+          "matched_signals": [
+            "token_overlap:Bucheon FC 1995:1995/bucheon"
+          ],
+          "status": "seed_manual_confirmed"
+        }
+      ]
+    },
+    {
+      "key": "j1_league",
+      "label": "日职联",
+      "target_league_name": "J1 League",
+      "alias_count": 20,
+      "aliases": [
+        {
+          "league_key": "j1_league",
+          "league_label": "日职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 907,
+          "source_team_name_zh": "京都不死鸟",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=907",
+          "sportmonks_team_id": 3509,
+          "sportmonks_team_name": "Kyoto Sanga",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.98,
+          "confidence_gap": 0.468,
+          "matched_signals": [
+            "alias_exact:kyoto sanga"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "j1_league",
+          "league_label": "日职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 6384,
+          "source_team_name_zh": "町田泽维亚",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=6384",
+          "sportmonks_team_id": 9180,
+          "sportmonks_team_name": "Machida Zelvia",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.98,
+          "confidence_gap": 0.468,
+          "matched_signals": [
+            "alias_exact:machida zelvia"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "j1_league",
+          "league_label": "日职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 6072,
+          "source_team_name_zh": "长崎航海",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=6072",
+          "sportmonks_team_id": 9986,
+          "sportmonks_team_name": "V-Varen Nagasaki",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:V-Varen Nagasaki"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "j1_league",
+          "league_label": "日职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 5534,
+          "source_team_name_zh": "冈山绿雉",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=5534",
+          "sportmonks_team_id": 5915,
+          "sportmonks_team_name": "Fagiano Okayama",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.98,
+          "confidence_gap": 0.447,
+          "matched_signals": [
+            "alias_exact:fagiano okayama"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "j1_league",
+          "league_label": "日职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 4127,
+          "source_team_name_zh": "水户蜀葵",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=4127",
+          "sportmonks_team_id": 17806,
+          "sportmonks_team_name": "Mito Hollyhock",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.76,
+          "confidence_gap": 0.248,
+          "matched_signals": [
+            "alias_substring:FC Mito Hollyhock"
+          ],
+          "status": "seed_manual_confirmed"
+        },
+        {
+          "league_key": "j1_league",
+          "league_label": "日职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 2272,
+          "source_team_name_zh": "川崎前锋",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=2272",
+          "sportmonks_team_id": 3935,
+          "sportmonks_team_name": "Kawasaki Frontale",
+          "sportmonks_short_code": "KAW",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Kawasaki Frontale"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "j1_league",
+          "league_label": "日职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1178,
+          "source_team_name_zh": "清水鼓动",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1178",
+          "sportmonks_team_id": 3663,
+          "sportmonks_team_name": "Shimizu S-Pulse",
+          "sportmonks_short_code": "SHI",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Shimizu S-Pulse"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "j1_league",
+          "league_label": "日职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1164,
+          "source_team_name_zh": "浦和红钻",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1164",
+          "sportmonks_team_id": 280,
+          "sportmonks_team_name": "Urawa Reds",
+          "sportmonks_short_code": "URA",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:urawa reds"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "j1_league",
+          "league_label": "日职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1100,
+          "source_team_name_zh": "名古屋鲸八",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1100",
+          "sportmonks_team_id": 8738,
+          "sportmonks_team_name": "Nagoya Grampus",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:nagoya grampus"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "j1_league",
+          "league_label": "日职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1029,
+          "source_team_name_zh": "鹿岛鹿角",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1029",
+          "sportmonks_team_id": 3690,
+          "sportmonks_team_name": "Kashima Antlers",
+          "sportmonks_short_code": "KAS",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Kashima Antlers"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "j1_league",
+          "league_label": "日职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 267,
+          "source_team_name_zh": "东京FC",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=267",
+          "sportmonks_team_id": 2988,
+          "sportmonks_team_name": "FC Tokyo",
+          "sportmonks_short_code": "TOK",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.447,
+          "matched_signals": [
+            "alias_exact:FC Tokyo"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "j1_league",
+          "league_label": "日职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 870,
+          "source_team_name_zh": "横滨水手",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=870",
+          "sportmonks_team_id": 2756,
+          "sportmonks_team_name": "Yokohama F. Marinos",
+          "sportmonks_short_code": "YOK",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Yokohama F Marinos"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "j1_league",
+          "league_label": "日职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 845,
+          "source_team_name_zh": "广岛三箭",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=845",
+          "sportmonks_team_id": 14738,
+          "sportmonks_team_name": "Sanfrecce Hiroshima",
+          "sportmonks_short_code": "SAN",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Sanfrecce Hiroshima"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "j1_league",
+          "league_label": "日职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 842,
+          "source_team_name_zh": "千叶市原",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=842",
+          "sportmonks_team_id": 4260,
+          "sportmonks_team_name": "JEF United",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.76,
+          "confidence_gap": 0.76,
+          "matched_signals": [
+            "alias_substring:JEF United Ichihara"
+          ],
+          "status": "seed_manual_confirmed"
+        },
+        {
+          "league_key": "j1_league",
+          "league_label": "日职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 808,
+          "source_team_name_zh": "福冈黄蜂",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=808",
+          "sportmonks_team_id": 2882,
+          "sportmonks_team_name": "Avispa Fukuoka",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Avispa Fukuoka"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "j1_league",
+          "league_label": "日职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 775,
+          "source_team_name_zh": "东京绿茵",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=775",
+          "sportmonks_team_id": 2691,
+          "sportmonks_team_name": "Tokyo Verdy",
+          "sportmonks_short_code": "TOK",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.447,
+          "matched_signals": [
+            "alias_exact:Tokyo Verdy"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "j1_league",
+          "league_label": "日职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 753,
+          "source_team_name_zh": "大阪樱花",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=753",
+          "sportmonks_team_id": 3634,
+          "sportmonks_team_name": "Cerezo Osaka",
+          "sportmonks_short_code": "CER",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.447,
+          "matched_signals": [
+            "alias_exact:Cerezo Osaka"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "j1_league",
+          "league_label": "日职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 752,
+          "source_team_name_zh": "大阪钢巴",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=752",
+          "sportmonks_team_id": 14754,
+          "sportmonks_team_name": "Gamba Osaka",
+          "sportmonks_short_code": "GAM",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.447,
+          "matched_signals": [
+            "alias_exact:Gamba Osaka"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "j1_league",
+          "league_label": "日职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 658,
+          "source_team_name_zh": "柏太阳神",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=658",
+          "sportmonks_team_id": 298,
+          "sportmonks_team_name": "Kashiwa Reysol",
+          "sportmonks_short_code": "KAR",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Kashiwa Reysol"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "j1_league",
+          "league_label": "日职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 492,
+          "source_team_name_zh": "神户胜利船",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=492",
+          "sportmonks_team_id": 3867,
+          "sportmonks_team_name": "Vissel Kobe",
+          "sportmonks_short_code": "VIS",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Vissel Kobe"
+          ],
+          "status": "seed_confirmed"
+        }
+      ]
+    },
+    {
+      "key": "uefa_champions_league",
+      "label": "欧冠",
+      "target_league_name": "Champions League",
+      "alias_count": 26,
+      "aliases": [
+        {
+          "league_key": "uefa_champions_league",
+          "league_label": "欧冠",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 6572,
+          "source_team_name_zh": "佛罗里亚纳",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=6572",
+          "sportmonks_team_id": 762,
+          "sportmonks_team_name": "Floriana",
+          "sportmonks_short_code": "FLO",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.405,
+          "matched_signals": [
+            "alias_exact:floriana"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "uefa_champions_league",
+          "league_label": "欧冠",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 13920,
+          "source_team_name_zh": "埃格纳蒂亚",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=13920",
+          "sportmonks_team_id": 63383,
+          "sportmonks_team_name": "Egnatia Rrogozhinë",
+          "sportmonks_short_code": "EGN",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Egnatia Rrogozhine"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "uefa_champions_league",
+          "league_label": "欧冠",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 13070,
+          "source_team_name_zh": "ML麦克斯林",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=13070",
+          "sportmonks_team_id": 6641,
+          "sportmonks_team_name": "ML Vitebsk",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:ml vitebsk"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "uefa_champions_league",
+          "league_label": "欧冠",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 11804,
+          "source_team_name_zh": "克拉约瓦大学",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=11804",
+          "sportmonks_team_id": 11676,
+          "sportmonks_team_name": "Universitatea Craiova",
+          "sportmonks_short_code": "UCR",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.488,
+          "matched_signals": [
+            "alias_exact:universitatea craiova"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "uefa_champions_league",
+          "league_label": "欧冠",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 10810,
+          "source_team_name_zh": "沙巴巴库",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=10810",
+          "sportmonks_team_id": 138649,
+          "sportmonks_team_name": "Sabah",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:sabah"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "uefa_champions_league",
+          "league_label": "欧冠",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 10745,
+          "source_team_name_zh": "德利塔格尼拉内",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=10745",
+          "sportmonks_team_id": 148038,
+          "sportmonks_team_name": "Drita",
+          "sportmonks_short_code": "DRI",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:drita"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "uefa_champions_league",
+          "league_label": "欧冠",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 8706,
+          "source_team_name_zh": "里加迪纳莫",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=8706",
+          "sportmonks_team_id": 3546,
+          "sportmonks_team_name": "Riga",
+          "sportmonks_short_code": "RFC",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:riga"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "uefa_champions_league",
+          "league_label": "欧冠",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 8398,
+          "source_team_name_zh": "萨布塔洛",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=8398",
+          "sportmonks_team_id": 6392,
+          "sportmonks_team_name": "FC Iberia 1999",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:fc iberia 1999"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "uefa_champions_league",
+          "league_label": "欧冠",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 8364,
+          "source_team_name_zh": "佩特罗古",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=8364",
+          "sportmonks_team_id": 6131,
+          "sportmonks_team_name": "Petrocub",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:petrocub"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "uefa_champions_league",
+          "league_label": "欧冠",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 8248,
+          "source_team_name_zh": "林肯红魔",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=8248",
+          "sportmonks_team_id": 10068,
+          "sportmonks_team_name": "Lincoln Red Imps",
+          "sportmonks_short_code": "LRI",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Lincoln Red Imps"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "uefa_champions_league",
+          "league_label": "欧冠",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 7953,
+          "source_team_name_zh": "考诺萨基列斯",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=7953",
+          "sportmonks_team_id": 928,
+          "sportmonks_team_name": "Kauno Žalgiris",
+          "sportmonks_short_code": "KAU",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Kauno Zalgiris"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "uefa_champions_league",
+          "league_label": "欧冠",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 6925,
+          "source_team_name_zh": "伊斯卡尔德斯",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=6925",
+          "sportmonks_team_id": 17303,
+          "sportmonks_team_name": "Inter Club d'Escaldes",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:inter club d'escaldes"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "uefa_champions_league",
+          "league_label": "欧冠",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 806,
+          "source_team_name_zh": "科罗拉",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=806",
+          "sportmonks_team_id": 8697,
+          "sportmonks_team_name": "Flora",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.98,
+          "confidence_gap": 0.48,
+          "matched_signals": [
+            "alias_exact:flora"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "uefa_champions_league",
+          "league_label": "欧冠",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 5844,
+          "source_team_name_zh": "特费奥里",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=5844",
+          "sportmonks_team_id": 5444,
+          "sportmonks_team_name": "Tre Fiori",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Tre Fiori"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "uefa_champions_league",
+          "league_label": "欧冠",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 5760,
+          "source_team_name_zh": "巴尼亚卢卡战士",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=5760",
+          "sportmonks_team_id": 3877,
+          "sportmonks_team_name": "Borac Banja Luka",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Borac Banja Luka"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "uefa_champions_league",
+          "league_label": "欧冠",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 4867,
+          "source_team_name_zh": "拉恩",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=4867",
+          "sportmonks_team_id": 11833,
+          "sportmonks_team_name": "Larne",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.98,
+          "confidence_gap": 0.468,
+          "matched_signals": [
+            "alias_exact:larne"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "uefa_champions_league",
+          "league_label": "欧冠",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 2814,
+          "source_team_name_zh": "阿拉木图凯拉特",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=2814",
+          "sportmonks_team_id": 3108,
+          "sportmonks_team_name": "Kairat",
+          "sportmonks_short_code": "KAI",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.48,
+          "matched_signals": [
+            "alias_exact:kairat"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "uefa_champions_league",
+          "league_label": "欧冠",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 2352,
+          "source_team_name_zh": "尼卡斯克",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=2352",
+          "sportmonks_team_id": 3712,
+          "sportmonks_team_name": "Sutjeska",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:sutjeska"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "uefa_champions_league",
+          "league_label": "欧冠",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1812,
+          "source_team_name_zh": "维京古尔",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1812",
+          "sportmonks_team_id": 2688,
+          "sportmonks_team_name": "Víkingur Reykjavík",
+          "sportmonks_short_code": "VIR",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.22,
+          "matched_signals": [
+            "alias_exact:Vikingur Reykjavik"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "uefa_champions_league",
+          "league_label": "欧冠",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1392,
+          "source_team_name_zh": "瓦尔达尔",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1392",
+          "sportmonks_team_id": 5492,
+          "sportmonks_team_name": "Vardar",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.98,
+          "confidence_gap": 0.48,
+          "matched_signals": [
+            "alias_exact:vardar"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "uefa_champions_league",
+          "league_label": "欧冠",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1373,
+          "source_team_name_zh": "沙姆洛克流浪",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1373",
+          "sportmonks_team_id": 207,
+          "sportmonks_team_name": "Shamrock Rovers",
+          "sportmonks_short_code": "SHA",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Shamrock Rovers"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "uefa_champions_league",
+          "league_label": "欧冠",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1207,
+          "source_team_name_zh": "索菲亚利夫斯基",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1207",
+          "sportmonks_team_id": 3223,
+          "sportmonks_team_name": "Levski Sofia",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.98,
+          "confidence_gap": 0.22,
+          "matched_signals": [
+            "alias_exact:Levski Sofia"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "uefa_champions_league",
+          "league_label": "欧冠",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 977,
+          "source_team_name_zh": "新圣徒",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=977",
+          "sportmonks_team_id": 579,
+          "sportmonks_team_name": "The New Saints",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:The New Saints"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "uefa_champions_league",
+          "league_label": "欧冠",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 960,
+          "source_team_name_zh": "克拉斯维克",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=960",
+          "sportmonks_team_id": 5284,
+          "sportmonks_team_name": "KÍ",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.98,
+          "confidence_gap": 0.4,
+          "matched_signals": [
+            "alias_exact:ki"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "uefa_champions_league",
+          "league_label": "欧冠",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 892,
+          "source_team_name_zh": "杰尔",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=892",
+          "sportmonks_team_id": 7926,
+          "sportmonks_team_name": "Győri ETO",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.98,
+          "confidence_gap": 0.48,
+          "matched_signals": [
+            "alias_exact:gyori eto"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "uefa_champions_league",
+          "league_label": "欧冠",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 841,
+          "source_team_name_zh": "库普斯",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=841",
+          "sportmonks_team_id": 4323,
+          "sportmonks_team_name": "KuPS",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:KuPS"
+          ],
+          "status": "seed_confirmed"
+        }
+      ]
+    },
+    {
+      "key": "allsvenskan",
+      "label": "瑞典超",
+      "target_league_name": "Allsvenskan",
+      "alias_count": 16,
+      "aliases": [
+        {
+          "league_key": "allsvenskan",
+          "league_label": "瑞典超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 215,
+          "source_team_name_zh": "AIK索尔纳",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=215",
+          "sportmonks_team_id": 2825,
+          "sportmonks_team_name": "AIK",
+          "sportmonks_short_code": "AIK",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:AIK索尔纳"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "allsvenskan",
+          "league_label": "瑞典超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 245,
+          "source_team_name_zh": "代格福什",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=245",
+          "sportmonks_team_id": 2753,
+          "sportmonks_team_name": "Degerfors",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Degerfors"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "allsvenskan",
+          "league_label": "瑞典超",
+          "source_provider": "sporttery.cn",
+            "alias_exact:Orgryte"
+          "source_team_name_zh": "哥德堡盖斯",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=288",
+          "sportmonks_team_id": 1777,
+          "sportmonks_team_name": "GAIS",
+          "sportmonks_short_code": "GAI",
+          "confidence_score": 0.76,
+          "confidence_gap": 0.76,
+          "matched_signals": [
+            "alias_substring:GAIS Gotenberg"
+          ],
+          "status": "seed_manual_confirmed"
+        },
+        {
+          "league_key": "allsvenskan",
+          "league_label": "瑞典超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 563,
+          "source_team_name_zh": "埃尔夫斯堡",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=563",
+          "sportmonks_team_id": 1226,
+          "sportmonks_team_name": "Elfsborg",
+          "sportmonks_short_code": "ELF",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Elfsborg"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "allsvenskan",
+          "league_label": "瑞典超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 606,
+          "source_team_name_zh": "奥尔格里特",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=606",
+          "sportmonks_team_id": 1870,
+          "sportmonks_team_name": "Örgryte",
+          "sportmonks_short_code": "ÖIS",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Orgryte",
+            "alias_exact:厄格里特"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "allsvenskan",
+          "league_label": "瑞典超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 823,
+          "source_team_name_zh": "哥德堡",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=823",
+          "sportmonks_team_id": 532,
+          "sportmonks_team_name": "IFK Göteborg",
+          "sportmonks_short_code": "GOT",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:IFK Goteborg"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "allsvenskan",
+          "league_label": "瑞典超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 848,
+          "source_team_name_zh": "哈尔姆",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=848",
+          "sportmonks_team_id": 720,
+          "sportmonks_team_name": "Halmstad",
+          "sportmonks_short_code": "HAL",
+          "confidence_score": 0.58,
+          "confidence_gap": 0.58,
+          "matched_signals": [
+            "alias_substring:Halmstads"
+          ],
+          "status": "seed_manual_confirmed"
+        },
+        {
+          "league_key": "allsvenskan",
+          "league_label": "瑞典超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 850,
+          "source_team_name_zh": "赫根",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=850",
+          "sportmonks_team_id": 2535,
+          "sportmonks_team_name": "Häcken",
+          "sportmonks_short_code": "HAC",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Hacken"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "allsvenskan",
+          "league_label": "瑞典超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 852,
+          "source_team_name_zh": "哈马比",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=852",
+          "sportmonks_team_id": 2353,
+          "sportmonks_team_name": "Hammarby",
+          "sportmonks_short_code": "HAM",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Hammarby"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "allsvenskan",
+          "league_label": "瑞典超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 913,
+          "source_team_name_zh": "卡尔马",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=913",
+          "sportmonks_team_id": 432,
+          "sportmonks_team_name": "Kalmar",
+          "sportmonks_short_code": "KAL",
+          "confidence_score": 0.76,
+          "confidence_gap": 0.227,
+          "matched_signals": [
+            "alias_substring:Kalmar FF"
+          ],
+          "status": "seed_manual_confirmed"
+        },
+        {
+          "league_key": "allsvenskan",
+          "league_label": "瑞典超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1051,
+          "source_team_name_zh": "马尔默",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1051",
+          "sportmonks_team_id": 354,
+          "sportmonks_team_name": "Malmö FF",
+          "sportmonks_short_code": "MAL",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Malmo FF"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "allsvenskan",
+          "league_label": "瑞典超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1253,
+          "source_team_name_zh": "瓦斯特拉斯",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1253",
+          "sportmonks_team_id": 8671,
+          "sportmonks_team_name": "Västerås SK",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.76,
+          "confidence_gap": 0.76,
+          "matched_signals": [
+            "alias_substring:Vasteras SK FK"
+          ],
+          "status": "seed_manual_confirmed"
+        },
+        {
+          "league_key": "allsvenskan",
+          "league_label": "瑞典超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1355,
+          "source_team_name_zh": "佐加顿斯",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1355",
+          "sportmonks_team_id": 443,
+          "sportmonks_team_name": "Djurgården",
+          "sportmonks_short_code": "DJU",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:djurgarden"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "allsvenskan",
+          "league_label": "瑞典超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1764,
+          "source_team_name_zh": "布鲁马波卡纳",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1764",
+          "sportmonks_team_id": 3285,
+          "sportmonks_team_name": "Brommapojkarna",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Brommapojkarna"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "allsvenskan",
+          "league_label": "瑞典超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 2465,
+          "source_team_name_zh": "米亚尔比",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=2465",
+          "sportmonks_team_id": 411,
+          "sportmonks_team_name": "Mjällby",
+          "sportmonks_short_code": "MJA",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:mjallby"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "allsvenskan",
+          "league_label": "瑞典超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 4067,
+          "source_team_name_zh": "天狼星",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=4067",
+          "sportmonks_team_id": 2678,
+          "sportmonks_team_name": "Sirius",
+          "sportmonks_short_code": "SIR",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:sirius"
+          ],
+          "status": "seed_confirmed"
+        }
+      ]
+    },
+    {
+      "key": "eliteserien",
+      "label": "挪超",
+      "target_league_name": "Eliteserien",
+      "alias_count": 16,
+      "aliases": [
+        {
+          "league_key": "eliteserien",
+          "league_label": "挪超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 508,
+          "source_team_name_zh": "斯达",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=508",
+          "sportmonks_team_id": 2735,
+          "sportmonks_team_name": "Start",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.76,
+          "confidence_gap": 0.76,
+          "matched_signals": [
+            "alias_substring:Start Kristiansand"
+          ],
+          "status": "seed_manual_confirmed"
+        },
+        {
+          "league_key": "eliteserien",
+          "league_label": "挪超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 546,
+          "source_team_name_zh": "奥勒松",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=546",
+          "sportmonks_team_id": 393,
+          "sportmonks_team_name": "Aalesund",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.76,
+          "confidence_gap": 0.76,
+          "matched_signals": [
+            "alias_substring:Aalesund FK"
+          ],
+          "status": "seed_manual_confirmed"
+        },
+        {
+          "league_key": "eliteserien",
+          "league_label": "挪超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 703,
+          "source_team_name_zh": "博德闪耀",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=703",
+          "sportmonks_team_id": 1668,
+          "sportmonks_team_name": "Bodø / Glimt",
+          "sportmonks_short_code": "BOD",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:bodø glimt"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "eliteserien",
+          "league_label": "挪超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 722,
+          "source_team_name_zh": "布兰",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=722",
+          "sportmonks_team_id": 2474,
+          "sportmonks_team_name": "Brann",
+          "sportmonks_short_code": "SKB",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Brann"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "eliteserien",
+          "league_label": "挪超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 861,
+          "source_team_name_zh": "汉坎",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=861",
+          "sportmonks_team_id": 8661,
+          "sportmonks_team_name": "HamKam",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Ham-Kam"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "eliteserien",
+          "league_label": "挪超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1009,
+          "source_team_name_zh": "利勒斯特罗姆",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1009",
+          "sportmonks_team_id": null,
+          "sportmonks_team_name": "Lillestrom",
+          "sportmonks_short_code": null,
+          "confidence_score": 1.0,
+          "confidence_gap": 0.0,
+          "matched_signals": [
+            "manual_confirmation"
+          ],
+          "status": "seed_manual_confirmed"
+        },
+        {
+          "league_key": "eliteserien",
+          "league_label": "挪超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1035,
+          "source_team_name_zh": "罗森博格",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1035",
+          "sportmonks_team_id": 1335,
+          "sportmonks_team_name": "Rosenborg",
+          "sportmonks_short_code": "RBK",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Rosenborg"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "eliteserien",
+          "league_label": "挪超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1109,
+          "source_team_name_zh": "莫尔德",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1109",
+          "sportmonks_team_id": 290,
+          "sportmonks_team_name": "Molde",
+          "sportmonks_short_code": "MOL",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Molde"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "eliteserien",
+          "league_label": "挪超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1226,
+          "source_team_name_zh": "特罗姆瑟",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1226",
+          "sportmonks_team_id": 7242,
+          "sportmonks_team_name": "Tromsø",
+          "sportmonks_short_code": "TIL",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:tromsø"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "eliteserien",
+          "league_label": "挪超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1242,
+          "source_team_name_zh": "瓦勒伦加",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1242",
+          "sportmonks_team_id": 502,
+          "sportmonks_team_name": "Vålerenga",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Valerenga"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "eliteserien",
+          "league_label": "挪超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1259,
+          "source_team_name_zh": "维京",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1259",
+          "sportmonks_team_id": 321,
+          "sportmonks_team_name": "Viking",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Viking"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "eliteserien",
+          "league_label": "挪超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1362,
+          "source_team_name_zh": "腓特烈斯塔",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1362",
+          "sportmonks_team_id": 1743,
+          "sportmonks_team_name": "Fredrikstad",
+          "sportmonks_short_code": "FFK",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Fredrikstad"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "eliteserien",
+          "league_label": "挪超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 3418,
+          "source_team_name_zh": "萨尔普斯堡",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=3418",
+          "sportmonks_team_id": 2601,
+          "sportmonks_team_name": "Sarpsborg 08",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:sarpsborg 08"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "eliteserien",
+          "league_label": "挪超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 3470,
+          "source_team_name_zh": "桑纳菲尤尔",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=3470",
+          "sportmonks_team_id": 617,
+          "sportmonks_team_name": "Sandefjord",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Sandefjord"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "eliteserien",
+          "league_label": "挪超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 4338,
+          "source_team_name_zh": "克里斯蒂安松",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=4338",
+          "sportmonks_team_id": 869,
+          "sportmonks_team_name": "Kristiansund",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.76,
+          "confidence_gap": 0.76,
+          "matched_signals": [
+            "alias_substring:Kristiansund BK"
+          ],
+          "status": "seed_manual_confirmed"
+        },
+        {
+          "league_key": "eliteserien",
+          "league_label": "挪超",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 5263,
+          "source_team_name_zh": "KFUM奥斯陆",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=5263",
+          "sportmonks_team_id": 11914,
+          "sportmonks_team_name": "KFUM",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:KFUM奥斯陆"
+          ],
+          "status": "seed_confirmed"
+        }
+      ]
+    },
+    {
+      "key": "brazilian_serie_a",
+      "label": "巴西甲",
+      "target_league_name": "Serie A",
+      "alias_count": 20,
+      "aliases": [
+        {
+          "league_key": "brazilian_serie_a",
+          "league_label": "巴西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1578,
+          "source_team_name_zh": "弗鲁米嫩塞",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1578",
+          "sportmonks_team_id": 1095,
+          "sportmonks_team_name": "Fluminense",
+          "sportmonks_short_code": "FLU",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:fluminense"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "brazilian_serie_a",
+          "league_label": "巴西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 6184,
+          "source_team_name_zh": "沙佩科",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=6184",
+          "sportmonks_team_id": 710,
+          "sportmonks_team_name": "Chapecoense",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.76,
+          "confidence_gap": 0.76,
+          "matched_signals": [
+            "alias_substring:Chapecoense SC"
+          ],
+          "status": "seed_manual_confirmed"
+        },
+        {
+          "league_key": "brazilian_serie_a",
+          "league_label": "巴西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 5164,
+          "source_team_name_zh": "米拉索尔",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=5164",
+          "sportmonks_team_id": 11126,
+          "sportmonks_team_name": "Mirassol",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.76,
+          "confidence_gap": 0.76,
+          "matched_signals": [
+            "alias_substring:Mirassol FC"
+          ],
+          "status": "seed_manual_confirmed"
+        },
+        {
+          "league_key": "brazilian_serie_a",
+          "league_label": "巴西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 3343,
+          "source_team_name_zh": "巴甘蒂诺",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=3343",
+          "sportmonks_team_id": 7808,
+          "sportmonks_team_name": "Bragantino",
+          "sportmonks_short_code": "BRA",
+          "confidence_score": 0.76,
+          "confidence_gap": 0.76,
+          "matched_signals": [
+            "alias_substring:RB Bragantino"
+          ],
+          "status": "seed_manual_confirmed"
+        },
+        {
+          "league_key": "brazilian_serie_a",
+          "league_label": "巴西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 2417,
+          "source_team_name_zh": "瑞模贝雷",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=2417",
+          "sportmonks_team_id": 11550,
+          "sportmonks_team_name": "Remo",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.76,
+          "confidence_gap": 0.76,
+          "matched_signals": [
+            "alias_substring:Remo Belem (PA)"
+          ],
+          "status": "seed_manual_confirmed"
+        },
+        {
+          "league_key": "brazilian_serie_a",
+          "league_label": "巴西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 2277,
+          "source_team_name_zh": "巴伊亚",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=2277",
+          "sportmonks_team_id": 692,
+          "sportmonks_team_name": "Bahia",
+          "sportmonks_short_code": "BAH",
+          "confidence_score": 0.76,
+          "confidence_gap": 0.76,
+          "matched_signals": [
+            "alias_substring:Bahia(BA)"
+          ],
+          "status": "seed_manual_confirmed"
+        },
+        {
+          "league_key": "brazilian_serie_a",
+          "league_label": "巴西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1589,
+          "source_team_name_zh": "维多利亚",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1589",
+          "sportmonks_team_id": 3440,
+          "sportmonks_team_name": "Vitória",
+          "sportmonks_short_code": "VTO",
+          "confidence_score": 0.76,
+          "confidence_gap": 0.76,
+          "matched_signals": [
+            "alias_substring:Vitoria Salvador BA"
+          ],
+          "status": "seed_manual_confirmed"
+        },
+        {
+          "league_key": "brazilian_serie_a",
+          "league_label": "巴西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1588,
+          "source_team_name_zh": "瓦斯科达伽马",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1588",
+          "sportmonks_team_id": 696,
+          "sportmonks_team_name": "Vasco da Gama",
+          "sportmonks_short_code": "VAG",
+          "confidence_score": 0.76,
+          "confidence_gap": 0.76,
+          "matched_signals": [
+            "alias_substring:Vasco da Gama(RJ)"
+          ],
+          "status": "seed_manual_confirmed"
+        },
+        {
+          "league_key": "brazilian_serie_a",
+          "league_label": "巴西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1582,
+          "source_team_name_zh": "巴西国际",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1582",
+          "sportmonks_team_id": 2696,
+          "sportmonks_team_name": "Internacional",
+          "sportmonks_short_code": "INL",
+          "confidence_score": 0.76,
+          "confidence_gap": 0.76,
+          "matched_signals": [
+            "alias_substring:Internacional (RS)"
+          ],
+          "status": "seed_manual_confirmed"
+        },
+        {
+          "league_key": "brazilian_serie_a",
+          "league_label": "巴西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1580,
+          "source_team_name_zh": "格雷米奥",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1580",
+          "sportmonks_team_id": 2925,
+          "sportmonks_team_name": "Grêmio",
+          "sportmonks_short_code": "GRE",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:gremio"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "brazilian_serie_a",
+          "league_label": "巴西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 472,
+          "source_team_name_zh": "桑托斯",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=472",
+          "sportmonks_team_id": 3684,
+          "sportmonks_team_name": "Santos",
+          "sportmonks_short_code": "STS",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Santos"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "brazilian_serie_a",
+          "league_label": "巴西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1577,
+          "source_team_name_zh": "弗拉门戈",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1577",
+          "sportmonks_team_id": 1024,
+          "sportmonks_team_name": "Flamengo",
+          "sportmonks_short_code": "FLA",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:flamengo"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "brazilian_serie_a",
+          "league_label": "巴西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1575,
+          "source_team_name_zh": "克鲁塞罗",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1575",
+          "sportmonks_team_id": 3371,
+          "sportmonks_team_name": "Cruzeiro",
+          "sportmonks_short_code": "CRZ",
+          "confidence_score": 0.76,
+          "confidence_gap": 0.76,
+          "matched_signals": [
+            "alias_substring:Cruzeiro (MG)"
+          ],
+          "status": "seed_manual_confirmed"
+        },
+        {
+          "league_key": "brazilian_serie_a",
+          "league_label": "巴西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1573,
+          "source_team_name_zh": "科里蒂巴",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1573",
+          "sportmonks_team_id": 6285,
+          "sportmonks_team_name": "Coritiba",
+          "sportmonks_short_code": null,
+          "confidence_score": 0.76,
+          "confidence_gap": 0.227,
+          "matched_signals": [
+            "alias_substring:Coritiba (PR)"
+          ],
+          "status": "seed_manual_confirmed"
+        },
+        {
+          "league_key": "brazilian_serie_a",
+          "league_label": "巴西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1572,
+          "source_team_name_zh": "科林蒂安",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1572",
+          "sportmonks_team_id": 303,
+          "sportmonks_team_name": "Corinthians",
+          "sportmonks_short_code": "CTH",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:corinthians"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "brazilian_serie_a",
+          "league_label": "巴西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1571,
+          "source_team_name_zh": "巴拉纳竞技",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1571",
+          "sportmonks_team_id": 3432,
+          "sportmonks_team_name": "Athletico PR",
+          "sportmonks_short_code": "APR",
+          "confidence_score": 1.0,
+          "confidence_gap": 0.533,
+          "matched_signals": [
+            "manual_confirmation"
+          ],
+          "status": "seed_manual_confirmed"
+        },
+        {
+          "league_key": "brazilian_serie_a",
+          "league_label": "巴西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1570,
+          "source_team_name_zh": "米内罗竞技",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1570",
+          "sportmonks_team_id": 3427,
+          "sportmonks_team_name": "Atlético Mineiro",
+          "sportmonks_short_code": "AMN",
+          "confidence_score": 0.76,
+          "confidence_gap": 0.76,
+          "matched_signals": [
+            "alias_substring:Atletico Mineiro (MG)"
+          ],
+          "status": "seed_manual_confirmed"
+        },
+        {
+          "league_key": "brazilian_serie_a",
+          "league_label": "巴西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1568,
+          "source_team_name_zh": "博塔弗戈",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1568",
+          "sportmonks_team_id": 2864,
+          "sportmonks_team_name": "Botafogo",
+          "sportmonks_short_code": "BOT",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:botafogo"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "brazilian_serie_a",
+          "league_label": "巴西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1567,
+          "source_team_name_zh": "帕尔梅拉斯",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1567",
+          "sportmonks_team_id": 3422,
+          "sportmonks_team_name": "Palmeiras",
+          "sportmonks_short_code": "PAL",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Palmeiras"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "brazilian_serie_a",
+          "league_label": "巴西甲",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1385,
+          "source_team_name_zh": "圣保罗",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1385",
+          "sportmonks_team_id": 3496,
+          "sportmonks_team_name": "São Paulo",
+          "sportmonks_short_code": "SAO",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Sao Paulo"
+          ],
+          "status": "seed_confirmed"
+        }
+      ]
+    },
+    {
+      "key": "major_league_soccer",
+      "label": "美职联",
+      "target_league_name": "Major League Soccer",
+      "alias_count": 30,
+      "aliases": [
+        {
+          "league_key": "major_league_soccer",
+          "league_label": "美职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 4293,
+          "source_team_name_zh": "蒙特利尔冲击",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=4293",
+          "sportmonks_team_id": 3736,
+          "sportmonks_team_name": "CF Montréal",
+          "sportmonks_short_code": "CFM",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:cf montreal"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "major_league_soccer",
+          "league_label": "美职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 15301,
+          "source_team_name_zh": "圣地亚哥",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=15301",
+          "sportmonks_team_id": 275650,
+          "sportmonks_team_name": "San Diego",
+          "sportmonks_short_code": "SDL",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.48,
+          "matched_signals": [
+            "alias_exact:san diego"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "major_league_soccer",
+          "league_label": "美职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 14129,
+          "source_team_name_zh": "圣路易斯城",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=14129",
+          "sportmonks_team_id": 267299,
+          "sportmonks_team_name": "St. Louis City",
+          "sportmonks_short_code": "LOU",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.468,
+          "matched_signals": [
+            "alias_exact:st louis city"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "major_league_soccer",
+          "league_label": "美职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 13702,
+          "source_team_name_zh": "夏洛特FC",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=13702",
+          "sportmonks_team_id": 260119,
+          "sportmonks_team_name": "Charlotte",
+          "sportmonks_short_code": "CHL",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.34,
+          "matched_signals": [
+            "alias_exact:charlotte"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "major_league_soccer",
+          "league_label": "美职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 12213,
+          "source_team_name_zh": "迈阿密国际",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=12213",
+          "sportmonks_team_id": 239235,
+          "sportmonks_team_name": "Inter Miami",
+          "sportmonks_short_code": "MIA",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.468,
+          "matched_signals": [
+            "alias_exact:inter miami"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "major_league_soccer",
+          "league_label": "美职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 11305,
+          "source_team_name_zh": "奥斯汀FC",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=11305",
+          "sportmonks_team_id": 254172,
+          "sportmonks_team_name": "Austin",
+          "sportmonks_short_code": "ATX",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.34,
+          "matched_signals": [
+            "alias_exact:austin"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "major_league_soccer",
+          "league_label": "美职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 10715,
+          "source_team_name_zh": "纳什维尔",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=10715",
+          "sportmonks_team_id": 148048,
+          "sportmonks_team_name": "Nashville SC",
+          "sportmonks_short_code": "NSH",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Nashville SC"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "major_league_soccer",
+          "league_label": "美职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 10525,
+          "source_team_name_zh": "洛杉矶FC",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=10525",
+          "sportmonks_team_id": 147671,
+          "sportmonks_team_name": "Los Angeles FC",
+          "sportmonks_short_code": "LAF",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Los Angeles FC"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "major_league_soccer",
+          "league_label": "美职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 9392,
+          "source_team_name_zh": "亚特兰大联",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=9392",
+          "sportmonks_team_id": 3645,
+          "sportmonks_team_name": "Atlanta United",
+          "sportmonks_short_code": "ATL",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.447,
+          "matched_signals": [
+            "alias_exact:Atlanta United"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "major_league_soccer",
+          "league_label": "美职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 8807,
+          "source_team_name_zh": "辛辛那提FC",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=8807",
+          "sportmonks_team_id": 3636,
+          "sportmonks_team_name": "Cincinnati",
+          "sportmonks_short_code": "CIN",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.34,
+          "matched_signals": [
+            "alias_exact:cincinnati"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "major_league_soccer",
+          "league_label": "美职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 7947,
+          "source_team_name_zh": "纽约城",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=7947",
+          "sportmonks_team_id": 3627,
+          "sportmonks_team_name": "New York City",
+          "sportmonks_short_code": "NYC",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.405,
+          "matched_signals": [
+            "alias_exact:new york city"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "major_league_soccer",
+          "league_label": "美职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 7316,
+          "source_team_name_zh": "明尼苏达联",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=7316",
+          "sportmonks_team_id": 3639,
+          "sportmonks_team_name": "Minnesota United",
+          "sportmonks_short_code": "MIN",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.447,
+          "matched_signals": [
+            "alias_exact:minnesota united"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "major_league_soccer",
+          "league_label": "美职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 6563,
+          "source_team_name_zh": "多伦多FC",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=6563",
+          "sportmonks_team_id": 111,
+          "sportmonks_team_name": "Toronto",
+          "sportmonks_short_code": "TOR",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.34,
+          "matched_signals": [
+            "alias_exact:toronto"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "major_league_soccer",
+          "league_label": "美职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 6555,
+          "source_team_name_zh": "奥兰多城",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=6555",
+          "sportmonks_team_id": 204,
+          "sportmonks_team_name": "Orlando City",
+          "sportmonks_short_code": "ORL",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.468,
+          "matched_signals": [
+            "alias_exact:Orlando City"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "major_league_soccer",
+          "league_label": "美职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 6186,
+          "source_team_name_zh": "费城联合",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=6186",
+          "sportmonks_team_id": 275,
+          "sportmonks_team_name": "Philadelphia Union",
+          "sportmonks_short_code": "PHI",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Philadelphia Union"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "major_league_soccer",
+          "league_label": "美职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 499,
+          "source_team_name_zh": "圣何塞地震",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=499",
+          "sportmonks_team_id": 287,
+          "sportmonks_team_name": "SJ Earthquakes",
+          "sportmonks_short_code": "SJE",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.468,
+          "matched_signals": [
+            "alias_exact:sj earthquakes"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "major_league_soccer",
+          "league_label": "美职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 4292,
+          "source_team_name_zh": "波特兰伐木工",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=4292",
+          "sportmonks_team_id": 607,
+          "sportmonks_team_name": "Portland Timbers",
+          "sportmonks_short_code": "POT",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Portland Timbers"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "major_league_soccer",
+          "league_label": "美职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 4286,
+          "source_team_name_zh": "西雅图海湾人",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=4286",
+          "sportmonks_team_id": 2649,
+          "sportmonks_team_name": "Seattle Sounders",
+          "sportmonks_short_code": "SEA",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.48,
+          "matched_signals": [
+            "alias_exact:Seattle Sounders"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "major_league_soccer",
+          "league_label": "美职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 4285,
+          "source_team_name_zh": "温哥华白帽",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=4285",
+          "sportmonks_team_id": 292,
+          "sportmonks_team_name": "Vancouver Whitecaps",
+          "sportmonks_short_code": "VAN",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.48,
+          "matched_signals": [
+            "alias_exact:vancouver whitecaps"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "major_league_soccer",
+          "league_label": "美职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 3419,
+          "source_team_name_zh": "休斯顿迪纳摩",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=3419",
+          "sportmonks_team_id": 478,
+          "sportmonks_team_name": "Houston Dynamo",
+          "sportmonks_short_code": "HOU",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Houston Dynamo"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "major_league_soccer",
+          "league_label": "美职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 2440,
+          "source_team_name_zh": "皇家盐湖城",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=2440",
+          "sportmonks_team_id": 1062,
+          "sportmonks_team_name": "Real Salt Lake",
+          "sportmonks_short_code": "RSL",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Real Salt Lake"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "major_league_soccer",
+          "league_label": "美职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1349,
+          "source_team_name_zh": "芝加哥火焰",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1349",
+          "sportmonks_team_id": 75,
+          "sportmonks_team_name": "Chicago Fire",
+          "sportmonks_short_code": "CHI",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Chicago Fire"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "major_league_soccer",
+          "league_label": "美职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1302,
+          "source_team_name_zh": "新英格兰革命",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1302",
+          "sportmonks_team_id": 641,
+          "sportmonks_team_name": "New England",
+          "sportmonks_short_code": "NER",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.468,
+          "matched_signals": [
+            "alias_exact:new england"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "major_league_soccer",
+          "league_label": "美职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1139,
+          "source_team_name_zh": "纽约红牛",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1139",
+          "sportmonks_team_id": 383,
+          "sportmonks_team_name": "New York RB",
+          "sportmonks_short_code": "NYR",
+          "confidence_score": 0.55,
+          "confidence_gap": 0.0,
+          "matched_signals": [
+            "token_overlap:New York Red Bulls:new/york"
+          ],
+          "status": "seed_manual_confirmed"
+        },
+        {
+          "league_key": "major_league_soccer",
+          "league_label": "美职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 1044,
+          "source_team_name_zh": "洛杉矶银河",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=1044",
+          "sportmonks_team_id": 413,
+          "sportmonks_team_name": "LA Galaxy",
+          "sportmonks_short_code": "LAG",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.405,
+          "matched_signals": [
+            "alias_exact:la galaxy"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "major_league_soccer",
+          "league_label": "美职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 950,
+          "source_team_name_zh": "堪萨斯城竞技",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=950",
+          "sportmonks_team_id": 323,
+          "sportmonks_team_name": "Sporting KC",
+          "sportmonks_short_code": "SKC",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.468,
+          "matched_signals": [
+            "alias_exact:sporting kc"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "major_league_soccer",
+          "league_label": "美职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 934,
+          "source_team_name_zh": "科罗拉多急流",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=934",
+          "sportmonks_team_id": 179,
+          "sportmonks_team_name": "Colorado Rapids",
+          "sportmonks_short_code": "CLR",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Colorado Rapids"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "major_league_soccer",
+          "league_label": "美职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 881,
+          "source_team_name_zh": "华盛顿联",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=881",
+          "sportmonks_team_id": 182,
+          "sportmonks_team_name": "DC United",
+          "sportmonks_short_code": "DCU",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.447,
+          "matched_signals": [
+            "alias_exact:dc united"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "major_league_soccer",
+          "league_label": "美职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 821,
+          "source_team_name_zh": "哥伦布机员",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=821",
+          "sportmonks_team_id": 577,
+          "sportmonks_team_name": "Columbus Crew",
+          "sportmonks_short_code": "COL",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.98,
+          "matched_signals": [
+            "alias_exact:Columbus Crew"
+          ],
+          "status": "seed_confirmed"
+        },
+        {
+          "league_key": "major_league_soccer",
+          "league_label": "美职联",
+          "source_provider": "sporttery.cn",
+          "target_provider": "sportmonks",
+          "source_team_id": 750,
+          "source_team_name_zh": "达拉斯FC",
+          "source_team_url": "https://www.sporttery.cn/zqlszl/qdzl/index.html?gmtid=750",
+          "sportmonks_team_id": 583,
+          "sportmonks_team_name": "Dallas",
+          "sportmonks_short_code": "DAL",
+          "confidence_score": 0.98,
+          "confidence_gap": 0.34,
+          "matched_signals": [
+            "alias_exact:dallas"
+          ],
+          "status": "seed_confirmed"
+        }
+      ]
+    }
+  ]
+}

@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 """模型C: 市场+基本面动态博弈 Poisson —— 联赛参数包架构，支持联赛级定制规则"""
 import numpy as np
 from scipy.stats import poisson
@@ -13,11 +14,30 @@ class ModelC:
       ① 诱导强度（回落幅度、基本面背离、跨市场矛盾、波动）
       ② 市场可信度（庄家共识、盘口稳定、样本充足）
       ③ 盘口-基本面背离（开高/开低幅度）
+=======
+"""模型C: 市场基线 Poisson —— 联赛参数包架构，支持联赛级定制规则"""
+import numpy as np
+from scipy.stats import poisson
+
+class ModelC:
+    """市场基线模型
+
+    核心公式:
+      λ = goal_line × calib × (1 + strength_adj + form_adj + drop_adj) × rule_factors
+>>>>>>> 927ef941e22d3f6ac1a4472d4e70b57b35ea02ae
 
     联赛参数包: 每个联赛一个 dict，只覆写差异项，其余走 default
     """
 
     # ── 联赛参数包 ──
+<<<<<<< HEAD
+=======
+    # calib: 基于历史 ratio = avg(actual) / avg(goal_line)
+    # strength_weight: 攻防偏离联赛均值的调整幅度
+    # form_weight: 近期状态的调整幅度
+    # drop_sensitivity: 盘口回落每单位对 λ 的衰减
+    # low_score_*: 低分盘口特殊规则（韩K专属），goal_line≤阈值 且 drop≥阈值 → 额外衰减
+>>>>>>> 927ef941e22d3f6ac1a4472d4e70b57b35ea02ae
     LEAGUE_PARAMS = {
         "default": {
             "calib": 0.95,
@@ -28,7 +48,11 @@ class ModelC:
             "low_score_enabled": False,
             "low_score_goal_line_max": 1.5,
             "low_score_drop_min": 1.0,
+<<<<<<< HEAD
             "low_score_factor": 1.0,
+=======
+            "low_score_factor": 1.0,  # 1.0 = 不生效
+>>>>>>> 927ef941e22d3f6ac1a4472d4e70b57b35ea02ae
         },
         "英超":   {"calib": 0.942},
         "西甲":   {"calib": 0.923},
@@ -41,6 +65,10 @@ class ModelC:
         "挪超": {
             "calib": 1.022,
             "strength_weight": 0.14,
+<<<<<<< HEAD
+=======
+            # 博德闪耀 0-0: 盘口≤1.5 且回落≥1.0，市场看小球
+>>>>>>> 927ef941e22d3f6ac1a4472d4e70b57b35ea02ae
             "low_score_enabled": True,
             "low_score_goal_line_max": 1.5,
             "low_score_drop_min": 1.0,
@@ -48,6 +76,10 @@ class ModelC:
         },
         "美职联": {
             "calib": 1.050,
+<<<<<<< HEAD
+=======
+            # 洛杉矶银河 0-0: 盘口≤1.5 且回落≥1.0，市场看小球
+>>>>>>> 927ef941e22d3f6ac1a4472d4e70b57b35ea02ae
             "low_score_enabled": True,
             "low_score_goal_line_max": 1.5,
             "low_score_drop_min": 1.0,
@@ -57,11 +89,16 @@ class ModelC:
         "韩K": {
             "calib": 0.947,
             "strength_weight": 0.10,
+<<<<<<< HEAD
+=======
+            # 全北 0-0 规则: 盘口≤1.5 且回落≥1.0 → 市场强烈看小球
+>>>>>>> 927ef941e22d3f6ac1a4472d4e70b57b35ea02ae
             "low_score_enabled": True,
             "low_score_goal_line_max": 1.5,
             "low_score_drop_min": 1.0,
             "low_score_factor": 0.75,
         },
+<<<<<<< HEAD
         # ── 新联赛（基于上赛季 SM 数据回归）──
         "葡超": {"calib": 1.040},   # 2024/2025: 341场, 场均2.60, actual/2.5=1.04
         "英冠": {"calib": 0.992},   # 2024/2025: 599场, 场均2.48, actual/2.5=0.99
@@ -84,10 +121,17 @@ class ModelC:
     }
 
     def _get_params(self, league_name: str) -> dict:
+=======
+    }
+
+    def _get_params(self, league_name: str) -> dict:
+        """获取联赛参数，联赛缺失时合并 default"""
+>>>>>>> 927ef941e22d3f6ac1a4472d4e70b57b35ea02ae
         default = self.LEAGUE_PARAMS["default"]
         league = self.LEAGUE_PARAMS.get(league_name, {})
         return {**default, **league}
 
+<<<<<<< HEAD
     # ═══════════════════════════════════════════════════════════════
     # 基本面预期进球 λ_fundamental
     # ═══════════════════════════════════════════════════════════════
@@ -217,6 +261,8 @@ class ModelC:
     # 主预测
     # ═══════════════════════════════════════════════════════════════
 
+=======
+>>>>>>> 927ef941e22d3f6ac1a4472d4e70b57b35ea02ae
     def predict(self, features: dict, league_name: str = None) -> dict:
         p = self._get_params(league_name)
 
@@ -239,6 +285,7 @@ class ModelC:
             form_total = max(home_gf6, 0.3) + max(away_gf6, 0.3)
             form_adj = p["form_weight"] * (form_total / 2.5 - 1.0)
 
+<<<<<<< HEAD
         # ── 4. 盘口回落信号（真实看小信号，纯负向衰减） ──
         goal_drop = float(features.get("goal_line_drop_from_peak", 0) or 0)
         drop_adj = -p["drop_sensitivity"] * min(goal_drop, 2.0)
@@ -346,6 +393,41 @@ class ModelC:
             high_goal_risk = {"level": risk_level, "factors": factors}
 
         # ── 12. Poisson 分布 ──
+=======
+        # ── 4. 盘口回落信号（四档：微调/真实看小/诱盘逐级回调） ──
+        goal_drop = float(features.get("goal_line_drop_from_peak", 0) or 0)
+        if goal_drop >= 2.0:
+            # >=2.0: 强诱盘，系数 0.50
+            induce_coef = 0.50
+            drop_adj = +induce_coef * min(goal_drop - 1.0, 1.0)
+        elif goal_drop >= 1.5:
+            # 1.5~2.0: 中诱盘，系数 0.30
+            induce_coef = 0.30
+            drop_adj = +induce_coef * (goal_drop - 1.0)
+        elif goal_line > 2.0 and goal_drop > 1.0:
+            # 1.0~1.5: 轻诱盘，系数 0.15（仅GL>2.0触发，低盘口回落为真实信号）
+            induce_coef = 0.15
+            drop_adj = +induce_coef * (goal_drop - 1.0)
+        elif goal_drop >= 0.5:
+            # 0.5~1.0: 真实看小球信号，正常负向衰减
+            drop_adj = -p["drop_sensitivity"] * min(goal_drop, 2.0)
+        else:
+            # <0.5: 轻微波动，小幅负向
+            drop_adj = -p["drop_sensitivity"] * min(goal_drop, 2.0)
+
+        # ── 5. 计算基础 λ ──
+        lambda_val = goal_line * p["calib"] * (1.0 + strength_adj + form_adj + drop_adj)
+
+        # ── 6. 联赛定制规则: 低分盘口增强 ──
+        if p["low_score_enabled"]:
+            # 安全阀: drop>=2.0 为极端诱盘，不触发低分规则
+            if goal_drop < 2.0 and goal_line <= p["low_score_goal_line_max"] and goal_drop >= p["low_score_drop_min"]:
+                lambda_val *= p["low_score_factor"]
+
+        lambda_val = max(0.5, min(6.0, lambda_val))
+
+        # ── 7. Poisson 分布 ──
+>>>>>>> 927ef941e22d3f6ac1a4472d4e70b57b35ea02ae
         goal_probs = [float(poisson.pmf(k, lambda_val)) for k in range(5)]
         goal_probs[4] = float(1.0 - poisson.cdf(3, lambda_val))
         total = sum(goal_probs)
@@ -356,13 +438,18 @@ class ModelC:
             "goal_distribution": [round(p / total, 4) for p in goal_probs],
             "over_2_5_prob": round(float(1.0 - poisson.cdf(2, lambda_val)), 4),
             "zero_inflation_prob": 0.0,
+<<<<<<< HEAD
             "high_goal_risk": high_goal_risk,
+=======
+            # 计算明细
+>>>>>>> 927ef941e22d3f6ac1a4472d4e70b57b35ea02ae
             "detail": {
                 "goal_line": round(goal_line, 2),
                 "calib": p["calib"],
                 "strength_adj": round(strength_adj, 4),
                 "form_adj": round(form_adj, 4),
                 "drop_adj": round(drop_adj, 4),
+<<<<<<< HEAD
                 "lambda_market": round(lambda_market, 2),
                 "lambda_fundamental": round(lambda_fundamental, 2),
                 "divergence": round(divergence, 2),
@@ -373,6 +460,11 @@ class ModelC:
                 "low_score_applied": low_score_applied,
                 "low_score_factor": p["low_score_factor"] if p["low_score_enabled"] else None,
                 "league_rule_applied": league_rule_applied,
+=======
+                "lambda_raw": round(goal_line * p["calib"] * (1.0 + strength_adj + form_adj + drop_adj), 4),
+                "low_score_applied": p["low_score_enabled"] and goal_line <= p["low_score_goal_line_max"] and goal_drop >= p["low_score_drop_min"],
+                "low_score_factor": p["low_score_factor"] if p["low_score_enabled"] else None,
+>>>>>>> 927ef941e22d3f6ac1a4472d4e70b57b35ea02ae
                 "home_goals_avg": round(home_gf, 2),
                 "away_goals_avg": round(away_gf, 2),
                 "home_gf_avg_6": round(home_gf6, 2),

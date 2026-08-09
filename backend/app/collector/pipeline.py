@@ -468,21 +468,11 @@ class SyncPipeline:
                                                 # 匹配成功：设置 fixture ID + 反推球队 SM ID
                                                 fx_id = fx["id"]
                                                 if unknown_team and not unknown_team.sportmonks_id:
-                                                    # 检查 other_pid 是否已被其他球队占用（唯一约束保护）
-                                                    existing = await db.execute(
-                                                        select(Team).where(Team.sportmonks_id == other_pid)
-                                                    )
-                                                    existing_team = existing.scalar_one_or_none()
-                                                    if existing_team:
-                                                        AppLogger.warning("match_fixtures",
-                                                            f"  反推球队映射冲突: {unknown_team.name_zh}(id={unknown_team.id}) → SM id={other_pid}，"
-                                                            f"但该 ID 已被 {existing_team.name_en}(id={existing_team.id}) 占用，跳过 sportmonks_id 赋值")
-                                                    else:
-                                                        unknown_team.sportmonks_id = other_pid
-                                                        unknown_team.name_en = other_name
-                                                        unknown_team.needs_review = False
-                                                        AppLogger.info("match_fixtures",
-                                                            f"  反推球队映射: {unknown_team.name_zh} → SM id={other_pid} name={other_name} (来自 fixture {fx_id})")
+                                                    unknown_team.sportmonks_id = other_pid
+                                                    unknown_team.name_en = other_name
+                                                    unknown_team.needs_review = False
+                                                    AppLogger.info("match_fixtures",
+                                                        f"  反推球队映射: {unknown_team.name_zh} → SM id={other_pid} name={other_name} (来自 fixture {fx_id})")
                                                 break
 
                         # ── 策略 B（原）：名称双向匹配 ──

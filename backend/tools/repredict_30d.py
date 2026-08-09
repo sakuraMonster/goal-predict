@@ -78,11 +78,16 @@ async def main():
                 pred.snap_top2_c = new_snap
 
             kickoff_str = m.kickoff_time.strftime("%m-%d %H:%M") if m.kickoff_time else "?"
+<<<<<<< HEAD
             # 比赛周期: 当日12:00~次日12:00, 标签取起始日期
             cycle_label = (m.kickoff_time - timedelta(hours=12)).strftime("%m-%d") if m.kickoff_time else "?"
             results.append({
                 "date": kickoff_str,
                 "cycle": cycle_label,
+=======
+            results.append({
+                "date": kickoff_str,
+>>>>>>> 927ef941e22d3f6ac1a4472d4e70b57b35ea02ae
                 "home": m.home_team_name or "?",
                 "away": m.away_team_name or "?",
                 "league": lg_name,
@@ -115,11 +120,20 @@ async def main():
     lines.append("修改后: {}/{} = {:.1f}%".format(new_hit, len(settled), new_hit/len(settled)*100 if settled else 0))
     lines.append("改善: +{}  恶化: -{}  净改善: {:+d}".format(len(changed_better), len(changed_worse), len(changed_better) - len(changed_worse)))
 
+<<<<<<< HEAD
     # 按比赛周期分组
     lines.append("--- 按比赛周期（12:00~次日12:00） ---")
     by_date = defaultdict(lambda: {"total": 0, "old_hit": 0, "new_hit": 0})
     for r in settled:
         d = r["cycle"]
+=======
+    # 按日期分组
+    lines.append("")
+    lines.append("--- 按日期 ---")
+    by_date = defaultdict(lambda: {"total": 0, "old_hit": 0, "new_hit": 0})
+    for r in settled:
+        d = r["date"][:5]  # MM-DD
+>>>>>>> 927ef941e22d3f6ac1a4472d4e70b57b35ea02ae
         by_date[d]["total"] += 1
         if r["old_hit"]: by_date[d]["old_hit"] += 1
         if r["new_hit"]: by_date[d]["new_hit"] += 1

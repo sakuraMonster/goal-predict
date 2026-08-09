@@ -1,12 +1,19 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   getMatches, getMatchDates, getLeagues, getPrediction, getH2H, getMatchTeamComparison,
+<<<<<<< HEAD
   getReportRange, getLeagueAccuracy, repredictModelB, predictModelC, syncOdds, updateTeams
+=======
+  getReportRange, repredictModelB, predictModelC, syncOdds, updateTeams
+>>>>>>> 927ef941e22d3f6ac1a4472d4e70b57b35ea02ae
 } from "../api/client";
 import EmptyState from "../components/EmptyState";
 import ErrorState from "../components/ErrorState";
 import SkeletonCard from "../components/Skeleton";
+<<<<<<< HEAD
 import LeagueAccuracyBarChart from "../components/LeagueAccuracyBarChart";
+=======
+>>>>>>> 927ef941e22d3f6ac1a4472d4e70b57b35ea02ae
 import { useToast } from "../components/Toast";
 import type { PredictionData, KeyFactors } from "../api/client";
 
@@ -722,8 +729,11 @@ function HistoryReportView() {
   const [repredictDate, setRepredictDate] = useState("");
   const [showConfirm, setShowConfirm] = useState(false);
   const [repredicting, setRepredicting] = useState(false);
+<<<<<<< HEAD
   const [leagueAccuracy, setLeagueAccuracy] = useState<any[]>([]);
   const [leagueAccLoading, setLeagueAccLoading] = useState(false);
+=======
+>>>>>>> 927ef941e22d3f6ac1a4472d4e70b57b35ea02ae
   const PAGE_SIZE = 20;
 
   // 筛选
@@ -789,6 +799,7 @@ function HistoryReportView() {
 
   useEffect(() => { fetchHistory(); setPage(1); }, [range]); // eslint-disable-line react-hooks/exhaustive-deps
 
+<<<<<<< HEAD
   // 拉取联赛命中率（近30天固定）
   useEffect(() => {
     setLeagueAccLoading(true);
@@ -798,6 +809,8 @@ function HistoryReportView() {
       .finally(() => setLeagueAccLoading(false));
   }, [range]);
 
+=======
+>>>>>>> 927ef941e22d3f6ac1a4472d4e70b57b35ea02ae
   // 筛选
   const filteredRows = useMemo(() => {
     let list = rows;
@@ -913,9 +926,12 @@ function HistoryReportView() {
         ))}
       </div>
 
+<<<<<<< HEAD
       {/* 联赛命中率柱状图 */}
       <LeagueAccuracyBarChart data={leagueAccuracy} loading={leagueAccLoading} />
 
+=======
+>>>>>>> 927ef941e22d3f6ac1a4472d4e70b57b35ea02ae
       {/* 空数据 */}
       {rows.length === 0 && (
         <EmptyState icon="📋" message="暂无历史预测数据"

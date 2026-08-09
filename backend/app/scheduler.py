@@ -11,6 +11,8 @@ from app.db.redis_client import acquire_lock, release_lock
 # 让 APScheduler 的日志输出到控制台
 logging.getLogger("apscheduler").setLevel(logging.WARNING)
 
+scheduler = AsyncIOScheduler()
+
 
 async def _run_with_lock(task_name: str, fn):
     """带 Redis 分布式锁的任务执行包装"""
@@ -63,7 +65,7 @@ def init_scheduler():
     scheduler.add_job(_run_sync_matches, CronTrigger(hour=9, minute=0, timezone=tz), id="sync_matches_09")
     scheduler.add_job(_run_sync_matches, CronTrigger(hour=12, minute=0, timezone=tz), id="sync_matches_12")
 
-    scheduler.add_job(_run_sync_odds, CronTrigger(minute="*/30", timezone=tz), id="sync_odds_30m")
+    scheduler.add_job(_run_sync_odds, CronTrigger(minute="*/30"), id="sync_odds_30m")
 
     scheduler.add_job(_run_update_teams, CronTrigger(hour=3, minute=0, timezone=tz), id="update_teams")
 

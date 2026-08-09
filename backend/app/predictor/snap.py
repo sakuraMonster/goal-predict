@@ -30,6 +30,7 @@ def snap_top2(expected_goals: float) -> list[int]:
     return [dists[0][0], dists[1][0]]
 
 
+<<<<<<< HEAD
 def snap_top3(expected_goals: float) -> list[int]:
     """返回距离 effective λ 最近的3个整数（0-6 范围内）"""
     effective = snap_effective(expected_goals)
@@ -48,6 +49,8 @@ def snap_top2_norway(expected_goals: float) -> list[int]:
     return [dists[0][0], dists[1][0], dists[2][0]]
 
 
+=======
+>>>>>>> 927ef941e22d3f6ac1a4472d4e70b57b35ea02ae
 def judge_goals(total_goals: int, expected_goals: float) -> int:
     """判定进球数是否命中：实际总进球是否在 SNAP Top2 范围内"""
     top2 = snap_top2(expected_goals)

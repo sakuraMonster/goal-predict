@@ -141,9 +141,12 @@ export const getDailyReport = (date?: string) =>
 export const getReportRange = (params: { date_from: string; date_to: string; league_id?: number }) =>
   api.get("/reports/range", { params }).then((r) => r.data);
 
+<<<<<<< HEAD
 export const getLeagueAccuracy = (days: number = 30) =>
   api.get("/reports/league-accuracy", { params: { days } }).then((r) => r.data);
 
+=======
+>>>>>>> 927ef941e22d3f6ac1a4472d4e70b57b35ea02ae
 export const getDailySummary = (date?: string) =>
   api.get("/reports/daily/summary", { params: date ? { date } : {} }).then((r) => r.data);
 

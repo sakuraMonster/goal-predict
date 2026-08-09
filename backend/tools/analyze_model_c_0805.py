@@ -140,6 +140,7 @@ async def main():
         print(f"    goal_line(市场盘口) = {d['goal_line']:.2f}")
         print(f"    calib(联赛校准)    = {d['calib']:.4f}")
         print(f"    strength_adj       = {d['strength_adj']:.4f}  (主攻{d['home_goals_avg']:.2f} + 客攻{d['away_goals_avg']:.2f} = {d['home_goals_avg'] + d['away_goals_avg']:.2f})")
+<<<<<<< HEAD
         print(f"    form_adj           = {d['form_adj']:.4f}  (主近6场{d['home_gf_avg_6']:.2f} + 客近6场{d['away_gf_avg_6']:.2f})")
         print(f"    drop_adj           = {d['drop_adj']:.4f}  (回落={d['goal_drop']:.2f})")
         print(f"    --- 新架构 ---")
@@ -149,6 +150,10 @@ async def main():
         print(f"    induce_score       = {d.get('induce_score', 'N/A')}")
         print(f"    market_confidence  = {d.get('market_confidence', 'N/A')}")
         print(f"    market_weight      = {d.get('market_weight', 'N/A')}")
+=======
+        print(f"    form_adj           = {d['form_adj']:.4f}  (主近10场{d['home_gf_avg_10']:.2f} + 客近10场{d['away_gf_avg_10']:.2f})")
+        print(f"    drop_adj           = {d['drop_adj']:.4f}  (回落={d['goal_drop']:.2f})")
+>>>>>>> 927ef941e22d3f6ac1a4472d4e70b57b35ea02ae
         print(f"    lambda_raw         = {d['lambda_raw']:.4f}")
         if d.get("low_score_applied"):
             print(f"    *** 低分规则触发! factor={d['low_score_factor']} ***")

@@ -4,6 +4,7 @@ import MatchCard from "../components/MatchCard";
 import EmptyState from "../components/EmptyState";
 import SkeletonCard from "../components/Skeleton";
 import ErrorState from "../components/ErrorState";
+<<<<<<< HEAD
 
 const WEEKDAY_CN = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
 
@@ -39,6 +40,8 @@ function matchNumOrder(matchNum: string): number {
   }
   return 99999;
 }
+=======
+>>>>>>> 927ef941e22d3f6ac1a4472d4e70b57b35ea02ae
 
 export default function Dashboard() {
   const [matches, setMatches] = useState<any[]>([]);
@@ -46,10 +49,14 @@ export default function Dashboard() {
   const [leagues, setLeagues] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+<<<<<<< HEAD
   const [selectedDate, setSelectedDate] = useState(() => {
     const now = new Date();
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
   });
+=======
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().slice(0, 10));
+>>>>>>> 927ef941e22d3f6ac1a4472d4e70b57b35ea02ae
   const [selectedLeague, setSelectedLeague] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<"all" | "cold" | "hot">("all");
   /** 当前选中的比赛日（默认=今日），用于左侧高亮 */
@@ -74,7 +81,10 @@ export default function Dashboard() {
 
   const fetchData = useCallback(() => {
     setLoading(true);
+<<<<<<< HEAD
     setMatches([]);  // 清空旧数据，避免切换日期时短暂显示上一批数据
+=======
+>>>>>>> 927ef941e22d3f6ac1a4472d4e70b57b35ea02ae
     setError(null);
     const params: any = {};
     if (queryDate) params.date = queryDate;
@@ -93,6 +103,7 @@ export default function Dashboard() {
         setError("赛事加载失败，请重试");
       }
       if (d.status === "fulfilled") {
+<<<<<<< HEAD
         const datesData = d.value.data || [];
         setDates(datesData);
         if (datesData.length) {
@@ -107,6 +118,20 @@ export default function Dashboard() {
             } else {
               setSelectedDate(datesData[0].date);
             }
+=======
+        setDates(d.value.data || []);
+        // 默认选中今天或最近的未来日期
+        if (!selectedDate && d.value.data?.length) {
+          const today = new Date().toISOString().slice(0, 10);
+          const todayItem = d.value.data.find((item: any) => item.date === today);
+          const futureDates = d.value.data.filter((item: any) => !item.is_past);
+          if (todayItem) {
+            setSelectedDate(todayItem.date);
+          } else if (futureDates.length > 0) {
+            setSelectedDate(futureDates[0].date);
+          } else {
+            setSelectedDate(d.value.data[d.value.data.length - 1].date);
+>>>>>>> 927ef941e22d3f6ac1a4472d4e70b57b35ea02ae
           }
         }
       }
@@ -163,11 +188,20 @@ export default function Dashboard() {
 
   if (error) return <ErrorState message={error} onRetry={fetchData} />;
 
+  if (error) return <ErrorState message={error} onRetry={fetchData} />;
+
   return (
     <div className="flex">
+<<<<<<< HEAD
       {/* ── 左侧边栏 ── */}
       <aside className="w-[150px] bg-parchment-light border-r border-border p-3.5 font-body text-xs text-ink-muted leading-loose flex-shrink-0 overflow-y-auto max-h-[calc(100vh-100px)]">
         <div className="font-semibold text-ink mb-1">日期</div>
+=======
+      <aside className="w-[150px] bg-parchment-light border-r border-border p-3.5 font-body text-xs text-ink-muted leading-loose flex-shrink-0 overflow-y-auto max-h-[calc(100vh-100px)]">
+        <div className="font-semibold text-ink mb-1">日期</div>
+
+        {/* 日期快捷输入 */}
+>>>>>>> 927ef941e22d3f6ac1a4472d4e70b57b35ea02ae
         <div className="mb-2">
           <input
             type="date"
@@ -177,6 +211,7 @@ export default function Dashboard() {
           />
         </div>
 
+<<<<<<< HEAD
         {/* 比赛周期列表 */}
         {matchDays.length > 0 && (
           <>
@@ -204,6 +239,11 @@ export default function Dashboard() {
         {isTodayOrFuture && dates.filter((d: any) => d.is_past).length > 0 && (
           <>
             <div className="border-t border-border my-2" />
+=======
+        {/* 历史日期（有赛事的） */}
+        {dates.filter((d: any) => d.is_past).length > 0 && (
+          <>
+>>>>>>> 927ef941e22d3f6ac1a4472d4e70b57b35ea02ae
             <div className="text-[10px] text-ink-muted/60 mb-0.5 mt-1">历史</div>
             {dates.filter((d: any) => d.is_past).slice(-7).map((d: any) => (
               <div
@@ -217,8 +257,26 @@ export default function Dashboard() {
           </>
         )}
 
+<<<<<<< HEAD
         <div className="border-t border-border my-2" />
 
+=======
+        {/* 未来日期 */}
+        {dates.filter((d: any) => !d.is_past).length > 0 && (
+          <>
+            <div className="text-[10px] text-ink-muted/60 mb-0.5 mt-1">未来</div>
+            {dates.filter((d: any) => !d.is_past).map((d: any) => (
+              <div
+                key={d.date}
+                className={`cursor-pointer hover:text-moss transition-colors ${d.date === selectedDate ? "text-moss font-semibold" : ""}`}
+                onClick={() => setSelectedDate(d.date)}
+              >
+                {d.date.slice(5)} ({d.count}场)
+              </div>
+            ))}
+          </>
+        )}
+>>>>>>> 927ef941e22d3f6ac1a4472d4e70b57b35ea02ae
         <div className="mt-3 font-semibold text-ink mb-1">联赛</div>
         <div
           className={`cursor-pointer hover:text-moss transition-colors ${!selectedLeague ? "text-moss font-semibold" : ""}`}
@@ -228,7 +286,11 @@ export default function Dashboard() {
         </div>
         {leagues.map((l: any) => (
           <div
+<<<<<<< HEAD
             key={l.id != null ? l.id : `venue:${l.name}`}
+=======
+            key={l.id}
+>>>>>>> 927ef941e22d3f6ac1a4472d4e70b57b35ea02ae
             className={`cursor-pointer hover:text-moss truncate ${l.id === selectedLeague ? "text-moss font-semibold" : ""}`}
             title={l.name}
             onClick={() => setSelectedLeague(l.id === selectedLeague ? null : l.id)}
@@ -253,7 +315,11 @@ export default function Dashboard() {
               </span>
             ))}
           </div>
+<<<<<<< HEAD
           <span className="font-body text-xs text-ink-light">共 {totalFiltered} 场</span>
+=======
+          <span className="font-body text-xs text-ink-light">共 {filteredMatches.length} 场</span>
+>>>>>>> 927ef941e22d3f6ac1a4472d4e70b57b35ea02ae
           <button
             onClick={fetchData}
             disabled={loading}

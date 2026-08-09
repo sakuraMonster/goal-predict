@@ -1,6 +1,6 @@
 """报告相关 API"""
 import httpx
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 from datetime import datetime, timedelta, timezone
@@ -689,4 +689,71 @@ async def get_report_range(
         },
         "date_from": date_from,
         "date_to": date_to,
+    }
+
+
+@router.get("/league-accuracy")
+async def get_league_accuracy(
+    days: int = Query(30, description="统计近N天，默认30天"),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    近N天按联赛分组的 SNAP Top2 进球数命中率。
+    返回按已结算场次降序排列的联赛列表。
+    """
+    from collections import defaultdict
+    from sqlalchemy.orm import joinedload
+
+    today = datetime.now(BEIJING_TZ)
+    start = (today - timedelta(days=days)).replace(hour=12, minute=0, second=0, microsecond=0).replace(tzinfo=None)
+    end = (today + timedelta(days=1)).replace(hour=12, minute=0, second=0, microsecond=0).replace(tzinfo=None)
+
+    result = await db.execute(
+        select(Prediction)
+        .options(joinedload(Prediction.match).joinedload(Match.league))
+        .where(and_(Prediction.kickoff_time >= start, Prediction.kickoff_time < end))
+    )
+    predictions = result.unique().scalars().all()
+
+    # 按联赛分组统计
+    by_league: dict[str, dict] = defaultdict(lambda: {"total": 0, "settled": 0, "hit": 0, "miss": 0})
+
+    for pred in predictions:
+        match = pred.match
+        if not match:
+            continue
+        lg_name = match.league.name_zh if match.league else "未知联赛"
+        by_league[lg_name]["total"] += 1
+
+        if pred.actual_total_goals is not None:
+            by_league[lg_name]["settled"] += 1
+            snap = pred.snap_top2_c if pred.snap_top2_c else pred.snap_top2
+            if snap:
+                act_capped = min(pred.actual_total_goals, 4)
+                if act_capped in snap:
+                    by_league[lg_name]["hit"] += 1
+                else:
+                    by_league[lg_name]["miss"] += 1
+
+    # 组装结果，按已结算场次降序
+    result_list = []
+    for lg_name, stats in by_league.items():
+        settled = stats["settled"]
+        accuracy = round(stats["hit"] / settled * 100, 1) if settled > 0 else 0.0
+        result_list.append({
+            "league_name": lg_name,
+            "total": stats["total"],
+            "settled": settled,
+            "hit": stats["hit"],
+            "miss": stats["miss"],
+            "accuracy": accuracy,
+        })
+
+    result_list.sort(key=lambda x: x["settled"], reverse=True)
+
+    return {
+        "data": result_list,
+        "days": days,
+        "date_from": start.date().isoformat(),
+        "date_to": (today + timedelta(days=1)).date().isoformat(),
     }

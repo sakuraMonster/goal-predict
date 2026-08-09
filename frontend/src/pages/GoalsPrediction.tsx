@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   getMatches, getMatchDates, getLeagues, getPrediction, getH2H, getMatchTeamComparison,
-  getReportRange, repredictModelB, predictModelC, syncOdds, updateTeams
+  getReportRange, getLeagueAccuracy, repredictModelB, predictModelC, syncOdds, updateTeams
 } from "../api/client";
 import EmptyState from "../components/EmptyState";
 import ErrorState from "../components/ErrorState";
 import SkeletonCard from "../components/Skeleton";
+import LeagueAccuracyBarChart from "../components/LeagueAccuracyBarChart";
 import { useToast } from "../components/Toast";
 import type { PredictionData, KeyFactors } from "../api/client";
 
@@ -721,6 +722,8 @@ function HistoryReportView() {
   const [repredictDate, setRepredictDate] = useState("");
   const [showConfirm, setShowConfirm] = useState(false);
   const [repredicting, setRepredicting] = useState(false);
+  const [leagueAccuracy, setLeagueAccuracy] = useState<any[]>([]);
+  const [leagueAccLoading, setLeagueAccLoading] = useState(false);
   const PAGE_SIZE = 20;
 
   // 筛选
@@ -785,6 +788,15 @@ function HistoryReportView() {
   }, [range, repredictDate]);
 
   useEffect(() => { fetchHistory(); setPage(1); }, [range]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // 拉取联赛命中率（近30天固定）
+  useEffect(() => {
+    setLeagueAccLoading(true);
+    getLeagueAccuracy(30)
+      .then((res) => setLeagueAccuracy(res.data || []))
+      .catch(() => {})
+      .finally(() => setLeagueAccLoading(false));
+  }, [range]);
 
   // 筛选
   const filteredRows = useMemo(() => {
@@ -900,6 +912,9 @@ function HistoryReportView() {
           </div>
         ))}
       </div>
+
+      {/* 联赛命中率柱状图 */}
+      <LeagueAccuracyBarChart data={leagueAccuracy} loading={leagueAccLoading} />
 
       {/* 空数据 */}
       {rows.length === 0 && (

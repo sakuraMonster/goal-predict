@@ -30,6 +30,24 @@ def snap_top2(expected_goals: float) -> list[int]:
     return [dists[0][0], dists[1][0]]
 
 
+def snap_top3(expected_goals: float) -> list[int]:
+    """返回距离 effective λ 最近的3个整数（0-6 范围内）"""
+    effective = snap_effective(expected_goals)
+    dists = [(i, abs(effective - i)) for i in range(MAX_GOALS + 1)]
+    dists.sort(key=lambda x: x[1])
+    return [dists[0][0], dists[1][0], dists[2][0]]
+
+
+def snap_top2_norway(expected_goals: float) -> list[int]:
+    """挪超专属 SNAP: 联赛系统性爆大球(actual/GL=1.53, 5+球率36%)
+    effective λ + 0.2 微调 + Top3 扩覆盖，兼顾大球识别与正常比赛不丢失"""
+    effective = snap_effective(expected_goals) + 0.2
+    effective = min(MAX_GOALS, effective)
+    dists = [(i, abs(effective - i)) for i in range(MAX_GOALS + 1)]
+    dists.sort(key=lambda x: x[1])
+    return [dists[0][0], dists[1][0], dists[2][0]]
+
+
 def judge_goals(total_goals: int, expected_goals: float) -> int:
     """判定进球数是否命中：实际总进球是否在 SNAP Top2 范围内"""
     top2 = snap_top2(expected_goals)

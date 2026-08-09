@@ -36,6 +36,32 @@ CN_TO_EN_SEARCH = {
     "坦佩雷山猫": "Tampere", "布鲁马波": "Brommapojkarna",
     "赫尔辛基火花": "HIFK",  # 赫尔火花 / HIFK，不是 HJK 赫尔辛基
     "赫尔辛基": "HJK",
+    # 2026-08-07 新增：荷甲/荷乙/德乙/葡超/英冠/日职联
+    "坎布尔": "Cambuur", "柏林赫塔": "Hertha BSC",
+    "法马利康": "Famalicao", "女王公园巡游者": "Queens Park Rangers",
+    "前进之鹰": "Go Ahead Eagles", "威廉二世": "Willem II",
+    "吉马良斯": "Vitoria Guimaraes", "阿尔克马尔": "AZ Alkmaar",
+    "山形山神": "Montedio Yamagata", "菲尔特": "Greuther Furth",
+    "兹沃勒": "PEC Zwolle", "阿贾克斯": "Ajax",
+    "吉维森特": "Gil Vicente",
+    # 2026-08-08 新增：修复历史数据中name_en错误的球队
+    "波尔图": "Porto", "阿尔维卡": "Alverca", "圣保利": "St Pauli",
+    "德累斯顿": "Dresden", "海牙": "ADO Den Haag",
+    "波城FC": "Pau", "阿纳西": "Annecy", "南特": "Nantes",
+    "圣旺红星": "Red Star", "蒙彼利埃": "Montpellier",
+    "第戎": "Dijon", "阿罗卡": "Arouca", "马里迪莫": "Maritimo",
+    "卡萨皮亚": "Casa Pia", "西汉姆联": "West Ham",
+    "埃斯托里尔": "Estoril", "SBV精英": "Excelsior",
+    "新潟天鹅": "Albirex Niigata", "拉赫蒂": "Lahti",
+    "米拉索尔": "Mirassol", "格雷米奥": "Gremio",
+    "桑托斯": "Santos", "里莫": "Remo", "维多利亚": "Vitoria",
+    "博德闪耀": "Bodo Glimt", "汉坎": "HamKam",
+    "哈马比": "Hammarby", "斯达": "Start",
+    "瓦萨": "VPS", "库普斯": "KuPS",
+    "塞伊奈约基": "SJK", "朴次茅斯": "Portsmouth",
+    "斯旺西": "Swansea", "伯明翰": "Birmingham",
+    "米尔沃尔": "Millwall", "雷克斯汉姆": "Wrexham",
+    "米德尔斯堡": "Middlesbrough",
 }
 
 

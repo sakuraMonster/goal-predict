@@ -35,10 +35,11 @@ def _date_range(day_str: str):
 async def list_matches(
     date: str = Query(None, description="日期 YYYY-MM-DD，不传默认今天"),
     league_id: int = Query(None),
-    limit: int = Query(50, description="最大返回数量"),
+    days: int = Query(1, description="查询天数（1=单日，3=未来3天），与date配合使用"),
+    limit: int = Query(150, description="最大返回数量"),
     db: AsyncSession = Depends(get_db),
 ):
-    """赛事列表（含预测摘要）"""
+    """赛事列表（含预测摘要），支持多日范围查询"""
     from sqlalchemy.orm import joinedload
 
     query = select(Match).options(
@@ -51,8 +52,16 @@ async def list_matches(
         filter_date = date
     else:
         filter_date = datetime.now().strftime("%Y-%m-%d")
-    start, end = _date_range(filter_date)
-    query = query.where(and_(Match.kickoff_time >= start, Match.kickoff_time < end))
+
+    if days > 1:
+        # 多日范围：[date 12:00, (date + days) 12:00)
+        start, _ = _date_range(filter_date)
+        end_dt = datetime.strptime(filter_date, "%Y-%m-%d") + timedelta(days=days)
+        end = end_dt.replace(hour=12, minute=0, second=0)
+        query = query.where(and_(Match.kickoff_time >= start, Match.kickoff_time < end))
+    else:
+        start, end = _date_range(filter_date)
+        query = query.where(and_(Match.kickoff_time >= start, Match.kickoff_time < end))
     if league_id:
         query = query.where(Match.league_id == league_id)
     query = query.order_by(Match.match_num).limit(limit)

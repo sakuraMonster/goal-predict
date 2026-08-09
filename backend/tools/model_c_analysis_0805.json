@@ -1,0 +1,108 @@
+{
+  "summary": {
+    "total": 3,
+    "settled": 3,
+    "hit": 1,
+    "miss": 2,
+    "accuracy": 33.3
+  },
+  "by_league": {
+    "欧冠": {
+      "hit": 1,
+      "total": 2
+    },
+    "未知": {
+      "hit": 0,
+      "total": 1
+    }
+  },
+  "missed": [
+    {
+      "date": "2026-08-05",
+      "match_id": 15513,
+      "home": "弗鲁米嫩塞",
+      "away": "瓦斯科达伽马",
+      "league": "未知",
+      "actual_score": "1:3",
+      "actual_total": 4,
+      "expected_goals": 2.45,
+      "snap_top2": [
+        2,
+        3
+      ],
+      "detail": {
+        "goal_line": 2.5,
+        "calib": 0.95,
+        "strength_adj": 0.0141,
+        "form_adj": -0.0272,
+        "drop_adj": -0.0,
+        "lambda_market": 2.34,
+        "lambda_fundamental": 2.72,
+        "divergence": -0.22,
+        "induce_score": 0.2,
+        "market_confidence": 0.6757,
+        "market_weight": 0.7139,
+        "lambda_raw": 2.4515,
+        "low_score_applied": false,
+        "low_score_factor": null,
+        "home_goals_avg": 1.57,
+        "away_goals_avg": 1.22,
+        "home_gf_avg_6": 1.07,
+        "away_gf_avg_6": 0.57,
+        "goal_drop": 0.0,
+        "league_name": "未知"
+      }
+    },
+    {
+      "date": "2026-08-05",
+      "match_id": 15512,
+      "home": "费内巴切",
+      "away": "格拉茨风暴",
+      "league": "欧冠",
+      "actual_score": "2:0",
+      "actual_total": 2,
+      "expected_goals": 3.3,
+      "snap_top2": [
+        3,
+        4
+      ],
+      "detail": {
+        "goal_line": 3.5,
+        "calib": 0.95,
+        "strength_adj": -0.01,
+        "form_adj": -0.0061,
+        "drop_adj": -0.0,
+        "lambda_market": 3.27,
+        "lambda_fundamental": 3.34,
+        "divergence": 0.16,
+        "induce_score": 0.2,
+        "market_confidence": 0.3385,
+        "market_weight": 0.6446,
+        "lambda_raw": 3.2958,
+        "low_score_applied": false,
+        "low_score_factor": null,
+        "home_goals_avg": 1.67,
+        "away_goals_avg": 0.62,
+        "home_gf_avg_6": 0.99,
+        "away_gf_avg_6": 1.32,
+        "goal_drop": 0.0,
+        "league_name": "欧冠"
+      }
+    }
+  ],
+  "hit": [
+    {
+      "date": "2026-08-05",
+      "match_id": 15511,
+      "home": "奥胡斯",
+      "away": "萨巴赫",
+      "league": "欧冠",
+      "actual_total": 3,
+      "expected_goals": 3.59,
+      "snap_top2": [
+        4,
+        3
+      ]
+    }
+  ]
+}

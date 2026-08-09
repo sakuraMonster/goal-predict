@@ -1,0 +1,143 @@
+{
+  "range": "2026-07-07~2026-08-06",
+  "summary": {
+    "total": 97,
+    "settled": 91,
+    "unsettled": 6,
+    "old_hit": 55,
+    "new_hit": 56,
+    "old_acc": 60.4,
+    "new_acc": 61.5,
+    "improved": 1,
+    "worsened": 0
+  },
+  "by_date": {
+    "07-24": {
+      "total": 2,
+      "old_hit": 1,
+      "new_hit": 1
+    },
+    "07-25": {
+      "total": 11,
+      "old_hit": 7,
+      "new_hit": 7
+    },
+    "07-26": {
+      "total": 18,
+      "old_hit": 13,
+      "new_hit": 13
+    },
+    "07-27": {
+      "total": 2,
+      "old_hit": 0,
+      "new_hit": 0
+    },
+    "07-28": {
+      "total": 2,
+      "old_hit": 2,
+      "new_hit": 2
+    },
+    "07-29": {
+      "total": 6,
+      "old_hit": 4,
+      "new_hit": 4
+    },
+    "07-30": {
+      "total": 6,
+      "old_hit": 3,
+      "new_hit": 3
+    },
+    "07-31": {
+      "total": 2,
+      "old_hit": 2,
+      "new_hit": 2
+    },
+    "08-01": {
+      "total": 16,
+      "old_hit": 10,
+      "new_hit": 10
+    },
+    "08-02": {
+      "total": 14,
+      "old_hit": 8,
+      "new_hit": 8
+    },
+    "08-03": {
+      "total": 4,
+      "old_hit": 2,
+      "new_hit": 3
+    },
+    "08-04": {
+      "total": 5,
+      "old_hit": 2,
+      "new_hit": 2
+    },
+    "08-05": {
+      "total": 3,
+      "old_hit": 1,
+      "new_hit": 1
+    }
+  },
+  "by_league": {
+    "芬超": {
+      "total": 12,
+      "old_hit": 9,
+      "new_hit": 9
+    },
+    "瑞典超": {
+      "total": 14,
+      "old_hit": 8,
+      "new_hit": 9
+    },
+    "韩K": {
+      "total": 12,
+      "old_hit": 7,
+      "new_hit": 7
+    },
+    "挪超": {
+      "total": 14,
+      "old_hit": 6,
+      "new_hit": 6
+    },
+    "巴甲": {
+      "total": 9,
+      "old_hit": 6,
+      "new_hit": 6
+    },
+    "美职联": {
+      "total": 9,
+      "old_hit": 6,
+      "new_hit": 6
+    },
+    "欧冠": {
+      "total": 10,
+      "old_hit": 7,
+      "new_hit": 7
+    },
+    "?": {
+      "total": 11,
+      "old_hit": 6,
+      "new_hit": 6
+    }
+  },
+  "improved": [
+    {
+      "home": "哈尔姆斯塔德",
+      "away": "天狼星",
+      "league": "瑞典超",
+      "date": "08-04 01:00",
+      "total": 2,
+      "old_lam": 3.06,
+      "new_lam": 3.0,
+      "old_snap": [
+        3,
+        4
+      ],
+      "new_snap": [
+        2,
+        1
+      ]
+    }
+  ],
+  "worsened": []
+}

@@ -105,7 +105,7 @@ export interface PredictionData {
   result_score?: number;
 }
 
-export const getMatches = (params?: { date?: string; league_id?: number }) =>
+export const getMatches = (params?: { date?: string; league_id?: number; days?: number }) =>
   api.get("/matches", { params }).then((r) => r.data);
 
 export const getMatchDetail = (id: number) =>
@@ -140,6 +140,9 @@ export const getDailyReport = (date?: string) =>
 
 export const getReportRange = (params: { date_from: string; date_to: string; league_id?: number }) =>
   api.get("/reports/range", { params }).then((r) => r.data);
+
+export const getLeagueAccuracy = (days: number = 30) =>
+  api.get("/reports/league-accuracy", { params: { days } }).then((r) => r.data);
 
 export const getDailySummary = (date?: string) =>
   api.get("/reports/daily/summary", { params: date ? { date } : {} }).then((r) => r.data);

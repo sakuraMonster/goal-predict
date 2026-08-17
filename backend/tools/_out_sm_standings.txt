@@ -1,0 +1,13 @@
+活跃联赛: [(6, '韩K', 1034), (7, '日职联', 968), (9, '瑞典超', 573), (11, '挪超', 444), (12, '美职联', 779), (13, '巴甲', 648)]
+  韩K: season=2026(id=26894) standings 12 条
+    样例: {"id": 283659, "participant_id": 672, "sport_id": 1, "league_id": 1034, "season_id": 26894, "stage_id": 77480127, "group_id": null, "round_id": 399366, "standing_rule_id": 134882, "position": 1, "result": "equal", "points": 44}
+  日职联: season=2026/2027(id=26810) standings 40 条
+    样例: {"id": 282187, "participant_id": 280, "sport_id": 1, "league_id": 968, "season_id": 26810, "stage_id": 77480365, "group_id": null, "round_id": 401198, "standing_rule_id": 135328, "position": 1, "result": "up", "points": 0}
+  瑞典超: season=2026(id=26806) standings 16 条
+    样例: {"id": 280441, "participant_id": 2678, "sport_id": 1, "league_id": 573, "season_id": 26806, "stage_id": 77479707, "group_id": null, "round_id": 398346, "standing_rule_id": 134659, "position": 1, "result": "equal", "points": 42}
+  挪超: season=2026(id=26781) standings 16 条
+    样例: {"id": 283520, "participant_id": 1668, "sport_id": 1, "league_id": 444, "season_id": 26781, "stage_id": 77479627, "group_id": null, "round_id": 397491, "standing_rule_id": 134532, "position": 1, "result": "equal", "points": 41}
+  美职联: season=2026(id=26720) standings 30 条
+    样例: {"id": 280863, "participant_id": 148048, "sport_id": 1, "league_id": 779, "season_id": 26720, "stage_id": 77479154, "group_id": 253479, "round_id": null, "standing_rule_id": 134275, "position": 1, "result": null, "points": 40}
+  巴甲: season=2026(id=26763) standings 20 条
+    样例: {"id": 288096, "participant_id": 3422, "sport_id": 1, "league_id": 648, "season_id": 26763, "stage_id": 77479548, "group_id": null, "round_id": 396703, "standing_rule_id": 134431, "position": 1, "result": "equal", "points": 48}

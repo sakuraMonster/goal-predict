@@ -1,0 +1,95 @@
+Team 总数: 1585
+已一致: 871
+不一致: 212（其中置信度: ratio>=0.8 的 157 个）
+无 match 记录: 502
+
+== 不一致且置信度>=0.8 的样本（前30）==
+  id=444 sm=1652 SBV精英: 当前=17 反推=6 票=70/72 ratio=97%
+  id=294 sm=29 Wolverhampton Wanderers: 当前=22 反推=1 票=57/63 ratio=90%
+  id=258 sm=3371 克鲁塞罗: 当前=4 反推=13 票=51/62 ratio=82%
+  id=256 sm=696 瓦斯科达伽马: 当前=4 反推=13 票=50/57 ratio=88%
+  id=252 sm=7808 巴甘蒂诺: 当前=4 反推=13 票=50/56 ratio=89%
+  id=261 sm=3427 米内罗竞技: 当前=4 反推=13 票=47/56 ratio=84%
+  id=401 sm=1085 Moreirense: 当前=21 反推=6 票=50/51 ratio=98%
+  id=471 sm=61 AZ: 当前=17 反推=6 票=43/48 ratio=90%
+  id=398 sm=4 Charlton Athletic: 当前=22 反推=6 票=47/47 ratio=100%
+  id=321 sm=5 朴次茅斯: 当前=22 反推=6 票=45/46 ratio=98%
+  id=317 sm=69 Cardiff City: 当前=22 反推=6 票=46/46 ratio=100%
+  id=368 sm=21 Sheffield United: 当前=22 反推=6 票=46/46 ratio=100%
+  id=328 sm=283 雷克斯汉姆: 当前=22 反推=6 票=44/45 ratio=98%
+  id=344 sm=12 伯明翰: 当前=22 反推=6 票=43/45 ratio=96%
+  id=326 sm=99 Preston North End: 当前=22 反推=6 票=45/45 ratio=100%
+  id=337 sm=305 Lincoln City: 当前=22 反推=6 票=45/45 ratio=100%
+  id=396 sm=65 Southampton: 当前=22 反推=6 票=45/45 ratio=100%
+  id=322 sm=30 斯旺西: 当前=22 反推=6 票=43/44 ratio=98%
+  id=314 sm=64 米尔沃尔: 当前=22 反推=6 票=42/44 ratio=95%
+  id=367 sm=7 米德尔斯堡: 当前=22 反推=6 票=43/44 ratio=98%
+  id=324 sm=24 Derby County: 当前=22 反推=6 票=44/44 ratio=100%
+  id=311 sm=122 Bristol City: 当前=22 反推=6 票=44/44 ratio=100%
+  id=318 sm=2 Blackburn Rovers: 当前=22 反推=6 票=44/44 ratio=100%
+  id=482 sm=750 乌德勒支: 当前=17 反推=6 票=39/43 ratio=91%
+  id=313 sm=25 Watford: 当前=22 反推=6 票=43/43 ratio=100%
+  id=316 sm=26 Stoke City: 当前=22 反推=6 票=43/43 ratio=100%
+  id=312 sm=47 女王公园巡游者: 当前=22 反推=6 票=41/43 ratio=95%
+  id=486 sm=652 Porto: 当前=21 反推=6 票=37/42 ratio=88%
+  id=320 sm=33 Norwich City: 当前=22 反推=6 票=42/42 ratio=100%
+  id=325 sm=10 West Bromwich Albion: 当前=22 反推=6 票=42/42 ratio=100%
+
+== 不一致且置信度<0.8（前20，留人检）==
+  id=3 sm=116 伊普斯维奇: 当前=1 反推=6 票=26/71 ratio=37%
+  id=12 sm=117 考文垂: 当前=1 反推=6 票=38/73 ratio=52%
+  id=13 sm=22 赫尔城: 当前=1 反推=6 票=39/74 ratio=53%
+  id=186 sm=303 科林蒂安: 当前=4 反推=13 票=47/68 ratio=69%
+  id=287 sm=3357 格拉茨风暴: 当前=None 反推=6 票=4/14 ratio=29%
+  id=286 sm=314 哈茨: 当前=None 反推=8 票=1/2 ratio=50%
+  id=289 sm=368 奥莫尼亚: 当前=None 反推=6 票=8/17 ratio=47%
+  id=375 sm=10116 Pontevedra: 当前=6 反推=2 票=1/2 ratio=50%
+  id=417 sm=361 Real Valladolid: 当前=6 反推=2 票=19/40 ratio=48%
+  id=405 sm=1028 Reims: 当前=20 反推=6 票=23/42 ratio=55%
+  id=501 sm=9377 Stade Briochin: 当前=6 反推=5 票=2/4 ratio=50%
+  id=552 sm=216 Slavia Praha: 当前=6 反推=4 票=2/6 ratio=33%
+  id=569 sm=1453 Olimpija: 当前=6 反推=8 票=4/6 ratio=67%
+  id=584 sm=2927 DSC Arminia Bielefeld: 当前=19 反推=6 票=13/20 ratio=65%
+  id=760 sm=3621 Fortaleza: 当前=6 反推=13 票=23/31 ratio=74%
+  id=770 sm=6308 Club Bolívar: 当前=6 反推=13 票=4/9 ratio=44%
+  id=787 sm=10779 LDU Quito: 当前=6 反推=13 票=7/15 ratio=47%
+  id=832 sm=3994 Neman Grodno: 当前=6 反推=2 票=2/5 ratio=40%
+  id=187 sm=2864 博塔弗戈: 当前=4 反推=13 票=46/68 ratio=68%
+  id=854 sm=3998 Differdange 03: 当前=6 反推=8 票=3/4 ratio=75%
+
+== 无 match 记录（前20）==
+  id=1685 sm=18272 Fujieda MYFC: 当前=24
+  id=61 sm=4070 弗洛西诺内: 当前=4
+  id=1686 sm=639 Sagan Tosu: 当前=24
+  id=1687 sm=15945 Imabari: 当前=24
+  id=1688 sm=14744 Oita Trinita: 当前=24
+  id=1689 sm=199336 Tegevajaro Miyazaki: 当前=24
+  id=121 sm=762 佛罗里亚纳: 当前=8
+  id=122 sm=63383 埃格纳蒂亚: 当前=8
+  id=123 sm=6641 ML麦克斯林: 当前=8
+  id=129 sm=6131 佩特罗古: 当前=8
+  id=131 sm=928 考诺萨基列斯: 当前=8
+  id=132 sm=17303 伊斯卡尔德斯: 当前=8
+  id=133 sm=8697 科罗拉: 当前=8
+  id=134 sm=5444 特费奥里: 当前=8
+  id=135 sm=3877 巴尼亚卢卡战士: 当前=8
+  id=136 sm=11833 拉恩: 当前=8
+  id=138 sm=3712 尼卡斯克: 当前=8
+  id=140 sm=5492 瓦尔达尔: 当前=8
+  id=143 sm=579 新圣徒: 当前=8
+  id=1357 sm=10098 Constància: 当前=6
+
+== 葡超重点球队 ==
+  id=1299 波尔图: 当前=6 反推=21 票=1/1 ratio=100%
+  id=1678 阿尔维卡: 当前=None 反推=21 票=1/1 ratio=100%
+  id=1646 马里迪莫: 当前=None 反推=21 票=1/1 ratio=100%
+  id=208 卡萨皮亚: 当前=12 反推=12 票=54/55 ratio=98%
+  id=1662 阿马多拉: 当前=None 反推=21 票=1/1 ratio=100%
+  id=1680 里奥阿维: 当前=None 反推=21 票=1/1 ratio=100%
+  id=1651 阿罗卡: 当前=None 反推=21 票=1/1 ratio=100%
+  id=785 Nacional: 当前=6 反推=6 票=5/10 ratio=50%
+  id=388 吉马良斯: 当前=21 反推=6 票=32/33 ratio=97%
+  id=389 里斯本竞技: 当前=21 反推=6 票=34/43 ratio=79%
+  id=401 Moreirense: 当前=21 反推=6 票=50/51 ratio=98%
+  id=408 Sporting Braga: 当前=21 反推=6 票=37/47 ratio=79%
+  id=422 Santa Clara: 当前=21 反推=6 票=30/35 ratio=86%

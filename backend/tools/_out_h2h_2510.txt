@@ -1,0 +1,50 @@
+=== SM H2H 11914(KFUM) vs 2510(Lillestrøm): 3 条 ===
+  fx=19629632 2026-07-18 14:00:00 Lillestrøm vs KFUM
+  fx=19052020 2024-08-30 17:00:00 KFUM vs Lillestrøm
+  fx=19051947 2024-06-27 19:15:00 Lillestrøm vs KFUM
+
+=== 最近 task_logs (48h) ===
+  2026-08-15 03:36:49.392068 api_request     success  13ms GET /api/teams/match/15650/comparison → 200
+  2026-08-15 03:36:49.373043 api_request     success  41ms GET /api/matches/15650/odds-history → 200
+  2026-08-15 03:36:49.243757 api_request     success  10ms GET /api/matches/15650/h2h → 200
+  2026-08-15 03:36:49.230257 api_request     success  6ms GET /api/predictions/15650 → 200
+  2026-08-15 03:36:49.118081 api_request     success  133ms GET /api/matches/15650/odds-history → 200
+  2026-08-15 03:36:49.016402 api_request     success  32ms GET /api/teams/match/15650/comparison → 200
+  2026-08-15 03:36:49.011260 api_request     success  27ms GET /api/matches/15650/h2h → 200
+  2026-08-15 03:36:49.000288 api_request     success  16ms GET /api/matches/15650 → 200
+  2026-08-15 03:36:48.993306 api_request     success  10ms GET /api/predictions/15650 → 200
+  2026-08-15 03:36:48.974909 api_request     success  2ms GET /api/matches/15650 → 200
+  2026-08-15 03:36:46.068748 api_request     success  81ms GET /api/matches/dates → 200
+  2026-08-15 03:36:46.064758 api_request     success  72ms GET /api/matches → 200
+  2026-08-15 03:36:46.001793 api_request     success  58ms GET /api/matches/leagues → 200
+  2026-08-15 03:36:45.985831 api_request     success  102ms GET /api/matches → 200
+  2026-08-15 03:36:45.974122 api_request     success  87ms GET /api/matches/dates → 200
+  2026-08-15 03:36:45.929949 api_request     success  43ms GET /api/matches/leagues → 200
+  2026-08-15 03:36:29.882400 api_request     success  17ms GET /api/admin/task-status → 200
+  2026-08-15 03:36:29.874421 api_request     success  10ms GET /api/admin/logs → 200
+  2026-08-15 03:36:29.848730 api_request     success  1092ms POST /api/admin/update-teams → 200
+  2026-08-15 03:36:22.578848 api_request     success  17ms GET /api/admin/task-status → 200
+  2026-08-15 03:36:22.553916 api_request     success  40ms GET /api/admin/task-status → 200
+  2026-08-15 03:36:22.552861 api_request     success  13ms GET /api/admin/logs → 200
+  2026-08-15 03:36:22.532709 api_request     success  14ms GET /api/admin/logs → 200
+  2026-08-15 03:36:06.518330 api_request     success  4ms GET /api/matches/15649 → 200
+  2026-08-15 03:36:06.507632 api_request     success  2500ms GET /api/matches/15649 → 200
+  2026-08-15 03:36:05.416519 api_request     success  8ms GET /api/teams/match/15649/comparison → 200
+  2026-08-15 03:36:05.407039 api_request     success  37ms GET /api/matches/15649/h2h → 200
+  2026-08-15 03:36:05.317313 api_request     success  5ms GET /api/matches/15649/odds-history → 200
+  2026-08-15 03:36:05.313182 api_request     success  6ms GET /api/predictions/15649 → 200
+  2026-08-15 03:36:05.163073 api_request     success  16ms GET /api/teams/match/15649/comparison → 200
+
+=== task_logs 中 update_teams 最后 5 条 ===
+  2026-08-14 09:50:13.693273 success  367444ms 球队信息更新完成
+  2026-08-14 09:50:13.687087 success  366345ms 更新 54 支球队：53 条统计，0 条伤病，2 条交锋
+  2026-08-14 09:30:18.752243 success  616353ms 球队信息更新完成
+  2026-08-14 09:30:18.749251 success  615155ms 更新 54 支球队：78 条统计，0 条伤病，53 条交锋
+  2026-08-13 07:11:10.828274 success  324211ms 球队信息更新完成
+
+=== scheduler 状态（查 uvicorn 进程？改查 api_request 最近 update-teams）===
+  2026-08-15 03:36:29.848730 POST /api/admin/update-teams → 200
+  2026-08-15 03:22:25.672515 POST /api/admin/update-teams → 200
+  2026-08-15 02:19:27.403053 POST /api/admin/update-teams → 200
+  2026-08-15 02:01:44.128595 POST /api/admin/update-teams → 200
+  2026-08-14 10:38:49.414236 POST /api/admin/update-teams → 200

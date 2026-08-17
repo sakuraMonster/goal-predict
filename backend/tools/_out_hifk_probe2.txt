@@ -1,0 +1,4 @@
+[H2H] 912 vs 8998: 0 条
+[TEAM 912] name=HIFK short=None 
+[TEAM 8998] name=Tampere United short=TAUN 
+[BETWEEN] 08-14~08-20: 248 场

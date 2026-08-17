@@ -1,0 +1,36 @@
+== 1. sm_id 修正 ==
+  警告: 阿尔维卡(1678) 新sm=269225 已被 AVS(402) 占用，跳过
+  警告: 卡萨皮亚(208) 新sm=11741 已被 Casa Pia(424) 占用，跳过
+  警告: 马里迪莫(1646) 新sm=5931 已被 Marítimo(1683) 占用，跳过
+  警告: 阿马多拉(1662) 新sm=12152 已被 Estrela Amadora(426) 占用，跳过
+  警告: 里奥阿维(1680) 新sm=6377 已被 Rio Ave(430) 占用，跳过
+  警告: 阿罗卡(1651) 新sm=4092 已被 Arouca(413) 占用，跳过
+
+== 2. 波尔图重复合并 ==
+  波尔图(1299, sm=1498) -> Porto(486, sm=652)
+  matches: home 1 场, away 0 场 迁移
+  删除 1299 的垃圾 TeamSeasonStats 2 条
+  TeamAlias 迁移 1 条
+  486.name_zh -> 波尔图
+  已删除 Team 1299
+
+== 3. 垃圾 TeamSeasonStats 清理 ==
+  删除 1678 的 TeamSeasonStats 1 条
+  删除 208 的 TeamSeasonStats 4 条
+  删除 1646 的 TeamSeasonStats 2 条
+  删除 1662 的 TeamSeasonStats 2 条
+  删除 1680 的 TeamSeasonStats 2 条
+  删除 1651 的 TeamSeasonStats 0 条
+
+== 4. TeamSeasonStats.league_id 修正（污染值6 -> 真实联赛）==
+  涉及球队数: 184
+  修正 85 条 stats 记录 league_id
+    league 9: 1 条
+    league 17: 27 条
+    league 18: 12 条
+    league 19: 5 条
+    league 20: 2 条
+    league 21: 23 条
+    league 22: 15 条
+
+已提交

@@ -8,6 +8,7 @@ interface MatchCardProps {
   home_team: string;
   away_team: string;
   match_num?: string;
+  status?: string;
   home_prob: number;
   draw_prob: number;
   away_prob: number;
@@ -23,11 +24,12 @@ interface MatchCardProps {
 }
 
 export default function MatchCard({
-  id, league_name, kickoff_time, home_team, away_team, match_num,
+  id, league_name, kickoff_time, home_team, away_team, match_num, status,
   home_prob, draw_prob, away_prob, expected_goals,
-  goal_distribution, score_top5_json,
+  score_top5_json,
   reference_score, is_cold_match, is_hot_match, cold_correction, risk_warning,
 }: MatchCardProps) {
+  const ignored = status === "cancelled";
   const time = new Date(kickoff_time).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
   const maxProb = Math.max(home_prob, draw_prob, away_prob);
   const hasCorrection = cold_correction && cold_correction.model_original;
@@ -64,10 +66,17 @@ export default function MatchCard({
     : [];
 
   return (
-    <Link to={`/match/${id}`} className="block bg-white rounded-md border border-border p-3.5 hover:shadow-sm transition-shadow">
-      <div className="text-xs text-ink-light tracking-wide font-body uppercase">
-        {match_num ? <span className="text-ink-muted mr-1">{match_num}</span> : null}
-        {league_name} · {time}
+    <Link to={`/match/${id}`} className={`block bg-white rounded-md border border-border p-3.5 hover:shadow-sm transition-shadow ${ignored ? "opacity-60" : ""}`}>
+      <div className="flex items-center justify-between gap-1">
+        <div className="text-xs text-ink-light tracking-wide font-body uppercase truncate">
+          {match_num ? <span className="text-ink-muted mr-1">{match_num}</span> : null}
+          {league_name} · {time}
+        </div>
+        {ignored && (
+          <span className="shrink-0 text-[10px] font-body text-ink-muted border border-border bg-parchment-light px-1.5 py-0.5 rounded-sm">
+            已忽略
+          </span>
+        )}
       </div>
       <div className="text-sm font-bold my-1 flex justify-between items-center text-ink">
         <span>{home_team}</span>

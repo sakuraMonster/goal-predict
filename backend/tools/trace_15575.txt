@@ -1,0 +1,11 @@
+Traceback (most recent call last):
+  File "E:\zhangxuejun\new-thinking\ricking-03\backend\tools\_trace_15575.py", line 20, in main
+    fdf = await feat.extract_features(15575)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\zhangxuejun\new-thinking\ricking-03\backend\tools\..\app\predictor\features_b.py", line 383, in extract_features
+    features.update(self._extract_team_strength(home_stats, away_stats, league_baseline))
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "E:\zhangxuejun\new-thinking\ricking-03\backend\tools\..\app\predictor\features_b.py", line 703, in _extract_team_strength
+    feats["home_home_win_rate"] = home.home_wins / max(home.home_wins + home.home_draws + home.home_losses, self.DENOM_MIN_1)
+                                                       ~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~
+TypeError: unsupported operand type(s) for +: 'NoneType' and 'NoneType'

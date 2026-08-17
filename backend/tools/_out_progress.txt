@@ -1,0 +1,11 @@
+=== 1590 (Lillestrøm) team_season_stats ===
+  #38573 season=26781 lg=None played=1 form=DWLWWLLWLL
+  #38488 season=2026 lg=11 played=4 form=WLLL
+
+=== 各目标场次 H2H 现状 ===
+  #15622 秋田vs富山: H2H=0 条, 最新=None
+  #15650 米亚尔比vs天狼星: H2H=2 条, 最新=2025-07-27 14:30:00
+  #15637 德岛vs鸟栖: H2H=0 条, 最新=None
+  #15663 奥勒松vs瓦勒伦加: H2H=0 条, 最新=None
+  #15665 卡尔马vs哈马比: H2H=0 条, 最新=None
+  #15652 KFUM vs 利勒斯特罗姆: H2H=0 条, 最新=None

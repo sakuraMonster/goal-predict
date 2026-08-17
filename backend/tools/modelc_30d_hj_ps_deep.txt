@@ -1,0 +1,273 @@
+====================================================================================================
+Model C 近30天分析 | 窗口 07-11 12:00 ~ 08-11 12:00 (北京时间)
+====================================================================================================
+
+【Part 1: 近30天按联赛命中率（线上 snap_top2_c 口径, actual cap=4）】
+联赛            总场    结算    命中    未中     准确率   实际进球分布
+挪超            21    20     9    11   45.0%   {1: 3, 2: 3, 3: 8, 4: 1, 5: 2, 6: 2, 8: 1}
+瑞典超           21    19    12     7   63.2%   {0: 1, 1: 2, 2: 7, 3: 5, 5: 2, 6: 1, 7: 1}
+芬超            17    17     8     9   47.1%   {0: 1, 1: 6, 2: 3, 3: 4, 4: 3}
+韩K            15    15     7     8   46.7%   {0: 2, 1: 1, 2: 3, 3: 4, 4: 3, 5: 1, 6: 1}
+未知联赛          13    13     8     5   61.5%   {0: 1, 1: 2, 2: 6, 4: 3, 5: 1}
+巴甲            13    13     9     4   69.2%   {0: 2, 2: 7, 3: 2, 4: 2}
+欧冠            10    10     7     3   70.0%   {0: 1, 1: 1, 2: 3, 3: 4, 6: 1}
+美职联            9     9     6     3   66.7%   {0: 1, 1: 1, 2: 4, 3: 2, 4: 1}
+荷甲             8     8     3     5   37.5%   {1: 2, 2: 2, 3: 2, 4: 1, 5: 1}
+葡超             9     8     2     6   25.0%   {1: 3, 2: 2, 4: 3}
+日职联            5     5     3     2   60.0%   {2: 1, 3: 2, 7: 2}
+欧罗巴            4     4     3     1   75.0%   {1: 1, 2: 1, 3: 1, 7: 1}
+法乙             3     3     1     2   33.3%   {1: 2, 2: 1}
+德乙             3     3     2     1   66.7%   {1: 1, 2: 1, 3: 1}
+荷乙             3     3     3     0  100.0%   {1: 1, 3: 1, 4: 1}
+日乙             2     2     1     1   50.0%   {1: 1, 2: 1}
+巴西杯            2     2     0     2    0.0%   {4: 2}
+英冠             1     1     0     1    0.0%   {1: 1}
+
+====================================================================================================
+【Part 2: 荷甲 逐场深度拆解】
+====================================================================================================
+
+联赛 id=17 name_zh=荷甲 基线 baseline: {"league_count": 18, "league_avg_home_goals": 1.7729, "league_avg_away_goals": 1.7729, "league_home_win_rate": 0.5578, "league_draw_rate": 0.2311, "league_avg_total_goals": 3.5458}
+
+------------------------------------------------------------------------------------------
+[08-09 00:45] id=15539 前进之鹰 vs 威廉二世 | 实际=5球(4:1)
+  线上: expected_goals_c=2.33 snap_top2_c=[2, 3] result_goals=-1
+  线上: expected_goals(b)= 1.7931382674474254 snap_top2(b)=[2, 1]
+  重跑 ModelC: λ=2.13 SNAP=[2, 3] 命中=False | over_2_5=0.3597
+    goal_line=3.0 calib=0.95 strength_adj=-0.024 form_adj=-0.0256 drop_adj=-0.0
+    λ_market=2.71 λ_fund=1.7 divergence=1.3 induce=0.1 mkt_conf=0.5402 mkt_weight=0.431
+    early_season=False played=6.0/28.0
+    主攻=1.0 客攻=1.0 主近6=1.4 客近6=0.0 goal_drop=0.0 league_rule=None
+    league_avg_total_goals=3.5458 bookmaker_count=5.0 goal_line_market=3.0
+    home_goals_avg=1.0 away_goals_avg=1.0 home_gf_6=1.4 away_gf_6=0.0
+    home_games_played=6.0 away_games_played=28.0 has_h2h=1.0 h2h_cnt=2.0
+    偏差=+2.9 爆大球↑
+
+------------------------------------------------------------------------------------------
+[08-08 22:30] id=15537 奈梅亨 vs 特尔斯达 | 实际=3球(1:2)
+  线上: expected_goals_c=3.6 snap_top2_c=[4, 3] result_goals=-1
+  线上: expected_goals(b)= 1.8940529946355 snap_top2(b)=[2, 1]
+  重跑 ModelC: λ=3.25 SNAP=[3, 4] 命中=True | over_2_5=0.6304
+    goal_line=3.5 calib=0.95 strength_adj=0.0637 form_adj=-0.028 drop_adj=-0.0273
+    λ_market=3.35 λ_fund=3.06 divergence=0.44 induce=0.25 mkt_conf=0.6315 mkt_weight=0.6479
+    early_season=False played=25.0/24.0
+    主攻=2.16 客攻=1.67 主近6=1.32 客近6=0.0 goal_drop=0.0 league_rule=None
+    league_avg_total_goals=3.5458 bookmaker_count=6.0 goal_line_market=3.5
+    home_goals_avg=2.16 away_goals_avg=1.6666666666666667 home_gf_6=1.325 away_gf_6=0.0
+    home_games_played=25.0 away_games_played=24.0 has_h2h=1.0 h2h_cnt=2.0
+    偏差=-0.2 边界
+
+------------------------------------------------------------------------------------------
+[08-09 03:00] id=15545 阿尔克马尔 vs 海牙 | 实际=2球(2:0)
+  线上: expected_goals_c=3.1 snap_top2_c=[3, 4] result_goals=1
+  线上: expected_goals(b)= 1.8476826058703661 snap_top2(b)=[2, 1]
+  重跑 ModelC: λ=2.36 SNAP=[2, 3] 命中=True | over_2_5=0.4204
+    goal_line=3.25 calib=0.95 strength_adj=0.003 form_adj=0.0 drop_adj=-0.0
+    λ_market=3.1 λ_fund=1.88 divergence=1.37 induce=0.1 mkt_conf=0.3101 mkt_weight=0.3965
+    early_season=False played=41.0/34.0
+    主攻=1.27 客攻=1.29 主近6=0.0 客近6=0.0 goal_drop=0.0 league_rule=None
+    league_avg_total_goals=3.5458 bookmaker_count=4.0 goal_line_market=3.25
+    home_goals_avg=1.2682926829268293 away_goals_avg=1.2941176470588236 home_gf_6=0.0 away_gf_6=0.0
+    home_games_played=41.0 away_games_played=34.0 has_h2h=0.0 h2h_cnt=0.0
+    偏差=-0.4 边界
+
+------------------------------------------------------------------------------------------
+[08-09 02:00] id=15541 PSV埃因霍温 vs 福图纳锡塔德 | 实际=4球(2:2)
+  线上: expected_goals_c=4.05 snap_top2_c=[3, 2] result_goals=-1
+  线上: expected_goals(b)= 1.9323922904048856 snap_top2(b)=[3, 2]
+  重跑 ModelC: λ=3.84 SNAP=[4, 3] 命中=True | over_2_5=0.7375
+    goal_line=3.75 calib=0.95 strength_adj=0.0738 form_adj=0.0009 drop_adj=-0.0
+    λ_market=3.83 λ_fund=3.86 divergence=-0.11 induce=0.1 mkt_conf=0.2358 mkt_weight=0.6314
+    early_season=False played=7.0/26.0
+    主攻=3.0 客攻=1.04 主近6=2.23 客近6=0.0 goal_drop=0.0 league_rule=None
+    league_avg_total_goals=3.5458 bookmaker_count=3.0 goal_line_market=3.75
+    home_goals_avg=3.0 away_goals_avg=1.0384615384615385 home_gf_6=2.2273 away_gf_6=0.0
+    home_games_played=7.0 away_games_played=26.0 has_h2h=1.0 h2h_cnt=4.0
+    偏差=+0.2 边界
+
+------------------------------------------------------------------------------------------
+[08-09 18:15] id=15550 鹿特丹斯巴达 vs 费耶诺德 | 实际=1球(0:1)
+  线上: expected_goals_c=2.9 snap_top2_c=[3, 2] result_goals=0
+  线上: expected_goals(b)= None snap_top2(b)=None
+  重跑 ModelC: λ=2.81 SNAP=[3, 2] 命中=False | over_2_5=0.5326
+    goal_line=3.0 calib=0.95 strength_adj=0.0517 form_adj=-0.0253 drop_adj=-0.021
+    λ_market=2.87 λ_fund=2.69 divergence=0.31 induce=0.25 mkt_conf=0.6104 mkt_weight=0.6751
+    early_season=False played=24.0/7.0
+    主攻=1.29 客攻=2.29 主近6=0.0 客近6=1.41 goal_drop=0.0 league_rule=None
+    league_avg_total_goals=3.5458 bookmaker_count=6.0 goal_line_market=3.0
+    home_goals_avg=1.2916666666666667 away_goals_avg=2.2857142857142856 home_gf_6=0.0 away_gf_6=1.4091
+    home_games_played=24.0 away_games_played=7.0 has_h2h=1.0 h2h_cnt=4.0
+    偏差=-1.8 闷小球↓
+
+------------------------------------------------------------------------------------------
+[08-09 22:45] id=15555 海伦芬 vs 特温特 | 实际=1球(1:0)
+  线上: expected_goals_c=3.28 snap_top2_c=[3, 4] result_goals=0
+  线上: expected_goals(b)= None snap_top2(b)=None
+  重跑 ModelC: λ=2.97 SNAP=[3, 4] 命中=False | over_2_5=0.5697
+    goal_line=3.25 calib=0.95 strength_adj=0.016 form_adj=0.0203 drop_adj=-0.0126
+    λ_market=3.16 λ_fund=2.67 divergence=0.58 induce=0.15 mkt_conf=0.6142 mkt_weight=0.6085
+    early_season=False played=6.0/6.0
+    主攻=1.5 客攻=1.33 主近6=1.15 客近6=1.98 goal_drop=0.0 league_rule=None
+    league_avg_total_goals=3.5458 bookmaker_count=5.0 goal_line_market=3.25
+    home_goals_avg=1.5 away_goals_avg=1.3333333333333333 home_gf_6=1.15 away_gf_6=1.9833
+    home_games_played=6.0 away_games_played=6.0 has_h2h=1.0 h2h_cnt=4.0
+    偏差=-2.0 闷小球↓
+
+------------------------------------------------------------------------------------------
+[08-09 20:30] id=15553 兹沃勒 vs 阿贾克斯 | 实际=2球(0:2)
+  线上: expected_goals_c=3.03 snap_top2_c=[2, 3] result_goals=0
+  线上: expected_goals(b)= None snap_top2(b)=None
+  重跑 ModelC: λ=2.89 SNAP=[3, 2] 命中=True | over_2_5=0.551
+    goal_line=3.25 calib=0.95 strength_adj=0.012 form_adj=0.0182 drop_adj=-0.0147
+    λ_market=3.14 λ_fund=2.6 divergence=0.65 induce=0.15 mkt_conf=0.3924 mkt_weight=0.5356
+    early_season=False played=6.0/8.0
+    主攻=1.5 客攻=1.25 主近6=1.15 客近6=1.92 goal_drop=0.0 league_rule=None
+    league_avg_total_goals=3.5458 bookmaker_count=4.0 goal_line_market=3.25
+    home_goals_avg=1.5 away_goals_avg=1.25 home_gf_6=1.15 away_gf_6=1.92
+    home_games_played=6.0 away_games_played=8.0 has_h2h=1.0 h2h_cnt=4.0
+    偏差=-0.9 闷小球↓
+
+------------------------------------------------------------------------------------------
+[08-09 20:30] id=15554 格罗宁根 vs 乌德勒支 | 实际=3球(2:1)
+  线上: expected_goals_c=3.07 snap_top2_c=[3, 4] result_goals=0
+  线上: expected_goals(b)= None snap_top2(b)=None
+  重跑 ModelC: λ=2.61 SNAP=[3, 2] 命中=True | over_2_5=0.485
+    goal_line=2.75 calib=0.95 strength_adj=0.0144 form_adj=-0.021 drop_adj=-0.0252
+    λ_market=2.53 λ_fund=2.67 divergence=0.08 induce=0.25 mkt_conf=0.7143 mkt_weight=0.4
+    early_season=False played=26.0/9.0
+    主攻=1.58 客攻=1.22 主近6=0.0 客近6=1.54 goal_drop=0.0 league_rule=None
+    league_avg_total_goals=3.5458 bookmaker_count=6.0 goal_line_market=2.75
+    home_goals_avg=1.5769230769230769 away_goals_avg=1.2222222222222223 home_gf_6=0.0 away_gf_6=1.5444
+    home_games_played=26.0 away_games_played=9.0 has_h2h=1.0 h2h_cnt=4.0
+    偏差=+0.4 边界
+
+====================================================================================================
+【Part 2: 葡超 逐场深度拆解】
+====================================================================================================
+
+联赛 id=21 name_zh=葡超 基线 baseline: {"league_count": 17, "league_avg_home_goals": 1.4214, "league_avg_away_goals": 1.4214, "league_home_win_rate": 0.4692, "league_draw_rate": 0.2665, "league_avg_total_goals": 2.8428}
+
+------------------------------------------------------------------------------------------
+[08-09 01:00] id=15540 吉马良斯 vs 阿罗卡 | 实际=1球(0:1)
+  线上: expected_goals_c=2.63 snap_top2_c=[3, 2] result_goals=1
+  线上: expected_goals(b)= 1.8330992900437832 snap_top2(b)=[2, 1]
+  重跑 ModelC: λ=2.66 SNAP=[3, 2] 命中=False | over_2_5=0.4972
+    goal_line=2.5 calib=1.04 strength_adj=0.0099 form_adj=-0.0369 drop_adj=-0.0
+    λ_market=2.53 λ_fund=2.91 divergence=-0.41 induce=0.1 mkt_conf=0.4702 mkt_weight=0.65
+    early_season=True played=7.0/0.0
+    主攻=1.29 客攻=1.42 主近6=1.05 客近6=0.0 goal_drop=0.0 league_rule=None
+    league_avg_total_goals=2.8428 bookmaker_count=3.0 goal_line_market=2.5
+    home_goals_avg=1.2857142857142858 away_goals_avg=1.4214 home_gf_6=1.0455 away_gf_6=0.0
+    home_games_played=7.0 away_games_played=0.0 has_h2h=0.0 h2h_cnt=0.0
+    偏差=-1.7 闷小球↓
+
+------------------------------------------------------------------------------------------
+[08-08 03:15] id=15528 埃斯托里尔 vs 法马利康 | 实际=2球(1:1)
+  线上: expected_goals_c=2.61 snap_top2_c=[3, 2] result_goals=1
+  线上: expected_goals(b)= 2.1133406940415944 snap_top2(b)=[2, 3]
+  重跑 ModelC: λ=2.61 SNAP=[3, 2] 命中=True | over_2_5=0.4833
+    goal_line=2.5 calib=1.04 strength_adj=0.022 form_adj=0.0 drop_adj=-0.0
+    λ_market=2.66 λ_fund=2.45 divergence=0.05 induce=0.0 mkt_conf=0.6818 mkt_weight=0.758
+    early_season=False played=24.0/24.0
+    主攻=1.58 客攻=1.38 主近6=0.0 客近6=0.0 goal_drop=0.0 league_rule=None
+    league_avg_total_goals=2.8428 bookmaker_count=3.0 goal_line_market=2.5
+    home_goals_avg=1.5833333333333333 away_goals_avg=1.375 home_gf_6=0.0 away_gf_6=0.0
+    home_games_played=24.0 away_games_played=24.0 has_h2h=1.0 h2h_cnt=4.0
+    偏差=-0.6 闷小球↓
+
+------------------------------------------------------------------------------------------
+[08-08 22:30] id=15538 马里迪莫 vs 卡萨皮亚 | 实际=1球(1:0)
+  线上: expected_goals_c=2.81 snap_top2_c=[3, 2] result_goals=1
+  线上: expected_goals(b)= 1.6950088952470876 snap_top2(b)=[2, 1]
+  重跑 ModelC: λ=2.88 SNAP=[3, 2] 命中=False | over_2_5=0.5503
+    goal_line=2.5 calib=1.04 strength_adj=0.0418 form_adj=0.0 drop_adj=-0.0
+    λ_market=2.71 λ_fund=3.21 divergence=-0.71 induce=0.1 mkt_conf=0.5776 mkt_weight=0.65
+    early_season=True played=0.0/39.0
+    主攻=1.42 客攻=1.95 主近6=0.0 客近6=0.0 goal_drop=0.0 league_rule=None
+    league_avg_total_goals=2.8428 bookmaker_count=5.0 goal_line_market=2.5
+    home_goals_avg=1.4214 away_goals_avg=1.9487179487179487 home_gf_6=0.0 away_gf_6=0.0
+    home_games_played=0.0 away_games_played=39.0 has_h2h=0.0 h2h_cnt=0.0
+    偏差=-1.9 闷小球↓
+
+------------------------------------------------------------------------------------------
+[08-09 03:30] id=15546 阿马多拉 vs 里斯本竞技 | 实际=4球(2:2)
+  线上: expected_goals_c=2.37 snap_top2_c=[2, 3] result_goals=-1
+  线上: expected_goals(b)= 1.9215530603520203 snap_top2(b)=[2, 1]
+  重跑 ModelC: λ=3.21 SNAP=[3, 4] 命中=True | over_2_5=0.6222
+    goal_line=3.0 calib=1.04 strength_adj=0.0634 form_adj=0.004 drop_adj=-0.0
+    λ_market=3.33 λ_fund=3.13 divergence=-0.13 induce=0.1 mkt_conf=0.3481 mkt_weight=0.4
+    early_season=True played=0.0/10.0
+    主攻=1.42 客攻=2.4 主近6=0.0 客近6=2.33 goal_drop=0.0 league_rule=None
+    league_avg_total_goals=2.8428 bookmaker_count=3.0 goal_line_market=3.0
+    home_goals_avg=1.4214 away_goals_avg=2.4 home_gf_6=0.0 away_gf_6=2.325
+    home_games_played=0.0 away_games_played=10.0 has_h2h=0.0 h2h_cnt=0.0
+    偏差=+0.8 爆大球↑
+
+------------------------------------------------------------------------------------------
+[08-10 01:00] id=15556 波尔图 vs 阿尔维卡 | 实际=2球(2:0)
+  线上: expected_goals_c=3.73 snap_top2_c=[4, 3] result_goals=0
+  线上: expected_goals(b)= None snap_top2(b)=None
+  重跑 ModelC: λ=2.72 SNAP=[3, 2] 命中=True | over_2_5=0.5118
+    goal_line=2.5 calib=1.04 strength_adj=0.0165 form_adj=0.0 drop_adj=-0.0
+    λ_market=2.64 λ_fund=2.87 divergence=-0.37 induce=0.1 mkt_conf=0.3124 mkt_weight=0.65
+    early_season=True played=0.0/0.0
+    主攻=1.42 客攻=1.42 主近6=0.0 客近6=0.0 goal_drop=0.5 league_rule=None
+    league_avg_total_goals=2.8428 bookmaker_count=7.0 goal_line_market=2.5
+    home_goals_avg=1.4214 away_goals_avg=1.4214 home_gf_6=0.0 away_gf_6=0.0
+    home_games_played=0.0 away_games_played=0.0 has_h2h=0.0 h2h_cnt=0.0
+    偏差=-0.7 闷小球↓
+
+------------------------------------------------------------------------------------------
+[08-10 03:30] id=15557 吉维森特 vs 里奥阿维 | 实际=1球(1:0)
+  线上: expected_goals_c=2.19 snap_top2_c=[2, 3] result_goals=0
+  线上: expected_goals(b)= None snap_top2(b)=None
+  重跑 ModelC: λ=2.3 SNAP=[2, 3] 命中=False | over_2_5=0.4034
+    goal_line=2.25 calib=1.04 strength_adj=0.0001 form_adj=0.0 drop_adj=-0.0
+    λ_market=2.34 λ_fund=2.27 divergence=-0.02 induce=0.1 mkt_conf=0.5611 mkt_weight=0.4
+    early_season=True played=25.0/0.0
+    主攻=1.08 客攻=1.42 主近6=0.0 客近6=0.0 goal_drop=0.25 league_rule=None
+    league_avg_total_goals=2.8428 bookmaker_count=4.0 goal_line_market=2.25
+    home_goals_avg=1.08 away_goals_avg=1.4214 home_gf_6=0.0 away_gf_6=0.0
+    home_games_played=25.0 away_games_played=0.0 has_h2h=0.0 h2h_cnt=0.0
+    偏差=-1.3 闷小球↓
+
+------------------------------------------------------------------------------------------
+[08-10 03:30] id=15574 本菲卡 vs 维塞乌 | 实际=4球(2:2)
+  线上: expected_goals_c=3.39 snap_top2_c=[3, 4] result_goals=0
+  线上: expected_goals(b)= None snap_top2(b)=None
+  重跑 ModelC: λ=3.56 SNAP=[4, 3] 命中=True | over_2_5=0.6899
+    goal_line=3.5 calib=1.04 strength_adj=0.057 form_adj=0.0 drop_adj=-0.0292
+    λ_market=3.74 λ_fund=3.22 divergence=0.28 induce=0.5 mkt_conf=0.278 mkt_weight=0.65
+    early_season=True played=45.0/0.0
+    主攻=2.27 客攻=1.42 主近6=0.0 客近6=0.0 goal_drop=-0.25 league_rule=None
+    league_avg_total_goals=2.8428 bookmaker_count=6.0 goal_line_market=3.5
+    home_goals_avg=2.2666666666666666 away_goals_avg=1.4214 home_gf_6=0.0 away_gf_6=0.0
+    home_games_played=45.0 away_games_played=0.0 has_h2h=0.0 h2h_cnt=0.0
+    偏差=+0.4 边界
+
+------------------------------------------------------------------------------------------
+[08-10 03:30] id=15575 摩雷伦斯 vs 布拉加 | 实际=4球(2:2)
+  线上: expected_goals_c=2.65 snap_top2_c=[3, 2] result_goals=0
+  线上: expected_goals(b)= None snap_top2(b)=None
+  重跑 ModelC: λ=2.43 SNAP=[2, 3] 命中=False | over_2_5=0.4393
+    goal_line=2.25 calib=1.04 strength_adj=0.017 form_adj=0.0 drop_adj=-0.0072
+    λ_market=2.36 λ_fund=2.57 divergence=-0.32 induce=0.1 mkt_conf=0.5361 mkt_weight=0.654
+    early_season=False played=24.0/32.0
+    主攻=1.17 客攻=1.69 主近6=0.0 客近6=0.0 goal_drop=0.25 league_rule=None
+    league_avg_total_goals=2.8428 bookmaker_count=7.0 goal_line_market=2.25
+    home_goals_avg=1.1666666666666667 away_goals_avg=1.6875 home_gf_6=0.0 away_gf_6=0.0
+    home_games_played=24.0 away_games_played=32.0 has_h2h=1.0 h2h_cnt=4.0
+    偏差=+1.6 爆大球↑
+
+------------------------------------------------------------------------------------------
+[08-11 03:15] id=15580 圣克拉拉 vs 葡萄牙国民 | 实际=None球(None)
+  线上: expected_goals_c=2.1 snap_top2_c=[2, 3] result_goals=0
+  线上: expected_goals(b)= None snap_top2(b)=None
+  重跑 ModelC: λ=2.18 SNAP=[2, 3] 命中=None | over_2_5=0.3721
+    goal_line=2.5 calib=1.04 strength_adj=-0.012 form_adj=-0.0336 drop_adj=-0.0
+    λ_market=2.48 λ_fund=1.78 divergence=0.72 induce=0.1 mkt_conf=0.6046 mkt_weight=0.5712
+    early_season=False played=6.0/8.0
+    主攻=1.0 客攻=1.25 主近6=1.15 客近6=0.0 goal_drop=-0.25 league_rule=None
+    league_avg_total_goals=2.8428 bookmaker_count=6.0 goal_line_market=2.5
+    home_goals_avg=1.0 away_goals_avg=1.25 home_gf_6=1.15 away_gf_6=0.0
+    home_games_played=6.0 away_games_played=8.0 has_h2h=0.0 h2h_cnt=0.0

@@ -1,0 +1,23 @@
+=== matches 引用 1608 ===
+  #15567 ko=2026-08-09 20:30:00 1608 vs 173 fx=19629608 status=scheduled
+  #15652 ko=2026-08-15 22:00:00 181 vs 1608 fx=19629600 status=scheduled
+
+=== predictions 引用 1608 ===
+  ERROR: 字段 "home_team_id" 不存在
+
+=== head_to_head 引用 1608 ===
+  (无)
+
+=== team_aliases 引用 1608 ===
+  #620 alias='LIS' primary=False src=sporttery.cn
+
+=== team_season_stats 引用 1608 ===
+  #38696 season=latest lg=None played=8 form=DLWDWLLW
+  #38697 season=26639 lg=None played=8 form=DLWDWLLW
+
+=== 1590 现有状态 ===
+  1590: zh='Lillestrøm' en='Lillestrøm' sm=2510
+  (无别名)
+
+=== 别名 '利勒斯特罗姆' 全局归属 ===
+  (无)

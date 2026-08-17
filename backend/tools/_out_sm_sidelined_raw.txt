@@ -1,0 +1,8 @@
+include='sidelined': 3 条
+  记录完整 JSON: {"id": 784873, "player_id": 37288979, "type_id": 604, "category": "injury", "team_id": 8, "season_id": null, "start_date": "2026-04-15", "end_date": "2026-12-31", "games_missed": 10, "completed": false}
+
+include='sidelined.player': 3 条
+  记录完整 JSON: {"id": 784873, "player_id": 37288979, "type_id": 604, "category": "injury", "team_id": 8, "season_id": null, "start_date": "2026-04-15", "end_date": "2026-12-31", "games_missed": 10, "completed": false, "player": {"id": 37288979, "sport_id": 1, "country_id": 17, "nationality_id": 17, "city_id": 73757, "position_id": 27, "detailed_position_id": 151, "type_id": 27, "common_name": "H. Ekitike", "firstname": "Hugo", "lastname": "Ekitike", "name": "Hugo Ekitike", "display_name": "Hugo Ekitiké", "image_path": "https://cdn.sportmonks.com/images/soccer/players/19/37288979.png", "height": 190, "weight": 76, "date_of_birth": "2002-06-20", "gender": "male"}}
+
+include='player;sidelined': 异常 HTTPStatusError: Client error '404 Not Found' for url 'https://api.sportmonks.com/v3/football/teams/8?include=player%3Bsidelined&api_token=vVefqiiMY3B0Ph69Rp4PTOCztmAKUvNWFTHDJPdyfs930haXtMqjWZIYkJEE'
+For more informa

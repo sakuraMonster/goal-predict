@@ -111,35 +111,6 @@ function RadarChart({ homeData, awayData, homeName, awayName }: {
   );
 }
 
-/* ======== 近期状态指示器 ======== */
-function FormIndicator({ form, label }: { form: string[]; label: string }) {
-  const colorMap: Record<string, string> = {
-    W: "#2d5a3b", // 绿色-胜
-    D: "#8b7e6a", // 灰色-平
-    L: "#c44b3c", // 红色-负
-    "-": "#d4c9b5",
-  };
-  const labelMap: Record<string, string> = {
-    W: "胜", D: "平", L: "负", "-": "-",
-  };
-  return (
-    <div className="flex items-center gap-1.5">
-      <span className="text-xs text-ink-muted w-12 truncate text-right" title={label}>{label}</span>
-      {form.map((ch, i) => (
-        <div key={i} className="flex flex-col items-center">
-          <div
-            className="w-5 h-5 rounded-full flex items-center justify-center text-[11px] font-bold text-white"
-            style={{ backgroundColor: colorMap[ch] || "#d4c9b5" }}
-          >
-            {ch}
-          </div>
-          <span className="text-xs text-ink-light mt-0.5">{labelMap[ch]}</span>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 /* ======== 近期状态卡片 ======== */
 function RecentFormCard({ data, teamName }: { data: any; teamName: string }) {
   const matches = data?.recent_matches || [];

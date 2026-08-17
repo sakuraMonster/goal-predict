@@ -141,12 +141,128 @@ export const getDailyReport = (date?: string) =>
 export const getReportRange = (params: { date_from: string; date_to: string; league_id?: number }) =>
   api.get("/reports/range", { params }).then((r) => r.data);
 
-<<<<<<< HEAD
 export const getLeagueAccuracy = (days: number = 30) =>
   api.get("/reports/league-accuracy", { params: { days } }).then((r) => r.data);
 
-=======
->>>>>>> 927ef941e22d3f6ac1a4472d4e70b57b35ea02ae
+export interface GoalPickSignal {
+  type: string;
+  label: string;
+  acc: number;
+  n: number;
+  weight: number;
+}
+
+export interface GoalPick {
+  match_id: number;
+  match_num: string;
+  league_name: string;
+  home_team: string;
+  away_team: string;
+  kickoff_time: string;
+  expected_goals_c: number;
+  snap_top2_c: number[];
+  score: number;
+  signals: GoalPickSignal[];
+}
+
+export interface GoalPicksResponse {
+  data: GoalPick[];
+  secondary?: GoalPick[];   // 次选（不持久化，仅列表展示）
+  date: string;
+  days: number;
+  top_n: number;
+  global_accuracy: number;
+  global_n: number;
+  total_candidates: number;
+}
+
+export const getGoalPicks = (params?: { date?: string; days?: number; top_n?: number; secondary?: number }) =>
+  api.get("/reports/goal-picks", { params }).then((r) => r.data);
+
+export interface GoalPickHistoryDay {
+  date: string;
+  total: number;
+  settled: number;
+  hit: number;
+  accuracy: number;
+}
+
+export interface GoalPickHistorySummary {
+  total_picks: number;
+  settled: number;
+  hit: number;
+  miss: number;
+  accuracy: number;
+}
+
+export interface GoalPickHistoryResponse {
+  data: GoalPickHistoryDay[];
+  summary: GoalPickHistorySummary;
+  days: number;
+}
+
+export const getGoalPicksHistory = (params?: { days?: number }) =>
+  api.get("/reports/goal-picks/history", { params }).then((r) => r.data);
+
+export interface ColdPick {
+  match_id: number;
+  match_num: string;
+  league_name: string;
+  home_team: string;
+  away_team: string;
+  kickoff_time: string;
+  fav_dir: number;          // 市场热门方向 0=主胜 2=客胜
+  fav_prob: number;         // 市场热门方向隐含概率
+  implied_probs: {          // 去水归一化隐含概率三元组
+    home: number;
+    draw: number;
+    away: number;
+  };
+  cold_dirs: number[];      // 搏冷方向（所有非热门方向，含平局）
+  rank_gap: number;         // 同联赛排名差距 |home_pos - away_pos|
+  odds_delta_max: number;   // 盘口资金异动：开盘→收盘最大概率变动（待验证叠加特征）
+  odds_step_max: number;    // 盘口资金异动：相邻快照最大单步跳变（待验证叠加特征）
+  score: number;            // 把握度评分（rank_gap 为主）
+  signals: string[];
+}
+
+export interface ColdPicksResponse {
+  data: ColdPick[];
+  secondary?: ColdPick[];
+  date: string;
+  top_n: number;
+  total_candidates: number;
+  total_conflicts: number;
+}
+
+export const getColdPicks = (params?: { date?: string; top_n?: number; secondary?: number }) =>
+  api.get("/reports/cold-picks", { params }).then((r) => r.data);
+
+export interface ColdPickHistoryDay {
+  date: string;
+  total: number;
+  settled: number;
+  hit: number;
+  accuracy: number;
+}
+
+export interface ColdPickHistorySummary {
+  total_picks: number;
+  settled: number;
+  hit: number;
+  miss: number;
+  accuracy: number;
+}
+
+export interface ColdPickHistoryResponse {
+  data: ColdPickHistoryDay[];
+  summary: ColdPickHistorySummary;
+  days: number;
+}
+
+export const getColdPicksHistory = (params?: { days?: number }) =>
+  api.get("/reports/cold-picks/history", { params }).then((r) => r.data);
+
 export const getDailySummary = (date?: string) =>
   api.get("/reports/daily/summary", { params: date ? { date } : {} }).then((r) => r.data);
 
@@ -197,5 +313,8 @@ export const updateTeams = () =>
 
 export const repredictModelB = (date: string) =>
   api.post("/admin/repredict-model-b", null, { params: { date } }).then((r) => r.data);
+
+export const repredictModelC = (date: string) =>
+  api.post("/admin/repredict-model-c", null, { params: { date } }).then((r) => r.data);
 
 export default api;

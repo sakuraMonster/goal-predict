@@ -79,6 +79,7 @@ async def list_matches(
             "id": m.id,
             "jc_match_id": m.jc_match_id,
             "match_num": m.match_num,
+            "status": m.status,
             "league_name": m.league.name_zh if m.league else (m.venue or ""),
             "league_id": m.league_id,
             "kickoff_time": str(m.kickoff_time),

@@ -232,12 +232,15 @@ async def trigger_predict():
 
     start_time = time.time()
     async with async_session() as db:
-        cutoff = datetime.utcnow() + timedelta(hours=48)
+        # kickoff_time 存北京 naive，直接与北京当前时间比较（修正 UTC naive 偏移 8h 导致覆盖已开赛比赛的问题）
+        now_bj = datetime.now(BEIJING_TZ).replace(tzinfo=None)
+        cutoff = now_bj + timedelta(hours=48)
         result = await db.execute(
             select(Match).where(
                 Match.home_team_id.isnot(None),
                 Match.away_team_id.isnot(None),
-                Match.kickoff_time >= datetime.utcnow(),
+                Match.status == "scheduled",
+                Match.kickoff_time >= now_bj,
                 Match.kickoff_time <= cutoff,
             ).order_by(Match.kickoff_time)
         )
@@ -319,6 +322,7 @@ async def predict_model_c():
     """对当天比赛场次仅使用 Model C 进行预测，不触发 Model A/B/D"""
     from app.predictor.models.model_c import ModelC
     from app.predictor.features_b import FeatureEngineerB
+    from app.predictor.pipeline import PredictionPipeline
     from app.predictor.snap import snap_top2
     from app.db.database import async_session
     from app.db.models import Match, Prediction, League
@@ -339,6 +343,9 @@ async def predict_model_c():
             select(Match).options(joinedload(Match.league)).where(
                 Match.home_team_id.isnot(None),
                 Match.away_team_id.isnot(None),
+                Match.status == "scheduled",
+                # 只预测尚未开赛的场次（kickoff_time 存北京 naive，与 now 北京 naive 直接比较）
+                Match.kickoff_time > now.replace(tzinfo=None),
                 Match.kickoff_time >= query_start.astimezone(timezone.utc).replace(tzinfo=None),
                 Match.kickoff_time < query_end.astimezone(timezone.utc).replace(tzinfo=None),
             ).order_by(Match.kickoff_time)
@@ -363,6 +370,10 @@ async def predict_model_c():
                     continue
                 features = features_df.iloc[0].to_dict()
                 result_c = model_c.predict(features, league_name)
+                # V4.13: Model C 专属后验校准（与 pipeline.predict 保持一致，防止两个入口口径不一致）
+                mc_calib = PredictionPipeline.MODELC_LAMBDA_CALIBRATION.get(league_name)
+                if mc_calib:
+                    result_c = PredictionPipeline._apply_lambda_calibration(result_c, mc_calib)
             except Exception as e:
                 failed += 1
                 if failed <= 3:
@@ -397,6 +408,101 @@ async def predict_model_c():
         return {"status": "ok", "message": msg}
 
 
+@router.post("/repredict-model-c")
+async def repredict_model_c(
+    date: str = Query(..., description="日期 YYYY-MM-DD"),
+):
+    """Model C 重预测：对指定比赛日所有比赛重新执行 Model C 进球数预测（expected_goals_c/snap_top2_c）。
+
+    与 predict-model-c 的区别：后者只处理未开赛场次；本端点按用户主动选择的历史比赛日全量重算，
+    用于修正/补算历史预测值。
+    """
+
+    from app.predictor.models.model_c import ModelC
+    from app.predictor.features_b import FeatureEngineerB
+    from app.predictor.pipeline import PredictionPipeline
+    from app.predictor.snap import snap_top2
+    from app.db.database import async_session
+    from app.db.models import Match, Prediction
+    from sqlalchemy import select
+    from sqlalchemy.orm import joinedload
+
+    d_start = datetime.strptime(date, "%Y-%m-%d")
+    query_start = d_start.replace(hour=12)
+    query_end = (d_start + timedelta(days=1)).replace(hour=12)
+
+    start_time = time.time()
+    async with async_session() as db:
+        result = await db.execute(
+            select(Match).options(joinedload(Match.league)).where(
+                Match.home_team_id.isnot(None),
+                Match.away_team_id.isnot(None),
+                Match.kickoff_time >= query_start,
+                Match.kickoff_time < query_end,
+            ).order_by(Match.kickoff_time)
+        )
+        matches = list(result.unique().scalars().all())
+
+        if not matches:
+            return {"status": "ok", "message": f"{date} 无比赛数据"}
+
+        feat_engine = FeatureEngineerB(db)
+        model_c = ModelC()
+        version = datetime.now().strftime("%Y%m%d-%H%M")
+        updated, created, failed = 0, 0, 0
+
+        for m in matches:
+            league_name = m.league.name_zh if m.league else None
+
+            try:
+                features_df = await feat_engine.extract_features(m.id)
+                if features_df.empty:
+                    failed += 1
+                    continue
+                features = features_df.iloc[0].to_dict()
+                result_c = model_c.predict(features, league_name)
+                # Model C 专属后验校准（与 predict-model-c / pipeline.predict 口径一致）
+                mc_calib = PredictionPipeline.MODELC_LAMBDA_CALIBRATION.get(league_name)
+                if mc_calib:
+                    result_c = PredictionPipeline._apply_lambda_calibration(result_c, mc_calib)
+            except Exception as e:
+                failed += 1
+                if failed <= 3:
+                    print(f"[repredict-model-c] match_id={m.id} 预测失败: {e}", flush=True)
+                continue
+
+            expected_goals_c = result_c["expected_goals"]
+            snap_c = snap_top2(expected_goals_c)
+
+            existing = await db.execute(select(Prediction).where(Prediction.match_id == m.id))
+            pred = existing.scalar_one_or_none()
+
+            if pred:
+                pred.expected_goals_c = expected_goals_c
+                pred.snap_top2_c = snap_c
+                updated += 1
+            else:
+                db.add(Prediction(
+                    match_id=m.id,
+                    model_version=version,
+                    expected_goals_c=expected_goals_c,
+                    snap_top2_c=snap_c,
+                    kickoff_time=m.kickoff_time,
+                    league_id=m.league_id,
+                ))
+                created += 1
+
+        await db.commit()
+        duration = int((time.time() - start_time) * 1000)
+        msg = f"Model C 重预测完成: 新增 {created}, 更新 {updated}, 失败 {failed}（共 {len(matches)} 场）"
+        await AppLogger.log("predict", "success", msg, duration)
+        return {
+            "status": "ok", "message": msg,
+            "version": version,
+            "updated": updated, "created": created, "failed": failed,
+        }
+
+
 @router.post("/repredict-model-b")
 async def repredict_model_b(
     date: str = Query(..., description="日期 YYYY-MM-DD"),
@@ -420,6 +526,7 @@ async def repredict_model_b(
             from app.predictor.pipeline import PredictionPipeline
             result = await db.execute(
                 select(Match).where(
+                    Match.status == "scheduled",
                     Match.kickoff_time >= query_start,
                     Match.kickoff_time < query_end,
                 ).order_by(Match.kickoff_time)

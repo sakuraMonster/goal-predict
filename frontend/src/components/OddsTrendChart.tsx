@@ -126,7 +126,7 @@ export default function OddsTrendChart({ data, opening, matchHandicapLine, hasFi
       points.forEach((p) => {
         if (p.handicap_line == null || p.handicap_home == null || p.handicap_away == null) return;
         const existing = timeMap.get(p.time);
-        if (!existing || Math.abs(p.handicap_line - hcpTargetLine) < Math.abs(existing.handicap_line - hcpTargetLine)) {
+        if (!existing || Math.abs(p.handicap_line - hcpTargetLine) < Math.abs(existing.handicap_line! - hcpTargetLine)) {
           timeMap.set(p.time, p);
         }
       });
@@ -193,7 +193,7 @@ export default function OddsTrendChart({ data, opening, matchHandicapLine, hasFi
   const chartOption = useMemo(() => {
     if (!selectedBm) return {};
 
-    const baseXAxis = (ta: ReturnType<typeof timeAxis.spf>) => ({
+    const baseXAxis = (ta: { times: string[]; axisLabel: any }) => ({
       type: "category" as const,
       data: ta.times,
       axisLabel: ta.axisLabel,
@@ -237,7 +237,6 @@ export default function OddsTrendChart({ data, opening, matchHandicapLine, hasFi
     }
 
     // --- 盘口变化趋势 ---
-    const lineTimes = linePoints.map((p) => p.time.slice(11, 16));
     const openingLine = openingPoint?.handicap_line;
 
     return {

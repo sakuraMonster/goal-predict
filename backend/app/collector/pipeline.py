@@ -13,6 +13,7 @@ from app.db.models import (
 )
 from app.db.database import async_session, engine
 from app.db.logger import AppLogger
+from app import ou_flags
 
 
 def _normalize_name(s: str) -> str:
@@ -219,12 +220,14 @@ class SyncPipeline:
             async with async_session() as db:
                 from sqlalchemy.orm import joinedload
 
-                # 获取未匹配的赛事（含关联的 Team）
+                # 获取未匹配的赛事（含关联的 Team）；排除已标记 cancelled 的场次
+                # （SM 数据源未收录的比赛标记 cancelled 后不再重复尝试匹配）
                 result = await db.execute(
                     select(Match)
                     .options(joinedload(Match.home_team), joinedload(Match.away_team))
                     .where(
                         Match.sportmonks_fixture_id.is_(None),
+                        Match.status == "scheduled",
                         Match.kickoff_time >= datetime.utcnow() - timedelta(days=1),
                     )
                 )
@@ -252,6 +255,10 @@ class SyncPipeline:
                     alias_map.setdefault(a.team_id, []).append(a.alias_name.lower().strip())
                     if a.league_name_zh and a.team_id not in league_map:
                         league_map[a.team_id] = a.league_name_zh
+                alias_to_team: dict[str, int] = {}  # alias名 → team_id（占位去重用）
+                for _tid, _names in alias_map.items():
+                    for _n in _names:
+                        alias_to_team.setdefault(_n, _tid)
 
                 # ── 预解析：为无 sportmonks_id 的球队查找 SportMonks 映射 ──
                 def _has_cjk(s: str) -> bool:
@@ -264,6 +271,16 @@ class SyncPipeline:
                     return False
 
                 # 1. 为没有 team_id 的比赛创建占位球队
+                # 去重：预加载现存球队 name_zh → id 映射，防止同名球队重复创建占位
+                # （曾因同名重复占位导致同一 sm_id 被赋值给两支球队，触发 ix_teams_sportmonks_id 唯一约束冲突）
+                all_teams_result = await db.execute(select(Team.id, Team.name_zh, Team.name_en))
+                name_zh_to_team: dict[str, int] = {}
+                for _t_id, _t_zh, _t_en in all_teams_result.all():
+                    if _t_zh:
+                        name_zh_to_team.setdefault(_t_zh.strip(), _t_id)
+                    if _t_en and not _t_en.startswith("UNKNOWN:"):
+                        name_zh_to_team.setdefault(_t_en.strip().lower(), _t_id)
+
                 placeholder_created = 0
                 for m in unmatched:
                     for side, name_attr, tid_attr in [
@@ -274,6 +291,15 @@ class SyncPipeline:
                         raw_name = getattr(m, name_attr, "")
                         if tid or not raw_name:
                             continue
+                        # 去重：按中文名（含别名）精确查现存球队，命中则复用，不新建占位
+                        existing_id = name_zh_to_team.get(raw_name.strip())
+                        if existing_id is None:
+                            existing_id = alias_to_team.get(raw_name.strip().lower())
+                        if existing_id:
+                            setattr(m, tid_attr, existing_id)
+                            AppLogger.info("match_fixtures",
+                                f"  复用现存球队: {raw_name} (id={existing_id})，不创建占位")
+                            continue
                         placeholder = Team(
                             name_zh=raw_name,
                             name_en=f"UNKNOWN:{raw_name}",
@@ -282,6 +308,7 @@ class SyncPipeline:
                         )
                         db.add(placeholder)
                         await db.flush()
+                        name_zh_to_team[raw_name.strip()] = placeholder.id
                         setattr(m, tid_attr, placeholder.id)
                         placeholder_created += 1
                         AppLogger.info("match_fixtures", f"  创建占位球队: {raw_name} (id={placeholder.id})")
@@ -297,6 +324,7 @@ class SyncPipeline:
                         .options(joinedload(Match.home_team), joinedload(Match.away_team))
                         .where(
                             Match.sportmonks_fixture_id.is_(None),
+                            Match.status == "scheduled",
                             Match.kickoff_time >= datetime.utcnow() - timedelta(days=1),
                         )
                     )
@@ -468,12 +496,79 @@ class SyncPipeline:
                                                 # 匹配成功：设置 fixture ID + 反推球队 SM ID
                                                 fx_id = fx["id"]
                                                 if unknown_team and not unknown_team.sportmonks_id:
+                                                    # Fix B: 唯一性守卫 — other_pid 已被其他球队持有则跳过赋值，转人工
+                                                    holder = await db.execute(
+                                                        select(Team.id).where(
+                                                            Team.sportmonks_id == other_pid,
+                                                            Team.id != unknown_team.id,
+                                                        )
+                                                    )
+                                                    if holder.scalar_one_or_none():
+                                                        AppLogger.warning("match_fixtures",
+                                                            f"  SM id={other_pid} 已被其他球队持有，{unknown_team.name_zh} 转人工确认")
+                                                        needs_manual.append({
+                                                            "jc_match_id": match.jc_match_id,
+                                                            "home_name": match.home_team_name,
+                                                            "away_name": match.away_team_name,
+                                                            "kickoff": str(match.kickoff_time)[:16],
+                                                            "home_league": league_map.get(match.home_team_id, ""),
+                                                            "away_league": league_map.get(match.away_team_id, ""),
+                                                            "reason": f"SM id={other_pid} 已被其他球队持有，需人工确认映射",
+                                                        })
+                                                        break
                                                     unknown_team.sportmonks_id = other_pid
                                                     unknown_team.name_en = other_name
                                                     unknown_team.needs_review = False
                                                     AppLogger.info("match_fixtures",
                                                         f"  反推球队映射: {unknown_team.name_zh} → SM id={other_pid} name={other_name} (来自 fixture {fx_id})")
                                                 break
+                                    else:
+                                        # 中文球队无英文变体（如 UNKNOWN:xxx）：用开赛时间吻合 + 方向一致 作为确定性兜底
+                                        # 时间：fixture starting_at(UTC) ≈ 竞彩开赛(北京时间)-8h，±3h
+                                        # 方向：known 方在 fixture 中的 location 应与竞彩一致
+                                        try:
+                                            start_raw = fx.get("starting_at") or ""
+                                            fx_dt = (datetime.fromisoformat(start_raw.replace("Z", "+00:00")).replace(tzinfo=None)
+                                                     if start_raw.endswith("Z")
+                                                     else datetime.strptime(start_raw[:19], "%Y-%m-%d %H:%M:%S"))
+                                        except (ValueError, TypeError):
+                                            continue
+                                        kickoff_utc = match.kickoff_time.replace(tzinfo=None) - timedelta(hours=8)
+                                        if abs((fx_dt - kickoff_utc).total_seconds()) > 3 * 3600:
+                                            continue
+                                        known_loc = next((p.get("meta", {}).get("location", "")
+                                                          for p in participants if isinstance(p, dict) and p.get("id") == known_sm_id), "")
+                                        expected_loc = "home" if home_sm_id else "away"
+                                        if known_loc and known_loc != expected_loc:
+                                            continue
+                                        fx_id = fx["id"]
+                                        if unknown_team and not unknown_team.sportmonks_id:
+                                            # Fix B: 唯一性守卫 — other_pid 已被其他球队持有则跳过赋值，转人工
+                                            holder = await db.execute(
+                                                select(Team.id).where(
+                                                    Team.sportmonks_id == other_pid,
+                                                    Team.id != unknown_team.id,
+                                                )
+                                            )
+                                            if holder.scalar_one_or_none():
+                                                AppLogger.warning("match_fixtures",
+                                                    f"  SM id={other_pid} 已被其他球队持有，{unknown_team.name_zh} 转人工确认")
+                                                needs_manual.append({
+                                                    "jc_match_id": match.jc_match_id,
+                                                    "home_name": match.home_team_name,
+                                                    "away_name": match.away_team_name,
+                                                    "kickoff": str(match.kickoff_time)[:16],
+                                                    "home_league": league_map.get(match.home_team_id, ""),
+                                                    "away_league": league_map.get(match.away_team_id, ""),
+                                                    "reason": f"SM id={other_pid} 已被其他球队持有，需人工确认映射",
+                                                })
+                                                break
+                                            unknown_team.sportmonks_id = other_pid
+                                            unknown_team.name_en = other_name
+                                            unknown_team.needs_review = False
+                                            AppLogger.info("match_fixtures",
+                                                f"  时间校验反推球队映射: {unknown_team.name_zh} → SM id={other_pid} name={other_name} (fixture {fx_id} 时间吻合)")
+                                        break
 
                         # ── 策略 B（原）：名称双向匹配 ──
                         if not fx_id:
@@ -683,7 +778,8 @@ class SyncPipeline:
                     for bm_id, odds_items in list(bookmaker_groups.items())[:3]:
                         spf = {}                     # 胜平负（所有盘口线共用）
                         hcp_by_line: dict[float, dict] = {}  # 亚盘按 line 分组
-                        ou_data = {}                 # 大小球（取首要线，通常 2.5）
+                        ou_data = {}                 # 大小球（旧逻辑：取首要线）
+                        ou_by_line: dict[float, dict] = {}  # 大小球（新逻辑：按 line 分组）
 
                         for o in odds_items:
                             mid = o.get("market_id")
@@ -705,13 +801,20 @@ class SyncPipeline:
                                 hcp_by_line.setdefault(line, {})[key] = value
 
                             elif mid == self.MARKET_OVER_UNDER:
-                                # 大小球暂取第一条（通常是 2.5 球，最常见）
+                                raw = label_raw.strip().lower()
+                                line = _safe_float(o.get("total"))
+                                if line is None:
+                                    continue
+                                line = round(line, 2)
+                                # 过滤明显异常值（半场盘口等）
+                                if line < 0.5 or line > 6.5:
+                                    continue
+                                # 旧逻辑兼容：仍保留第一条
                                 if not ou_data:
-                                    raw = label_raw.strip().lower()
                                     ou_data[raw] = value
-                                    line = _safe_float(o.get("total"))
-                                    if line is not None:
-                                        ou_data["line"] = line
+                                    ou_data["line"] = line
+                                # 新逻辑：按 goal_line 分组
+                                ou_by_line.setdefault(line, {})[raw] = value
 
                         # ── 生成快照 ──
                         home_win = _safe_float(spf.get("home"))
@@ -722,67 +825,153 @@ class SyncPipeline:
                         if is_swapped:
                             home_win, away_win = away_win, home_win
 
-                        if hcp_by_line:
-                            # 每个亚盘线生成一条快照
-                            for line, hcp in hcp_by_line.items():
-                                hh = _safe_float(hcp.get("home"))
-                                ha = _safe_float(hcp.get("away"))
-                                if hh is None or ha is None:
-                                    continue
-                                actual_line = line
-                                if is_swapped:
-                                    hh, ha = ha, hh
-                                    actual_line = -line
+                        bm_name = bookmaker_names.get(bm_id, str(bm_id))
 
+                        if ou_flags.OU_MULTI_LINE_STORAGE:
+                            # ── 新逻辑：OU 独立行存储 ──
+                            # HCP 行：仅携带 HCP + SPF，OU 字段置空
+                            if hcp_by_line:
+                                for line, hcp in hcp_by_line.items():
+                                    hh = _safe_float(hcp.get("home"))
+                                    ha = _safe_float(hcp.get("away"))
+                                    if hh is None or ha is None:
+                                        continue
+                                    actual_line = line
+                                    if is_swapped:
+                                        hh, ha = ha, hh
+                                        actual_line = -line
+
+                                    db.add(OddsSnapshot(
+                                        match_id=match.id,
+                                        snapshot_time=snapshot_time,
+                                        bookmaker=bm_name,
+                                        home_win=home_win,
+                                        draw=draw,
+                                        away_win=away_win,
+                                        handicap_home=hh,
+                                        handicap_line=actual_line,
+                                        handicap_away=ha,
+                                        over_odds=None,
+                                        goal_line=None,
+                                        under_odds=None,
+                                    ))
+                                    total_snapshots += 1
+                            elif spf:
+                                # 无亚盘数据但有 1X2，生成一条仅含 1X2 的快照
                                 db.add(OddsSnapshot(
                                     match_id=match.id,
                                     snapshot_time=snapshot_time,
-                                    bookmaker=bookmaker_names.get(bm_id, str(bm_id)),
+                                    bookmaker=bm_name,
                                     home_win=home_win,
                                     draw=draw,
                                     away_win=away_win,
-                                    handicap_home=hh,
-                                    handicap_line=actual_line,
-                                    handicap_away=ha,
-                                    over_odds=_safe_float(ou_data.get("over")),
-                                    goal_line=ou_data.get("line"),
-                                    under_odds=_safe_float(ou_data.get("under")),
                                 ))
                                 total_snapshots += 1
-                        elif spf:
-                            # 无亚盘数据但有 1X2，生成一条仅含 1X2 的快照
-                            db.add(OddsSnapshot(
-                                match_id=match.id,
-                                snapshot_time=snapshot_time,
-                                bookmaker=bookmaker_names.get(bm_id, str(bm_id)),
-                                home_win=home_win,
-                                draw=draw,
-                                away_win=away_win,
-                            ))
-                            total_snapshots += 1
+
+                            # OU 独立行：每条 goal_line 一条，携带 SPF
+                            for gl, ou_vals in ou_by_line.items():
+                                db.add(OddsSnapshot(
+                                    match_id=match.id,
+                                    snapshot_time=snapshot_time,
+                                    bookmaker=bm_name,
+                                    home_win=home_win,
+                                    draw=draw,
+                                    away_win=away_win,
+                                    handicap_home=None,
+                                    handicap_line=None,
+                                    handicap_away=None,
+                                    over_odds=_safe_float(ou_vals.get("over")),
+                                    goal_line=gl,
+                                    under_odds=_safe_float(ou_vals.get("under")),
+                                ))
+                                total_snapshots += 1
+                        else:
+                            # ── 旧逻辑：OU 随 HCP 行存储 ──
+                            if hcp_by_line:
+                                for line, hcp in hcp_by_line.items():
+                                    hh = _safe_float(hcp.get("home"))
+                                    ha = _safe_float(hcp.get("away"))
+                                    if hh is None or ha is None:
+                                        continue
+                                    actual_line = line
+                                    if is_swapped:
+                                        hh, ha = ha, hh
+                                        actual_line = -line
+
+                                    db.add(OddsSnapshot(
+                                        match_id=match.id,
+                                        snapshot_time=snapshot_time,
+                                        bookmaker=bm_name,
+                                        home_win=home_win,
+                                        draw=draw,
+                                        away_win=away_win,
+                                        handicap_home=hh,
+                                        handicap_line=actual_line,
+                                        handicap_away=ha,
+                                        over_odds=_safe_float(ou_data.get("over")),
+                                        goal_line=ou_data.get("line"),
+                                        under_odds=_safe_float(ou_data.get("under")),
+                                    ))
+                                    total_snapshots += 1
+                            elif spf:
+                                db.add(OddsSnapshot(
+                                    match_id=match.id,
+                                    snapshot_time=snapshot_time,
+                                    bookmaker=bm_name,
+                                    home_win=home_win,
+                                    draw=draw,
+                                    away_win=away_win,
+                                ))
+                                total_snapshots += 1
 
                 # 标记初盘：尚无初盘的 (match, bookmaker) 组合自动标上最早快照
                 match_ids = [m.id for m in matches]
                 if match_ids:
-                    await db.execute(
-                        text("""
-                            UPDATE odds_snapshots SET is_opening = TRUE
-                            WHERE id IN (
-                                SELECT DISTINCT ON (match_id, bookmaker) id
-                                FROM odds_snapshots
-                                WHERE match_id = ANY(:mids)
-                                ORDER BY match_id, bookmaker, snapshot_time ASC
-                            )
-                            AND NOT EXISTS (
-                                SELECT 1 FROM odds_snapshots o2
-                                WHERE o2.match_id = odds_snapshots.match_id
-                                  AND o2.bookmaker = odds_snapshots.bookmaker
-                                  AND o2.is_opening = TRUE
-                                  AND o2.id != odds_snapshots.id
-                            )
-                        """),
-                        {"mids": match_ids}
-                    )
+                    if ou_flags.OU_MULTI_LINE_STORAGE:
+                        # 新逻辑：CTE 找最早 snapshot_time，标记该时间所有行（含多线OU）
+                        await db.execute(
+                            text("""
+                                WITH first_times AS (
+                                    SELECT match_id, bookmaker, MIN(snapshot_time) AS first_time
+                                    FROM odds_snapshots
+                                    WHERE match_id = ANY(:mids)
+                                    GROUP BY match_id, bookmaker
+                                )
+                                UPDATE odds_snapshots SET is_opening = TRUE
+                                WHERE (match_id, bookmaker, snapshot_time) IN (
+                                    SELECT match_id, bookmaker, first_time FROM first_times
+                                )
+                                AND NOT EXISTS (
+                                    SELECT 1 FROM odds_snapshots o2
+                                    WHERE o2.match_id = odds_snapshots.match_id
+                                      AND o2.bookmaker = odds_snapshots.bookmaker
+                                      AND o2.is_opening = TRUE
+                                      AND o2.id != odds_snapshots.id
+                                )
+                            """),
+                            {"mids": match_ids}
+                        )
+                    else:
+                        # 旧逻辑：DISTINCT ON 每条博彩公司标记最早一条
+                        await db.execute(
+                            text("""
+                                UPDATE odds_snapshots SET is_opening = TRUE
+                                WHERE id IN (
+                                    SELECT DISTINCT ON (match_id, bookmaker) id
+                                    FROM odds_snapshots
+                                    WHERE match_id = ANY(:mids)
+                                    ORDER BY match_id, bookmaker, snapshot_time ASC
+                                )
+                                AND NOT EXISTS (
+                                    SELECT 1 FROM odds_snapshots o2
+                                    WHERE o2.match_id = odds_snapshots.match_id
+                                      AND o2.bookmaker = odds_snapshots.bookmaker
+                                      AND o2.is_opening = TRUE
+                                      AND o2.id != odds_snapshots.id
+                                )
+                            """),
+                            {"mids": match_ids}
+                        )
 
                 await db.commit()
 
@@ -1374,6 +1563,96 @@ class SyncPipeline:
         except Exception as e:
             duration = int((datetime.utcnow() - start).total_seconds() * 1000)
             await self._log_task("sync_standings", "failed", str(e), duration)
+            raise
+
+    async def sync_injuries(self):
+        """V5: 同步近30天竞彩球队的伤停/停赛（SM sidelined include）
+
+        SM v3 无独立 /injuries 端点，伤停走 teams 的 sidelined include：
+          GET /teams/{sm_id}?include=sidelined.player
+        只保留 completed=False 的缺阵记录，写入 Injury 表；
+        completed=True（已康复）或不再出现在 sidelined 的旧记录会被清理。
+        """
+        start = datetime.utcnow()
+        try:
+            async with async_session() as db:
+                cutoff = datetime.utcnow() - timedelta(days=30)
+                result = await db.execute(
+                    select(Match).where(Match.kickoff_time >= cutoff)
+                )
+                matches = result.scalars().all()
+                team_ids = set()
+                for m in matches:
+                    if m.home_team_id:
+                        team_ids.add(m.home_team_id)
+                    if m.away_team_id:
+                        team_ids.add(m.away_team_id)
+                teams = (await db.execute(
+                    select(Team).where(Team.id.in_(team_ids), Team.sportmonks_id.isnot(None))
+                )).scalars().all()
+                if not teams:
+                    await self._log_task("sync_injuries", "success", "无待同步球队", 0)
+                    return
+
+                added = removed = 0
+                for t in teams:
+                    try:
+                        data = await self.sm.get_team_by_id(t.sportmonks_id, includes="sidelined.player")
+                    except Exception as e:
+                        AppLogger.warning("sync_injuries", f"{t.name_zh}(sm={t.sportmonks_id}) sidelined 拉取失败: {e}")
+                        continue
+                    sd = data.get("sidelined") or []
+                    existing = (await db.execute(
+                        select(Injury).where(Injury.team_id == t.id)
+                    )).scalars().all()
+
+                    active = set()
+                    for e in sd:
+                        if e.get("completed"):
+                            continue
+                        p = e.get("player") or {}
+                        pname = p.get("common_name") or p.get("name") or f"player_{e.get('player_id')}"
+                        cat = e.get("category") or "injury"
+                        sd_dt = None
+                        try:
+                            sd_dt = datetime.strptime(str(e.get("start_date"))[:10], "%Y-%m-%d")
+                        except (ValueError, TypeError):
+                            pass
+                        exp_dt = None
+                        try:
+                            exp_dt = datetime.strptime(str(e.get("end_date"))[:10], "%Y-%m-%d")
+                        except (ValueError, TypeError):
+                            pass
+                        key = (t.id, pname, sd_dt)
+                        active.add(key)
+                        rec = next((x for x in existing
+                                    if x.player_name == pname and x.start_date == sd_dt), None)
+                        if rec:
+                            rec.type = cat
+                            rec.status = "out"
+                            if exp_dt is not None:
+                                rec.expected_return = exp_dt
+                        else:
+                            db.add(Injury(
+                                team_id=t.id, player_name=pname, type=cat,
+                                reason="", start_date=sd_dt,
+                                expected_return=exp_dt, status="out",
+                            ))
+                            added += 1
+                    # 清理已康复/已不在 sidelined 的旧记录
+                    for rec in existing:
+                        if (rec.player_name, rec.start_date) not in {(k[1], k[2]) for k in active}:
+                            await db.delete(rec)
+                            removed += 1
+                await db.commit()
+                duration = int((datetime.utcnow() - start).total_seconds() * 1000)
+                await self._log_task("sync_injuries", "success",
+                    f"新增 {added} 条，清理 {removed} 条，球队 {len(teams)} 支", duration)
+                AppLogger.info("sync_injuries",
+                    f"新增 {added} 条，清理 {removed} 条，球队 {len(teams)} 支")
+        except Exception as e:
+            duration = int((datetime.utcnow() - start).total_seconds() * 1000)
+            await self._log_task("sync_injuries", "failed", str(e), duration)
             raise
 
     async def _sync_head_to_head(self, db) -> int:

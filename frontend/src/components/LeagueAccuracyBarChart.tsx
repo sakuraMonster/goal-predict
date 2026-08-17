@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import ReactECharts from "echarts-for-react";
 
 export interface LeagueAccuracyItem {
@@ -16,13 +16,14 @@ interface Props {
 }
 
 export default function LeagueAccuracyBarChart({ data, loading }: Props) {
+  const [collapsed, setCollapsed] = useState(false);
+
   const option = useMemo(() => {
     // 按 accuracy 升序排列（横条从低到高）
     const sorted = [...data].sort((a, b) => a.accuracy - b.accuracy);
 
     const names = sorted.map((d) => d.league_name);
     const accuracies = sorted.map((d) => d.accuracy);
-    const hitMisses = sorted.map((d) => [`${d.hit}中`, `${d.miss}失`, `${d.settled}场`]);
 
     return {
       tooltip: {
@@ -81,7 +82,7 @@ export default function LeagueAccuracyBarChart({ data, loading }: Props) {
       series: [
         {
           type: "bar",
-          data: accuracies.map((acc, i) => ({
+          data: accuracies.map((acc) => ({
             value: acc,
             itemStyle: {
               color: acc >= 60 ? "#2d5a3b" : acc >= 45 ? "#c4a44a" : "#c4553d",
@@ -105,33 +106,52 @@ export default function LeagueAccuracyBarChart({ data, loading }: Props) {
     };
   }, [data]);
 
+  const header = (
+    <button
+      type="button"
+      onClick={() => setCollapsed((c) => !c)}
+      className="w-full flex items-center justify-between"
+    >
+      <span className="text-xs font-bold text-ink-light uppercase tracking-wide">近30天各联赛命中率</span>
+      <span className="text-ink-light text-xs select-none">{collapsed ? "▸ 展开" : "▾ 收缩"}</span>
+    </button>
+  );
+
   if (loading) {
     return (
       <div className="bg-white rounded-lg border border-border p-4">
-        <div className="h-6 w-32 bg-parchment-light rounded mb-3 animate-pulse" />
-        <div className="h-[200px] bg-parchment-light rounded animate-pulse" />
+        {header}
+        {!collapsed && (
+          <>
+            <div className="h-6 w-32 bg-parchment-light rounded mt-3 mb-3 animate-pulse" />
+            <div className="h-[200px] bg-parchment-light rounded animate-pulse" />
+          </>
+        )}
       </div>
     );
   }
 
   if (data.length === 0) {
     return (
-      <div className="bg-white rounded-lg border border-border p-4 text-center text-xs text-ink-muted py-8">
-        暂无联赛命中率数据
+      <div className="bg-white rounded-lg border border-border p-4">
+        {header}
+        {!collapsed && (
+          <div className="text-center text-xs text-ink-muted py-8">暂无联赛命中率数据</div>
+        )}
       </div>
     );
   }
 
   return (
     <div className="bg-white rounded-lg border border-border p-4">
-      <div className="text-xs font-bold text-ink-light uppercase tracking-wide mb-2">
-        近30天各联赛命中率
-      </div>
-      <ReactECharts
-        option={option}
-        style={{ height: Math.max(180, data.length * 32) }}
-        opts={{ renderer: "svg" }}
-      />
+      {header}
+      {!collapsed && (
+        <ReactECharts
+          option={option}
+          style={{ height: Math.max(180, data.length * 32) }}
+          opts={{ renderer: "svg" }}
+        />
+      )}
     </div>
   );
 }

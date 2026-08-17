@@ -1,21 +1,14 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   getMatches, getMatchDates, getLeagues, getPrediction, getH2H, getMatchTeamComparison,
-<<<<<<< HEAD
-  getReportRange, getLeagueAccuracy, repredictModelB, predictModelC, syncOdds, updateTeams
-=======
-  getReportRange, repredictModelB, predictModelC, syncOdds, updateTeams
->>>>>>> 927ef941e22d3f6ac1a4472d4e70b57b35ea02ae
+  getReportRange, getLeagueAccuracy, getGoalPicks, getGoalPicksHistory, repredictModelC, predictModelC, syncOdds, updateTeams
 } from "../api/client";
 import EmptyState from "../components/EmptyState";
 import ErrorState from "../components/ErrorState";
 import SkeletonCard from "../components/Skeleton";
-<<<<<<< HEAD
 import LeagueAccuracyBarChart from "../components/LeagueAccuracyBarChart";
-=======
->>>>>>> 927ef941e22d3f6ac1a4472d4e70b57b35ea02ae
 import { useToast } from "../components/Toast";
-import type { PredictionData, KeyFactors } from "../api/client";
+import type { PredictionData, GoalPick, GoalPicksResponse, GoalPickHistoryResponse } from "../api/client";
 
 type GoalTab = "live" | "history";
 type RangeKey = "today" | "3d" | "7d" | "30d";
@@ -42,28 +35,6 @@ function getDateRange(days: number): string[] {
   return dates;
 }
 
-// ==================== SNAP 辅助 ====================
-const SNAP_DOWN = 0.05;
-const SNAP_UP = 0.93;
-function snapTop2(lambda: number): [number, number] {
-  if (lambda <= 0) return [0, 0];
-  const frac = lambda - Math.floor(lambda);
-  let eff = lambda;
-  if (frac < SNAP_DOWN) eff = Math.max(0, Math.floor(lambda) - 1);
-  else if (frac > SNAP_UP) eff = Math.min(6, Math.ceil(lambda) + 1);
-  // 找距离 effective 最近的 2 个整数
-  const dists = Array.from({ length: 7 }, (_, i) => [i, Math.abs(eff - i)] as [number, number]);
-  dists.sort((a, b) => a[1] - b[1]);
-  const a = Math.min(dists[0][0], dists[1][0]);
-  const b = Math.max(dists[0][0], dists[1][0]);
-  return [a, b];
-}
-
-function confidenceColor(level: string): string {
-  if (level === "high") return "bg-moss";
-  if (level === "medium") return "bg-amber";
-  return "bg-[#9e9e9e]";
-}
 function confidenceTextColor(level: string): string {
   if (level === "high") return "text-moss";
   if (level === "medium") return "text-amber";
@@ -111,6 +82,7 @@ interface MatchItem {
   kickoff_time: string;
   home_team: string;
   away_team: string;
+  status?: string;
   home_prob: number;
   draw_prob: number;
   away_prob: number;
@@ -129,6 +101,374 @@ interface DetailData {
   prediction: PredictionData | null;
   h2h: any[];
   comparison: any | null;
+}
+
+// ==================== 今日进球数优选面板 ====================
+const SIGNAL_TYPE_LABELS: Record<string, string> = {
+  cross: "联赛×λ区间",
+  league: "联赛",
+  bucket: "λ区间",
+  snap: "SNAP首位",
+  global: "全局",
+};
+
+const SIGNAL_TYPE_COLORS: Record<string, string> = {
+  cross: "text-moss",
+  league: "text-ink",
+  bucket: "text-amber",
+  snap: "text-rust",
+  global: "text-ink-light",
+};
+
+function lambdaBucket(egc?: number | null): string {
+  if (egc == null) return "-";
+  if (egc < 2.0) return "<2.0";
+  if (egc < 2.5) return "2.0-2.5";
+  if (egc < 3.0) return "2.5-3.0";
+  if (egc < 3.5) return "3.0-3.5";
+  return ">=3.5";
+}
+
+function GoalPicksPanel({ picks, loading }: { picks: GoalPicksResponse | null; loading: boolean }) {
+  const [collapsed, setCollapsed] = useState(false);
+  const [selectedPick, setSelectedPick] = useState<GoalPick | null>(null);
+  const items = picks?.data || [];
+  const secondary = picks?.secondary || [];
+  const primary = items.slice(0, 3);
+
+  return (
+    <>
+      <div className="bg-white rounded-lg border border-border p-4">
+        <div className="flex items-center gap-2 mb-3">
+          <span
+            className="flex items-center gap-1.5 cursor-pointer select-none"
+            onClick={() => setCollapsed(!collapsed)}
+            title={collapsed ? "展开" : "收起"}
+          >
+            <span className="font-heading text-sm font-bold text-ink">今日进球数优选</span>
+            <span className={`text-[10px] text-ink-light transition-transform ${collapsed ? "" : "rotate-180"}`}>▾</span>
+          </span>
+          {picks && (
+            <span className="text-[10px] text-ink-muted">
+              近{picks.days}天全局命中 {picks.global_accuracy}% · 候选 {picks.total_candidates} 场
+            </span>
+          )}
+          <span className="ml-auto text-[10px] text-ink-light">按历史 Model C 进球数命中率评分</span>
+        </div>
+
+        {!collapsed && (
+          <>
+            {loading ? (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-28 bg-parchment-light rounded-md animate-pulse" />
+                ))}
+              </div>
+            ) : primary.length === 0 && secondary.length === 0 ? (
+              <div className="text-xs text-ink-light py-6 text-center">
+                今日暂无可用候选（缺 Model C SNAP 或已全部开赛）
+              </div>
+            ) : (
+              <>
+                {/* 优选卡片（前 3 名） */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {primary.map((p, idx) => (
+                    <GoalPickCard key={p.match_id} pick={p} rank={idx + 1} onClick={() => setSelectedPick(p)} />
+                  ))}
+                </div>
+
+                {/* 次选列表（后 2 名） */}
+                {secondary.length > 0 && (
+                  <div className="mt-3 border-t border-border pt-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-[10px] font-bold text-ink-muted">次选</span>
+                      <span className="text-[10px] text-ink-light">
+                        第 {items.length + 1}~{items.length + secondary.length} 名 · 把握度低于优选
+                      </span>
+                    </div>
+                    <div className="space-y-1.5">
+                      {secondary.map((p, idx) => (
+                        <div
+                          key={p.match_id}
+                          className="flex items-center gap-2.5 px-3 py-2 rounded-md border border-border bg-white hover:border-moss hover:bg-highlight cursor-pointer transition-colors"
+                          onClick={() => setSelectedPick(p)}
+                        >
+                          <span className="w-5 h-5 rounded-full bg-parchment-dark text-ink-muted text-[11px] font-bold flex items-center justify-center shrink-0">
+                            {items.length + idx + 1}
+                          </span>
+                          {p.match_num && <span className="text-[10px] font-bold text-ink-muted bg-parchment-dark px-1.5 py-0.5 rounded shrink-0">{p.match_num}</span>}
+                          <span className="text-[10px] text-ink-light truncate shrink-0 max-w-[100px]">{p.league_name}</span>
+                          <span className="flex-1 text-xs font-semibold text-ink truncate">
+                            {p.home_team} <span className="text-ink-light font-normal text-[10px]">vs</span> {p.away_team}
+                          </span>
+                          <span className="text-[11px] text-ink-muted shrink-0">{p.kickoff_time.slice(11, 16)}</span>
+                          <span className="shrink-0 flex items-center gap-1.5">
+                            <span className="text-[10px] text-ink-light">SNAP</span>
+                            {p.snap_top2_c && p.snap_top2_c.length >= 2 ? (
+                              <span className="font-heading font-bold text-moss text-sm leading-none">
+                                {p.snap_top2_c[0]}/{p.snap_top2_c[1]}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-ink-light">-</span>
+                            )}
+                          </span>
+                          <span className="shrink-0 text-xs font-bold font-heading text-moss w-12 text-right">{p.score.toFixed(1)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* 优选逻辑详情（右侧抽屉） */}
+      {selectedPick && <GoalPickDetailDrawer pick={selectedPick} onClose={() => setSelectedPick(null)} />}
+    </>
+  );
+}
+
+function GoalPickCard({ pick, rank, onClick }: { pick: GoalPick; rank: number; onClick: () => void }) {
+  const snap = pick.snap_top2_c;
+  const topSignal = pick.signals?.[0];
+
+  return (
+    <div
+      onClick={onClick}
+      className={`rounded-md border p-3 cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5 ${rank === 1 ? "border-moss bg-parchment-light" : "border-border bg-white"}`}
+      title="查看优选逻辑"
+    >
+      <div className="flex items-center gap-1.5 mb-2">
+        <span className="w-5 h-5 rounded-full bg-moss text-white text-[11px] font-bold flex items-center justify-center shrink-0">{rank}</span>
+        {pick.match_num && <span className="text-[10px] font-bold text-ink-muted bg-parchment-dark px-1.5 py-0.5 rounded shrink-0">{pick.match_num}</span>}
+        <span className="text-[10px] text-ink-light truncate flex-1">{pick.league_name}</span>
+        <span className="text-[11px] text-ink-muted shrink-0">{pick.kickoff_time.slice(11, 16)}</span>
+      </div>
+
+      <div className="flex items-center justify-between gap-1.5 mb-2">
+        <span className="font-heading text-sm font-bold text-center flex-1 truncate leading-tight">{pick.home_team}</span>
+        <span className="text-[10px] text-ink-light shrink-0 font-semibold">VS</span>
+        <span className="font-heading text-sm font-bold text-center flex-1 truncate leading-tight">{pick.away_team}</span>
+      </div>
+
+      <div className="flex items-center gap-2 mb-2">
+        {snap && snap.length >= 2 ? (
+          <>
+            <span className="w-8 h-8 rounded-md bg-moss text-white text-base font-bold font-heading flex items-center justify-center shadow-sm">{snap[0]}</span>
+            <span className="text-[10px] text-ink-light">或</span>
+            <span className="w-8 h-8 rounded-md border border-moss text-moss text-base font-bold font-heading flex items-center justify-center">{snap[1]}</span>
+          </>
+        ) : (
+          <span className="text-xs text-ink-light">未预测</span>
+        )}
+        <div className="ml-auto text-right">
+          <div className="text-[10px] text-ink-light">把握度</div>
+          <div className="text-lg font-bold font-heading text-moss leading-none">{pick.score.toFixed(1)}</div>
+        </div>
+      </div>
+
+      {topSignal && (
+        <div className="text-[10px] text-ink-muted leading-relaxed">
+          <span className="text-moss font-semibold">{topSignal.label}</span> 命中 {topSignal.acc}%
+          <span className="text-ink-light">（{topSignal.n}场）</span>
+        </div>
+      )}
+      <div className="mt-1.5 text-[10px] text-moss/70 font-semibold">查看优选逻辑 ›</div>
+    </div>
+  );
+}
+
+// ==================== 优选逻辑详情抽屉 ====================
+function GoalPickDetailDrawer({ pick, onClose }: { pick: GoalPick; onClose: () => void }) {
+  const snap = pick.snap_top2_c;
+  const bucket = lambdaBucket(pick.expected_goals_c);
+  const signals = pick.signals || [];
+
+  // 逐信号加权明细（与后端 _score_goal_pick 口径一致：conf = min(√n, 10)）
+  const rows = signals.map((s) => {
+    const conf = Math.min(Math.sqrt(s.n), 10);
+    return { ...s, conf, contrib: s.acc * s.weight * conf };
+  });
+  const den = rows.reduce((a, r) => a + r.weight * r.conf, 0);
+  const num = rows.reduce((a, r) => a + r.contrib, 0);
+
+  return (
+    <div className="fixed inset-0 bg-ink/30 z-50 flex justify-end" onClick={onClose}>
+      <div className="w-[560px] max-w-[100vw] h-full bg-white shadow-xl overflow-y-auto animate-[slideIn_0.25s_ease]" onClick={e => e.stopPropagation()}>
+        {/* 头部 */}
+        <div className="sticky top-0 bg-white border-b border-border px-5 py-4 flex items-center justify-between z-10">
+          <span className="font-heading text-base font-bold">进球数优选 · 优选逻辑</span>
+          <button onClick={onClose} className="w-9 h-9 rounded-full border border-border flex items-center justify-center text-ink-muted hover:bg-parchment transition-colors">&times;</button>
+        </div>
+
+        <div>
+          {/* 对阵概要 */}
+          <div className="px-5 py-4 border-b border-border">
+            <div className="flex items-center gap-2 mb-2.5">
+              {pick.match_num && <span className="text-[10px] font-bold text-ink-muted bg-parchment-dark px-1.5 py-0.5 rounded">{pick.match_num}</span>}
+              <span className="text-[10px] text-ink-light bg-parchment-light px-2 py-0.5 rounded">{pick.league_name}</span>
+              <span className="text-[11px] text-ink-muted">{pick.kickoff_time.slice(0, 16).replace("T", " ")}</span>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-heading text-base font-bold flex-1 text-center">{pick.home_team}</span>
+              <span className="text-[11px] text-ink-light shrink-0 font-semibold">VS</span>
+              <span className="font-heading text-base font-bold flex-1 text-center">{pick.away_team}</span>
+            </div>
+          </div>
+
+          {/* 预测快照 */}
+          <div className="px-5 py-4 border-b border-border">
+            <div className="text-xs font-bold text-ink-light uppercase tracking-wide mb-3">预测快照</div>
+            <div className="flex gap-3">
+              <div className="flex-1 text-center p-3 bg-parchment-light rounded-md">
+                <div className="text-[10px] text-ink-light mb-1.5">SNAP Top2</div>
+                <div className="flex items-center justify-center gap-2">
+                  {snap && snap.length >= 2 ? (
+                    <>
+                      <span className="w-9 h-9 rounded-md bg-moss text-white text-lg font-bold font-heading flex items-center justify-center">{snap[0]}</span>
+                      <span className="text-[10px] text-ink-light">或</span>
+                      <span className="w-9 h-9 rounded-md border border-moss text-moss text-lg font-bold font-heading flex items-center justify-center">{snap[1]}</span>
+                    </>
+                  ) : <span className="text-xs text-ink-light">未预测</span>}
+                </div>
+              </div>
+              <div className="flex-1 text-center p-3 bg-parchment-light rounded-md">
+                <div className="text-[10px] text-ink-light mb-1.5">预期进球 λ</div>
+                <div className="text-xl font-bold font-heading text-moss">{pick.expected_goals_c?.toFixed(2) ?? "-"}</div>
+                <div className="text-[10px] text-ink-light mt-0.5">λ 区间 {bucket}</div>
+              </div>
+              <div className="flex-1 text-center p-3 bg-parchment-light rounded-md">
+                <div className="text-[10px] text-ink-light mb-1.5">把握度</div>
+                <div className="text-xl font-bold font-heading text-moss">{pick.score.toFixed(1)}</div>
+                <div className="text-[10px] text-ink-light mt-0.5">满分 100</div>
+              </div>
+            </div>
+          </div>
+
+          {/* 优选逻辑：信号明细 */}
+          <div className="px-5 py-4 border-b border-border">
+            <div className="text-xs font-bold text-ink-light uppercase tracking-wide mb-3">优选逻辑 · 信号明细</div>
+            <div className="text-[11px] text-ink-muted leading-relaxed mb-3">
+              逐层收集命中率信号（联赛×λ区间 → 联赛 → λ区间 → SNAP首位 → 全局），
+              信号按样本量 <span className="font-mono">min(√n, 10)</span> 做置信加权，越特异的信号权重越高。
+            </div>
+            <div className="space-y-2">
+              {rows.map((s, i) => {
+                const share = den > 0 ? ((s.weight * s.conf) / den) * 100 : 0;
+                return (
+                  <div key={i} className="p-2.5 bg-parchment-light rounded-md">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className={`text-[10px] font-bold ${SIGNAL_TYPE_COLORS[s.type] || "text-ink"}`}>{SIGNAL_TYPE_LABELS[s.type] || s.type}</span>
+                      <span className="text-xs font-semibold text-ink">{s.label}</span>
+                      <span className="ml-auto text-xs font-bold font-heading text-moss">{s.acc}%</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-1.5 bg-parchment rounded overflow-hidden">
+                        <div className="h-full bg-moss/70 rounded" style={{ width: `${Math.max(s.acc, 2)}%` }} />
+                      </div>
+                      <span className="text-[10px] text-ink-light shrink-0">
+                        样本 {s.n} 场 · w={s.weight} · conf={s.conf.toFixed(1)} · 贡献 {share.toFixed(0)}%
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 评分公式 */}
+          {den > 0 && (
+            <div className="px-5 py-4 border-b border-border">
+              <div className="text-xs font-bold text-ink-light uppercase tracking-wide mb-3">评分公式</div>
+              <div className="bg-parchment-light rounded px-3 py-2.5 font-mono text-[11px] text-ink leading-relaxed break-all">
+                score = Σ(acc × w × min(√n,10)) / Σ(w × min(√n,10))
+                <br />
+                <span className="text-ink-muted">
+                  = {num.toFixed(1)} / {den.toFixed(1)} = <span className="text-moss font-bold">{pick.score.toFixed(2)}</span>
+                </span>
+              </div>
+            </div>
+          )}
+
+          {/* 命中口径 */}
+          <div className="px-5 py-4">
+            <div className="text-xs font-bold text-ink-light uppercase tracking-wide mb-3">命中判定口径</div>
+            <div className="text-[11px] text-ink-muted leading-relaxed">
+              本场实际总进球（≥4 按 4 计）落在 SNAP Top2（{snap?.join("/") ?? "-"}）内即命中。
+              把握度 = 各信号历史命中率按特异性与样本置信加权后的加权平均。
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ==================== 进球数优选历史命中率 ====================
+function GoalPicksHistoryPanel({ data, loading }: { data: GoalPickHistoryResponse | null; loading: boolean }) {
+  const summary = data?.summary;
+  const days = data?.data || [];
+
+  return (
+    <div className="bg-white rounded-lg border border-border p-4">
+      <div className="flex items-center gap-2 mb-3">
+        <span className="font-heading text-sm font-bold text-ink">进球数优选命中率</span>
+        {data && (
+          <span className="text-[10px] text-ink-muted">
+            近{data.days}天累计推荐 {summary?.total_picks ?? 0} 场
+          </span>
+        )}
+        <span className="ml-auto text-[10px] text-ink-light">按推荐时的 Model C SNAP 快照判定</span>
+      </div>
+
+      {loading ? (
+        <div className="h-24 bg-parchment-light rounded animate-pulse" />
+      ) : !data || days.length === 0 ? (
+        <div className="text-xs text-ink-light py-6 text-center">
+          暂无进球数优选历史记录（打开「实时预测」页生成推荐后自动记录）
+        </div>
+      ) : (
+        <>
+          {/* 累计命中率 */}
+          <div className="flex items-center gap-6 mb-3 p-3 bg-parchment-light rounded-md">
+            <div className="min-w-[120px]">
+              <div className="text-[10px] text-ink-light">累计命中率</div>
+              <div className="text-2xl font-bold font-heading text-moss">{summary!.accuracy.toFixed(1)}%</div>
+            </div>
+            <div className="text-xs text-ink-muted leading-relaxed">
+              推荐 {summary!.total_picks} 场 · 命中 {summary!.hit} · 未命中 {summary!.miss}
+              <br />
+              <span className="text-ink-light">待结算 {summary!.total_picks - summary!.settled} 场</span>
+            </div>
+          </div>
+
+          {/* 按日期列表 */}
+          <div className="space-y-1.5">
+            {days.map((d) => (
+              <div key={d.date} className="flex items-center gap-3 px-3 py-2 border border-parchment rounded">
+                <span className="text-xs font-semibold text-ink w-24 shrink-0">{d.date}</span>
+                <div className="flex-1 h-2 bg-parchment rounded overflow-hidden">
+                  <div
+                    className={`h-full rounded ${d.accuracy >= 60 ? "bg-moss" : d.accuracy >= 45 ? "bg-amber" : "bg-rust"}`}
+                    style={{ width: `${Math.max(d.accuracy, 2)}%` }}
+                  />
+                </div>
+                <span className="text-xs text-ink-muted w-20 text-right shrink-0">
+                  {d.hit}/{d.settled}中
+                  {d.settled < d.total ? `（${d.total - d.settled}待）` : ""}
+                </span>
+                <span className="text-xs font-bold text-moss w-14 text-right shrink-0">
+                  {d.settled > 0 ? `${d.accuracy.toFixed(0)}%` : "-"}
+                </span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 function LivePredictionView() {
@@ -150,6 +490,18 @@ function LivePredictionView() {
   const [dateOpen, setDateOpen] = useState(false);
   const dateRef = useRef<HTMLDivElement>(null);
   const toast = useToast();
+  const [goalPicks, setGoalPicks] = useState<GoalPicksResponse | null>(null);
+  const [picksLoading, setPicksLoading] = useState(true);
+
+  const fetchGoalPicks = useCallback(() => {
+    setPicksLoading(true);
+    getGoalPicks({ date: selectedDate, days: 30, top_n: 3, secondary: 2 })
+      .then((res) => setGoalPicks(res))
+      .catch(() => setGoalPicks(null))
+      .finally(() => setPicksLoading(false));
+  }, [selectedDate]);
+
+  useEffect(() => { fetchGoalPicks(); }, [fetchGoalPicks]);
 
   const fetchData = useCallback(() => {
     setLoading(true);
@@ -281,6 +633,9 @@ function LivePredictionView() {
 
   return (
     <div className="space-y-4">
+      {/* 今日进球数优选 */}
+      <GoalPicksPanel picks={goalPicks} loading={picksLoading} />
+
       {/* 监控条 */}
       <div className="flex items-center gap-3 px-4 py-3 bg-parchment-dark rounded-lg border border-border-dark">
         <span className="flex items-center gap-2 text-xs text-moss font-semibold">
@@ -395,13 +750,14 @@ function LivePredictionView() {
             <div key={m.id}
               className={`bg-white rounded-lg border p-4 cursor-pointer transition-all hover:shadow-md hover:-translate-y-0.5 ${
                 selectedMatchId === m.id ? "border-moss shadow-[0_0_0_2px_rgba(45,90,59,0.15)]" : "border-border shadow-sm"
-              }`}
+              } ${m.status === "cancelled" ? "opacity-60" : ""}`}
               onClick={() => openDetail(m.id)}>
               {/* 头部：编号 + 联赛 + 时间 + 标签 */}
               <div className="flex items-center gap-2 mb-3">
                 {m.match_num && <span className="text-[10px] font-bold text-ink-muted bg-parchment-dark px-1.5 py-0.5 rounded flex-shrink-0">{m.match_num}</span>}
                 <span className="text-[10px] text-ink-light bg-parchment-light px-2 py-0.5 rounded tracking-wide flex-1 truncate">{m.league_name}</span>
                 <span className="text-[11px] text-ink-muted flex-shrink-0">{m.kickoff_time.slice(11, 16)}</span>
+                {m.status === "cancelled" && <span className="text-[10px] font-semibold px-1.5 py-px bg-parchment-dark text-ink-muted rounded flex-shrink-0">已忽略</span>}
                 {m.is_hot_match && <span className="text-[10px] font-semibold px-1.5 py-px bg-hot-bg text-moss rounded flex-shrink-0">热门</span>}
                 {m.is_cold_match && <span className="text-[10px] font-semibold px-1.5 py-px bg-cold-bg text-amber rounded flex-shrink-0">冷门</span>}
               </div>
@@ -729,11 +1085,10 @@ function HistoryReportView() {
   const [repredictDate, setRepredictDate] = useState("");
   const [showConfirm, setShowConfirm] = useState(false);
   const [repredicting, setRepredicting] = useState(false);
-<<<<<<< HEAD
   const [leagueAccuracy, setLeagueAccuracy] = useState<any[]>([]);
   const [leagueAccLoading, setLeagueAccLoading] = useState(false);
-=======
->>>>>>> 927ef941e22d3f6ac1a4472d4e70b57b35ea02ae
+  const [goalPicksHistory, setGoalPicksHistory] = useState<GoalPickHistoryResponse | null>(null);
+  const [goalPicksHistLoading, setGoalPicksHistLoading] = useState(false);
   const PAGE_SIZE = 20;
 
   // 筛选
@@ -799,7 +1154,6 @@ function HistoryReportView() {
 
   useEffect(() => { fetchHistory(); setPage(1); }, [range]); // eslint-disable-line react-hooks/exhaustive-deps
 
-<<<<<<< HEAD
   // 拉取联赛命中率（近30天固定）
   useEffect(() => {
     setLeagueAccLoading(true);
@@ -809,8 +1163,15 @@ function HistoryReportView() {
       .finally(() => setLeagueAccLoading(false));
   }, [range]);
 
-=======
->>>>>>> 927ef941e22d3f6ac1a4472d4e70b57b35ea02ae
+  // 拉取进球数优选历史命中率（近30天固定）
+  useEffect(() => {
+    setGoalPicksHistLoading(true);
+    getGoalPicksHistory({ days: 30 })
+      .then((res) => setGoalPicksHistory(res))
+      .catch(() => {})
+      .finally(() => setGoalPicksHistLoading(false));
+  }, []);
+
   // 筛选
   const filteredRows = useMemo(() => {
     let list = rows;
@@ -836,8 +1197,8 @@ function HistoryReportView() {
     const date = repredictDate || yesterday;
     setRepredicting(true);
     try {
-      const res = await repredictModelB(date);
-      toast.toast(res.message || `比赛日 ${date} Model B 重预测完成`, "success");
+      const res = await repredictModelC(date);
+      toast.toast(res.message || `比赛日 ${date} Model C 重预测完成`, "success");
       setShowConfirm(false);
       fetchHistory();
     } catch {
@@ -894,12 +1255,11 @@ function HistoryReportView() {
           <div className="bg-white rounded-lg p-6 w-[440px] max-w-[90vw] shadow-lg" onClick={e => e.stopPropagation()}>
             <div className="text-base font-bold font-heading mb-2">确认重新预测</div>
             <div className="text-xs text-ink-muted leading-relaxed mb-5">
-              <p>将对比赛日 <strong className="text-ink">{repredictDate || yesterday}</strong> 的所有已结束比赛重新执行 Model B（Poisson 回归）进球数预测。</p>
+              <p>将对比赛日 <strong className="text-ink">{repredictDate || yesterday}</strong> 的所有比赛重新执行 Model C 进球数预测。</p>
               <ul className="mt-2 ml-4 space-y-1 text-[11px] text-ink-light">
                 <li>使用最新模型版本重新计算预期进球 λ</li>
-                <li>更新 SNAP Top2、进球分布、比分 Top5</li>
-                <li><strong>自动保留旧预测数据供对比</strong></li>
-                <li>不影响模型 A（胜平负/让球）的预测结果</li>
+                <li>更新 SNAP Top2（expected_goals_c / snap_top2_c）</li>
+                <li>不影响模型 A（胜平负/让球）与模型 B（Poisson/比分）的预测结果</li>
               </ul>
             </div>
             <div className="flex justify-end gap-2.5">
@@ -926,12 +1286,12 @@ function HistoryReportView() {
         ))}
       </div>
 
-<<<<<<< HEAD
       {/* 联赛命中率柱状图 */}
       <LeagueAccuracyBarChart data={leagueAccuracy} loading={leagueAccLoading} />
 
-=======
->>>>>>> 927ef941e22d3f6ac1a4472d4e70b57b35ea02ae
+      {/* 进球数优选历史命中率 */}
+      <GoalPicksHistoryPanel data={goalPicksHistory} loading={goalPicksHistLoading} />
+
       {/* 空数据 */}
       {rows.length === 0 && (
         <EmptyState icon="📋" message="暂无历史预测数据"

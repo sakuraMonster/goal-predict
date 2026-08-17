@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, ForeignKey, Text, Enum, JSON
+from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, ForeignKey, Text, Enum, JSON, Date, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from .database import Base
@@ -121,6 +121,25 @@ class TeamSeasonStats(Base):
     league_points = Column(Integer)     # 当前积分
     league_goal_diff = Column(Integer)  # 净胜球
 
+class LeagueSeasonBaseline(Base):
+    """联赛历史赛季基线 —— 新赛季前期实时数据不足时的降级数据源
+
+    由 tools/precompute_league_baselines.py 基于 team_season_stats 完整赛季记录聚合生成。
+    字段与 features_base._get_league_baseline 返回结构一一对应，可直接替换使用。
+    """
+    __tablename__ = "league_season_baselines"
+    id = Column(Integer, primary_key=True)
+    league_id = Column(Integer, ForeignKey("leagues.id"), nullable=False, index=True)
+    season = Column(String(20), nullable=False, comment="对应 team_season_stats.season，如 '2025'")
+    league_count = Column(Integer, default=0, comment="参与聚合的球队数")
+    league_avg_home_goals = Column(Float, comment="联赛场均主队进球（无主客场分列时的近似值）")
+    league_avg_away_goals = Column(Float, comment="联赛场均客队进球（无主客场分列时的近似值）")
+    league_home_win_rate = Column(Float, comment="联赛主胜率 = sum(home_wins)/sum(played)")
+    league_draw_rate = Column(Float, comment="联赛平局率 = sum(draws)/sum(played)")
+    league_avg_total_goals = Column(Float, comment="联赛场均总进球 = sum(goals_for)/sum(played)")
+    source = Column(String(100), comment="数据来源说明")
+    created_at = Column(DateTime, default=datetime.utcnow)
+
 class HeadToHead(Base):
     __tablename__ = "head_to_head"
     id = Column(Integer, primary_key=True)
@@ -209,3 +228,50 @@ class TaskLog(Base):
     duration_ms = Column(Integer)
     message = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow)
+
+class GoalPickRecord(Base):
+    """进球数优选推荐快照（每日 top_n 场），用于历史命中率统计"""
+    __tablename__ = "goal_pick_records"
+    __table_args__ = (UniqueConstraint("pick_date", "rank", name="uq_goal_pick_date_rank"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    pick_date = Column(Date, nullable=False, index=True, comment="推荐对应的比赛日（竞彩 12:00 口径）")
+    rank = Column(Integer, nullable=False, comment="推荐排名 1~top_n")
+    match_id = Column(Integer, ForeignKey("matches.id"), nullable=False, index=True)
+    match_num = Column(String(50))
+    league_name = Column(String(100))
+    home_team = Column(String(100))
+    away_team = Column(String(100))
+    kickoff_time = Column(DateTime)
+    expected_goals_c = Column(Float)
+    snap_top2_c = Column(JSON, comment="推荐时的 Model C SNAP 快照，如 [2,3]")
+    score = Column(Float, comment="把握度评分")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+class ColdPickRecord(Base):
+    """冷门优选推荐快照（每日 top_n 场），用于历史命中率统计
+
+    规则：同联赛场次中，市场热门方向（收盘隐含概率 argmax）与排名优势方向相反
+    → 市场高估 → 冷门风险高。rank_gap 越大，信号越强。
+    """
+    __tablename__ = "cold_pick_records"
+    __table_args__ = (UniqueConstraint("pick_date", "rank", name="uq_cold_pick_date_rank"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    pick_date = Column(Date, nullable=False, index=True, comment="推荐对应的比赛日（竞彩 12:00 口径）")
+    rank = Column(Integer, nullable=False, comment="推荐排名 1~top_n")
+    match_id = Column(Integer, ForeignKey("matches.id"), nullable=False, index=True)
+    match_num = Column(String(50))
+    league_name = Column(String(100))
+    home_team = Column(String(100))
+    away_team = Column(String(100))
+    kickoff_time = Column(DateTime)
+    fav_dir = Column(Integer, comment="市场热门方向 0=主胜 1=平 2=客胜")
+    fav_prob = Column(Float, comment="市场热门方向隐含概率")
+    rank_gap = Column(Integer, comment="同联赛排名差距 |home_pos-away_pos|")
+    odds_delta_max = Column(Float, comment="盘口资金异动：开盘→收盘三方向隐含概率最大变动（待验证的叠加条件特征）")
+    odds_step_max = Column(Float, comment="盘口资金异动：相邻快照时刻最大单步跳变（待验证的叠加条件特征）")
+    score = Column(Float, comment="把握度评分（rank_gap 为主）")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

@@ -12,6 +12,7 @@ from app.predictor.models.model_c import ModelC
 from app.predictor.models.model_d import ModelD
 from app.predictor.snap import snap_top2
 from app.collector.sportmonks.client import SportMonksClient
+from app import ou_flags
 
 # ── 特征名 → 中文名映射 ──
 FEATURE_NAME_CN: dict[str, str] = {
@@ -119,6 +120,13 @@ class PredictionPipeline:
         "巴甲":   0.85,    # V4.12: raw_λ 均值4.99但极差大，保守校准，避免压制正确低λ预测
         "欧冠":   1.00,    # V4.12: 欧战数据充分，无需校准
         "韩K":    1.00,    # V4.12: raw_λ 均值1.81，无需校准（×0.90曾制造校准诱发失误）
+        "葡超":   0.92,    # 2026-08: 新赛季市场盘口系统性高估(λ/实=1.18, 8场样本)，SNAP top2 无法覆盖1球，温和后验
+    }
+    # V4.13: Model C 专属后验校准 —— 基于 Model C 自身 λ/实 偏差回测
+    # 葡超: λ/实=1.18 (8场样本, 修复后), SNAP top2 无法覆盖1球 → 温和后验 0.92 (38%→50%)
+    # 独立于 LEAGUE_LAMBDA_CALIBRATION (Model B)，避免双重计数；仅覆盖有充分证据的联赛
+    MODELC_LAMBDA_CALIBRATION = {
+        "葡超": 0.92,
     }
     # V4.12: 联赛级市场衰减参数 (max_attenuation, min_attenuation)
     # 默认: (0.08, 0.03) — 均匀时衰减8%，极端时衰减3%
@@ -218,6 +226,13 @@ class PredictionPipeline:
         result_c = self.model_c.predict(features_b, league_name)
         result_d = self.model_d.predict(features_b, league_name)
 
+        # V4.13: Model C 专属后验校准（仅葡超，证据充分；不随 Model B 的 calib map，避免双重计数）
+        if league_name and league_name in self.MODELC_LAMBDA_CALIBRATION:
+            mc_calib = self.MODELC_LAMBDA_CALIBRATION[league_name]
+            old_lambda_c = result_c["expected_goals"]
+            result_c = self._apply_lambda_calibration(result_c, mc_calib)
+            print(f"[CALIB_C] {league_name}: λ_c {old_lambda_c:.2f} → {result_c['expected_goals']:.2f} (×{mc_calib})", flush=True)
+
         is_cold = self._is_cold_match(result_a, features_a)
         if is_cold:
             result_a = self._apply_cold_correction(result_a, features_a)
@@ -252,6 +267,12 @@ class PredictionPipeline:
         )
 
         confidence = self._calc_confidence(result_a, is_cold)
+        # L3: 早季期置信度降级 —— 任一队已赛场次<5时基本面样本不足，强制降为 low
+        if confidence != "low":
+            home_played = int(features_a.get("home_games_played", 0) or 0)
+            away_played = int(features_a.get("away_games_played", 0) or 0)
+            if home_played < 5 or away_played < 5:
+                confidence = "low"
         data_quality = self._detect_data_quality(features_a, features_b, match)
 
         return {
@@ -293,6 +314,18 @@ class PredictionPipeline:
         over_move = features.get("over_odds_movement", 0) or 0
         over_decline = features.get("over_odds_decline_rate", 0) or 0
         goal_vol = features.get("goal_line_volatility", 0) or 0
+
+        # ── V5 新回落信号（OU_NEW_MODEL_THRESHOLDS 开启时使用） ──
+        odds_drift = features.get("odds_drift_over_mean", 0) or 0
+        drift_consensus = features.get("odds_drift_consensus", 0) or 0
+        gl_shift = features.get("goal_line_shift", 0) or 0
+        if ou_flags.OU_NEW_MODEL_THRESHOLDS:
+            # 新量纲：同线水位漂移 + 整线位移
+            # 韩K反向逻辑基于新信号：水位大幅下跌 + 高度一致 → 市场诱小球
+            goal_drop = gl_shift          # 整线位移替代旧的跨线差值
+            goal_max = max(goal_line, goal_line + gl_shift)  # 峰值 = 当前线 + 位移
+            over_move = odds_drift * 10   # 水位漂移映射到旧 over_move 量纲
+            over_decline = over_decline   # 衰减速率沿用
         
         # 无有效盘口数据 → 不调整
         if goal_line < 0.5 or goal_max < 0.5:
@@ -306,10 +339,20 @@ class PredictionPipeline:
         # >= 1.25: 大幅回落 → 真实市场方向，正常跟随
         invert = False
         if adj_weight < 0:  # 韩K
-            if goal_drop < 1.0:
-                return result
-            elif goal_drop < 1.25:
-                invert = True
+            if ou_flags.OU_NEW_MODEL_THRESHOLDS:
+                # 新量纲：gl_shift≈0~1.5, odds_drift≈0~0.3
+                # 无明确信号：整线位移小 且 水位漂移弱
+                if gl_shift < 0.5 and odds_drift < 0.03:
+                    return result
+                # 小幅回落 → 诱导，反向增强
+                elif gl_shift < 1.0 or (0.03 <= odds_drift < 0.08):
+                    invert = True
+                # 大幅回落 → 真实市场方向，正常跟随
+            else:
+                if goal_drop < 1.0:
+                    return result
+                elif goal_drop < 1.25:
+                    invert = True
             # goal_drop >= 1.25: invert=False, 走正常跟随市场逻辑
         
         # ── V4.11b: 向上修正 —— 盘口明确看大球 + 模型明显偏低 ──
@@ -351,6 +394,10 @@ class PredictionPipeline:
         if over_decline > 0.002:
             # 水位小时级下降速率
             drop_strength = max(drop_strength, min(over_decline * 50, 0.6))
+
+        # V5: 新信号一致性加成（水位漂移方向一致时加强）
+        if ou_flags.OU_NEW_MODEL_THRESHOLDS and drift_consensus > 0.7 and odds_drift > 0.03:
+            drop_strength = min(drop_strength * 1.3, 0.9)
         
         # 盘口波动大 → 降低调整力度（市场自己也不确定）
         if goal_vol > 1.5:
@@ -460,7 +507,8 @@ class PredictionPipeline:
         result["over_2_5_prob"] = float(1.0 - sum(result["goal_distribution"][:3]))
         return result
 
-    def _apply_lambda_calibration(self, result_b: dict, calib: float) -> dict:
+    @staticmethod
+    def _apply_lambda_calibration(result_b: dict, calib: float) -> dict:
         """V4.11: 联赛后验校准 —— 按联赛历史偏差缩放 λ 并重算分布"""
         from scipy.stats import poisson
         result = dict(result_b)

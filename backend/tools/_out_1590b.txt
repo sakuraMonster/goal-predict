@@ -1,0 +1,29 @@
+=== team_aliases 1590 / 1608 ===
+  #620 team=1608 alias='LIS' primary=False src=sporttery.cn
+
+=== teams 1590 / 1608 全字段 ===
+  id=1590 name_zh='Lillestrøm' name_en='Lillestrøm' sm=2510 lg=11
+  id=1608 name_zh='利勒斯特罗姆' name_en='Lillestrøm' sm=269 lg=11
+
+=== 引用 1608 的比赛 ===
+  #15567 ko=2026-08-09 20:30:00 lg=11 1608 vs 173 fx=19629608 status=scheduled
+  #15652 ko=2026-08-15 22:00:00 lg=11 181 vs 1608 fx=19629600 status=scheduled
+
+=== 引用 1590 的比赛 ===
+  #14859 ko=2026-04-19 12:30:00 lg=11 176 vs 1590 fx=19629704 status=finished
+  #15138 ko=2026-04-26 17:15:00 lg=11 1590 vs 170 fx=19629692 status=finished
+  #15286 ko=2026-05-20 17:45:00 lg=11 1590 vs 249 fx=19629726 status=finished
+  #15399 ko=2026-05-25 15:00:00 lg=11 172 vs 1590 fx=19629666 status=finished
+  #15470 ko=2026-08-01 03:00:00 lg=11 170 vs 1590 fx=19629619 status=scheduled
+
+=== 1608 的 team_season_stats / head_to_head 引用 ===
+  stats #38696 season=latest lg=None played=8 form=DLWDWLLW
+  stats #38697 season=26639 lg=None played=8 form=DLWDWLLW
+
+=== 1590 的 team_season_stats 明细 ===
+  #38573 season=26781 lg=None played=1 w/d/l=24/1/0 gf/ga=0/0 form=DWLWWLLWLL
+  #38488 season=2026 lg=11 played=4 w/d/l=1/0/3 gf/ga=3/6 form=WLLL
+
+=== 1608 recent_matches 首条/末条 ===
+  stats#38696 recent_matches=[{"opponent": "Porto", "opponent_sm_id": 652, "score": "2:2", "result": "D", "date": "2003-02-26", "is_home": true}, {"opponent": "Porto", "opponent_sm_id": 652, "score": "1:6", "result": "L", "date": "2003-02-19", "is_home": false}, {"opponent": "Olympique Lyonnais", "opponent_sm_id": 79, "score": "1:0", "result": "W", "date": "2002-12-11", "is_home": false}, {"opponent": "Olympique Lyonnais", "opponent_sm_id": 79, "score": "0:0", "result": "D", "date": "2002-11-27", "is_home": true}, {"opponen
+  stats#38697 recent_matches=[{"opponent": "Porto", "opponent_sm_id": 652, "score": "2:2", "result": "D", "date": "2003-02-26", "is_home": true}, {"opponent": "Porto", "opponent_sm_id": 652, "score": "1:6", "result": "L", "date": "2003-02-19", "is_home": false}, {"opponent": "Olympique Lyonnais", "opponent_sm_id": 79, "score": "1:0", "result": "W", "date": "2002-12-11", "is_home": false}, {"opponent": "Olympique Lyonnais", "opponent_sm_id": 79, "score": "0:0", "result": "D", "date": "2002-11-27", "is_home": true}, {"opponen

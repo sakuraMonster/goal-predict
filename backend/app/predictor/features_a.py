@@ -13,6 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, case, or_, cast, Integer
 from app.db.models import Match, TeamSeasonStats, HeadToHead, OddsSnapshot, Injury
 from app.predictor.features_base import BaseDataFetcher
+from app import ou_flags
 
 
 class FeatureEngineerA(BaseDataFetcher):
@@ -320,8 +321,11 @@ class FeatureEngineerA(BaseDataFetcher):
         if not match:
             return pd.DataFrame()
 
-        home_stats = await self._get_team_stats(match.home_team_id)
-        away_stats = await self._get_team_stats(match.away_team_id)
+        # 记录联赛名称（供 OU 特征联赛感知过滤使用）
+        self._current_league_name = getattr(match.league, "name_zh", None) if match.league else None
+
+        home_stats = await self._get_team_stats(match.home_team_id, match.league_id)
+        away_stats = await self._get_team_stats(match.away_team_id, match.league_id)
         h2h = await self._get_h2h(match.home_team_id, match.away_team_id, before_date=match.kickoff_time)
         odds_data = await self._get_odds_structured(match_id)
         home_injuries = await self._get_injury_count(match.home_team_id)
@@ -1034,6 +1038,14 @@ class FeatureEngineerA(BaseDataFetcher):
             "odds_consensus_direction": self.ODDS_DEFAULT_VAL, "handicap_consensus_direction": self.ODDS_DEFAULT_VAL,
             "odds_divergence_trend": self.ODDS_DEFAULT_VAL, "handicap_divergence_trend": self.ODDS_DEFAULT_VAL,
             "bookmaker_count": self.RANK_DEFAULT_POS, "odds_time_depth": self.ODDS_TIME_DEPTH,
+            # V5: 新回落信号
+            "odds_drift_over_mean": self.ODDS_DEFAULT_VAL,
+            "odds_drift_consensus": self.ODDS_DEFAULT_VAL,
+            "goal_line_shift": self.ODDS_DEFAULT_VAL,
+            # V5: 旧特征对照
+            "goal_line_market_old": self.ODDS_DEFAULT_VAL,
+            "goal_line_drop_from_peak_old": self.ODDS_DEFAULT_VAL,
+            "goal_line_max_old": self.ODDS_DEFAULT_VAL,
         }
 
         if not odds_data.get("has_data"):
@@ -1047,17 +1059,26 @@ class FeatureEngineerA(BaseDataFetcher):
         feats["bookmaker_count"] = odds_data["bookmaker_count"]
         feats["odds_time_depth"] = self.ODDS_TIME_DEPTH
 
+        # ---- SPF 去重（多线OU后同bookmaker的SPF只取一次，避免均值偏向多线bookmaker） ----
+        spf_by_bm: dict[str, object] = {}
+        for o in latest:
+            if o.home_win is not None:
+                bm = o.bookmaker or "unknown"
+                if bm not in spf_by_bm:
+                    spf_by_bm[bm] = o
+        latest_spf = list(spf_by_bm.values())
+
         # ---- 1X2 欧赔 ----
-        if latest:
-            feats["odds_home_current"] = self._safe_mean([o.home_win for o in latest])
-            feats["odds_draw_current"] = self._safe_mean([o.draw for o in latest])
-            feats["odds_away_current"] = self._safe_mean([o.away_win for o in latest])
+        if latest_spf:
+            feats["odds_home_current"] = self._safe_mean([o.home_win for o in latest_spf])
+            feats["odds_draw_current"] = self._safe_mean([o.draw for o in latest_spf])
+            feats["odds_away_current"] = self._safe_mean([o.away_win for o in latest_spf])
             feats["draw_odds_current"] = feats["odds_draw_current"]
 
-        if len(latest) >= self.ODDS_MIN_SAMPLES_STD:
-            feats["odds_std_home"] = self._safe_std([o.home_win for o in latest])
-            feats["odds_std_draw"] = self._safe_std([o.draw for o in latest])
-            feats["odds_std_away"] = self._safe_std([o.away_win for o in latest])
+        if len(latest_spf) >= self.ODDS_MIN_SAMPLES_STD:
+            feats["odds_std_home"] = self._safe_std([o.home_win for o in latest_spf])
+            feats["odds_std_draw"] = self._safe_std([o.draw for o in latest_spf])
+            feats["odds_std_away"] = self._safe_std([o.away_win for o in latest_spf])
             feats["odds_dispersity"] = max(feats["odds_std_home"], feats["odds_std_draw"], feats["odds_std_away"])
 
         movements_h, movements_d, movements_a = [], [], []
@@ -1195,72 +1216,42 @@ class FeatureEngineerA(BaseDataFetcher):
                 feats["handicap_divergence_trend"] = cur_hcp_std - prev_hcp_std
 
         # ---- 大小球 ----
-        all_ou_times = []
-        for t in times:
-            snaps_at_t = [o for o in all_odds_list if o.snapshot_time == t]
-            for o in snaps_at_t:
-                if o.goal_line is not None and (o.over_odds is not None or o.under_odds is not None):
-                    all_ou_times.append((t, o.goal_line, o.over_odds, o.under_odds, o.bookmaker))
+        league_name = getattr(self, '_current_league_name', None)
+        ou_feats = self._compute_ou_features(all_odds_list, times, by_bm, latest, league_name)
 
-        if all_ou_times:
-            latest_t = times[-self.DENOM_MIN_1]
-            latest_gls = [gl for (t, gl, ov, un, bm) in all_ou_times if t == latest_t]
-            gl_counter = Counter(latest_gls)
-            best_gl = gl_counter.most_common(self.DENOM_MIN_1)[self.RANK_DEFAULT_POS][self.RANK_DEFAULT_POS] if gl_counter else None
+        if ou_flags.OU_NEW_FEATURE_ALGORITHM:
+            # ── 新特征：加权众数 + 双维度回落 ──
+            feats["goal_line_market"] = ou_feats["goal_line_market"]
+            feats["over_odds_current"] = ou_feats["over_odds_current"]
+            feats["under_odds_current"] = ou_feats["under_odds_current"]
+            feats["over_odds_movement"] = ou_feats["over_odds_movement"]
+            feats["under_odds_movement"] = ou_feats["under_odds_movement"]
+            feats["goal_line_change"] = ou_feats["goal_line_change"]
+            feats["goal_line_drop_from_peak"] = ou_feats["goal_line_drop_from_peak"]
+            feats["goal_line_volatility"] = ou_feats["goal_line_volatility"]
+            feats["over_odds_decline_rate"] = ou_feats["over_odds_decline_rate"]
+            feats["odds_drift_over_mean"] = ou_feats["odds_drift_over_mean"]
+            feats["odds_drift_consensus"] = ou_feats["odds_drift_consensus"]
+            feats["goal_line_shift"] = ou_feats["goal_line_shift"]
+        else:
+            # ── 旧特征：保持原逻辑（兜底） ──
+            feats["goal_line_market"] = ou_feats["goal_line_market_old"]
+            feats["over_odds_current"] = ou_feats["over_odds_current"]
+            feats["under_odds_current"] = ou_feats["under_odds_current"]
+            feats["over_odds_movement"] = ou_feats["over_odds_movement"]
+            feats["under_odds_movement"] = ou_feats["under_odds_movement"]
+            feats["goal_line_change"] = ou_feats["goal_line_change"]
+            feats["goal_line_drop_from_peak"] = ou_feats["goal_line_drop_from_peak_old"]
+            feats["goal_line_volatility"] = ou_feats["goal_line_volatility"]
+            feats["over_odds_decline_rate"] = ou_feats["over_odds_decline_rate"]
 
-            if best_gl:
-                feats["goal_line_market"] = float(best_gl)
-
-                cur_overs = [ov for (t, gl, ov, un, bm) in all_ou_times
-                             if t == latest_t and gl == best_gl and ov is not None]
-                cur_unders = [un for (t, gl, ov, un, bm) in all_ou_times
-                              if t == latest_t and gl == best_gl and un is not None]
-                feats["over_odds_current"] = self._safe_mean(cur_overs)
-                feats["under_odds_current"] = self._safe_mean(cur_unders)
-
-            all_gls = [gl for (t, gl, ov, un, bm) in all_ou_times]
-            feats["goal_line_max"] = max(all_gls) if all_gls else self.ODDS_DEFAULT_VAL
-            feats["goal_line_min"] = min(all_gls) if all_gls else self.ODDS_DEFAULT_VAL
-            feats["goal_line_volatility"] = self._safe_std(all_gls)
-
-            if best_gl and feats["goal_line_max"] > self.RANK_DEFAULT_POS:
-                feats["goal_line_drop_from_peak"] = feats["goal_line_max"] - float(best_gl)
-
-            over_moves, under_moves, gl_moves = [], [], []
-            for bm, snaps in by_bm.items():
-                ou_snaps = [(s.snapshot_time, s.goal_line, s.over_odds, s.under_odds)
-                            for s in snaps if s.goal_line is not None
-                            and (s.over_odds is not None or s.under_odds is not None)]
-                if len(ou_snaps) >= self.ODDS_MIN_SAMPLES_STD:
-                    first = ou_snaps[self.RANK_DEFAULT_POS]
-                    last = ou_snaps[-self.DENOM_MIN_1]
-                    if first[self.H2H_POINTS_DRAW] is not None and last[self.H2H_POINTS_DRAW] is not None:
-                        over_moves.append(first[self.H2H_POINTS_DRAW] - last[self.H2H_POINTS_DRAW])
-                    if first[self.H2H_POINTS_WIN] is not None and last[self.H2H_POINTS_WIN] is not None:
-                        under_moves.append(first[self.H2H_POINTS_WIN] - last[self.H2H_POINTS_WIN])
-                    if first[self.DENOM_MIN_1] is not None and last[self.DENOM_MIN_1] is not None:
-                        gl_moves.append(last[self.DENOM_MIN_1] - first[self.DENOM_MIN_1])
-
-            feats["over_odds_movement"] = self._safe_mean(over_moves)
-            feats["under_odds_movement"] = self._safe_mean(under_moves)
-            feats["goal_line_change"] = self._safe_mean(gl_moves)
-
-            over_time_series = sorted(set(
-                (t, ov) for (t, gl, ov, un, bm) in all_ou_times
-                if ov is not None and gl == best_gl
-            ), key=lambda x: x[self.RANK_DEFAULT_POS])
-            if len(over_time_series) >= self.ODDS_MIN_SAMPLES_STD and best_gl:
-                cutoff = over_time_series[-self.DENOM_MIN_1][self.RANK_DEFAULT_POS] - timedelta(hours=self.OU_DECLINE_WINDOW_HOURS)
-                recent = [(t, ov) for (t, ov) in over_time_series if t >= cutoff]
-                if len(recent) >= self.ODDS_MIN_SAMPLES_STD:
-                    first_t, first_ov = recent[self.RANK_DEFAULT_POS]
-                    last_t, last_ov = recent[-self.DENOM_MIN_1]
-                    hours = max((last_t - first_t).total_seconds() / self.OU_SECONDS_PER_HOUR, self.OU_DECLINE_MIN_HOURS)
-                    rate = (first_ov - last_ov) / hours
-                    if first_ov > self.RANK_DEFAULT_POS:
-                        feats["over_odds_decline_rate"] = rate / first_ov
-                    else:
-                        feats["over_odds_decline_rate"] = rate
+        # 保留旧对照特征供 backtest 使用
+        feats["goal_line_market_old"] = ou_feats["goal_line_market_old"]
+        feats["goal_line_drop_from_peak_old"] = ou_feats["goal_line_drop_from_peak_old"]
+        feats["goal_line_max_old"] = ou_feats.get("goal_line_max_old", self.ODDS_DEFAULT_VAL)
+        # goal_line_max 保持赋值（pipeline 盘口修正依赖）
+        feats["goal_line_max"] = ou_feats.get("goal_line_max_old", self.ODDS_DEFAULT_VAL)
+        feats["goal_line_min"] = ou_feats.get("goal_line_min_old", self.ODDS_DEFAULT_VAL)
 
         # ---- 共识度 ----
         if movements_h:

@@ -29,14 +29,6 @@ function fmtProb(p: number | null | undefined): string {
   return (p * 100).toFixed(1) + "%";
 }
 
-function getTopGoals(dist: number[] | null | undefined, n: number = 2): { goals: number; prob: number }[] {
-  if (!dist || dist.length === 0) return [];
-  return dist
-    .map((prob, idx) => ({ goals: idx, prob }))
-    .sort((a, b) => b.prob - a.prob)
-    .slice(0, n);
-}
-
 function getTopScores(scores: Array<{ score: string; prob: number }> | null | undefined, n: number = 3) {
   if (!scores || scores.length === 0) return [];
   return scores.slice(0, n);
@@ -52,6 +44,8 @@ export default function Report() {
   const [error, setError] = useState<string | null>(null);
   const [updating, setUpdating] = useState(false);
   const [selectedDate, setSelectedDate] = useState<string>(getYesterdayStr());
+  // 本次点击「更新赛果」实际更新的比赛 ID（用于醒目标记）
+  const [updatedIds, setUpdatedIds] = useState<Set<number>>(new Set());
 
   const fetchData = useCallback((date: string) => {
     setLoading(true);
@@ -75,7 +69,10 @@ export default function Report() {
     try {
       const res = await updateResults(selectedDate);
       toast(res.message || "更新完成", res.success ? "success" : "error");
-      if (res.success) fetchData(selectedDate);
+      if (res.success) {
+        setUpdatedIds(new Set(res.updated_ids || []));
+        fetchData(selectedDate);
+      }
     } catch {
       toast("赛果更新失败", "error");
     } finally {
@@ -264,11 +261,14 @@ export default function Report() {
                   const hcpHit = hasActual && m.result_hcp === 1;
                   const goalsHit = hasActual && m.result_goals === 1;
                   const scoreHit = hasActual && m.result_score === 1;
+                  // 已更新赛果（result_spf 为 1/-1）；本次点击「更新赛果」刚结算的场次额外醒目标记
+                  const isUpdated = m.result_spf != null && m.result_spf !== 0;
+                  const justUpdated = updatedIds.has(m.id);
 
                   return (
                     <div
                       key={m.id}
-                      className="bg-white rounded-md border border-border overflow-hidden"
+                      className={`bg-white rounded-md border border-border overflow-hidden ${justUpdated ? "ring-1 ring-red-600" : ""}`}
                     >
                       {/* 头部行：时间 | 联赛 | 对阵 | 赛果 | 标签 */}
                       <div className="flex items-center gap-1.5 px-3 py-2 border-b border-highlight">
@@ -289,6 +289,18 @@ export default function Report() {
                         )}
                         {/* 标签 */}
                         <span className="flex items-center gap-1 shrink-0 ml-auto">
+                          {isUpdated && (
+                            <span
+                              className={`px-1 py-0.5 rounded-sm text-[10px] font-bold ${
+                                justUpdated
+                                  ? "bg-red-600 text-white"
+                                  : "bg-red-50 text-red-600 border border-red-600"
+                              }`}
+                              title={justUpdated ? "本次点击「更新赛果」已结算" : "该场比赛赛果已更新"}
+                            >
+                              {justUpdated ? "已更新" : "已结算"}
+                            </span>
+                          )}
                           {m.is_cold_match && (
                             <span className="bg-cold-bg text-amber px-1 py-0.5 rounded-sm text-[10px] font-bold">
                               冷

@@ -1,0 +1,3 @@
+[TEAM 912] name=HIFK country=None
+  seasons count=0
+[BETWEEN-FIN] 08-14~08-20 芬兰联赛 0 场:

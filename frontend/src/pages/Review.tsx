@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import type { ReactNode } from "react";
 import { getReviewSummary, getReviewTrend, getPnL } from "../api/client";
 import ErrorState from "../components/ErrorState";
 
@@ -28,7 +29,7 @@ export default function Review() {
   const wlTrend = wlCurrent >= wlLastWeek ? "↑" : "↓";
   const wlTrendColor = wlCurrent >= wlLastWeek ? "text-moss" : "text-rust";
 
-  const overviewCards = [
+  const overviewCards: { label: string; value: any; color: string; sub?: string; subEl?: ReactNode }[] = [
     {label:"累计预测场次", value: summary.total_predictions || 0, color:""},
     {label:"胜平负准确率", value: wlCurrent.toFixed(1)+"%", color:"text-moss", subEl: <span>上周 {wlLastWeek.toFixed(1)}% <span className={wlTrendColor}>{wlTrend}</span></span>},
     {label:"让球准确率", value: ((summary.handicap_accuracy||0)*100).toFixed(1)+"%", color:"text-moss"},

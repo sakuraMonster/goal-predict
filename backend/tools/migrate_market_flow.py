@@ -27,8 +27,12 @@ async def _add_team_style_tag(conn):
 
     try:
         await conn.execute(text("ALTER TABLE teams ADD COLUMN style_tag VARCHAR(20)"))
-    except Exception:
-        return
+    except Exception as e:
+        raise RuntimeError(
+            f"Unknown SQL dialect '{dialect}' while adding teams.style_tag; "
+            "attempted `ALTER TABLE teams ADD COLUMN style_tag VARCHAR(20)` but failed. "
+            f"Original error: {type(e).__name__}: {e}"
+        ) from e
 
 
 async def _create_market_flow_tables(conn):
@@ -108,12 +112,16 @@ async def _create_market_flow_tables(conn):
 
 
 async def main():
-    async with engine.begin() as conn:
-        await _add_team_style_tag(conn)
-        await _create_market_flow_tables(conn)
+    try:
+        async with engine.begin() as conn:
+            await _add_team_style_tag(conn)
+            await _create_market_flow_tables(conn)
+    except Exception as e:
+        print(f"migrate_market_flow failed: {e}", file=sys.stderr)
+        return 1
     print("ok")
+    return 0
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
-
+    raise SystemExit(asyncio.run(main()))

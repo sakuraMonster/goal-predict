@@ -71,13 +71,13 @@ def _style_priority(matchup_style: str) -> list[int]:
     return [2, 3, 1, 4, 0, 5]
 
 
-def _ttg_get(ttg: dict[str, float] | None, g: int) -> float | None:
+def _ttg_get(ttg: dict[Any, float] | None, g: int) -> float | None:
     if not ttg:
         return None
     v = ttg.get(str(g))
     if isinstance(v, (int, float)) and float(v) > 0:
         return float(v)
-    v2 = ttg.get(g)  # type: ignore[arg-type]
+    v2 = ttg.get(g)
     if isinstance(v2, (int, float)) and float(v2) > 0:
         return float(v2)
     return None
@@ -171,6 +171,8 @@ class MarketFlowEngine:
         priorities = _style_priority(matchup_style)
 
         candidate_goals = [g for g in priorities if g in goals_freq]
+        if not candidate_goals:
+            candidate_goals = list(goals_freq.keys())
 
         def _goal_sort_key(g: int) -> tuple[float, int, int]:
             odd = _ttg_get(ttg, g)
@@ -180,6 +182,8 @@ class MarketFlowEngine:
                 int(priorities.index(g)) if g in priorities else 999,
             )
 
+        ttg_used = {str(g): _ttg_get(ttg, g) for g in candidate_goals}
+        goal_sort_keys = {str(g): list(_goal_sort_key(g)) for g in candidate_goals}
         candidate_goals.sort(key=_goal_sort_key)
         best_g = candidate_goals[0] if len(candidate_goals) >= 1 else None
         second_g = candidate_goals[1] if len(candidate_goals) >= 2 else None
@@ -239,35 +243,38 @@ class MarketFlowEngine:
             p1 = _parse_score(s1)
             p2 = _parse_score(s2)
 
+            o_s1 = _crs_odd(crs, s1)
+            o_s2 = _crs_odd(crs, s2)
+            meta["crs_odds"] = {"a": o_s1, "b": o_s2}
+            c1 = float(o_s1) if o_s1 is not None else 1e18
+            c2 = float(o_s2) if o_s2 is not None else 1e18
+            if c1 != c2:
+                meta["reason"] = "crs_odds"
+                return (s1 if c1 < c2 else s2), meta
+
             if had_pref and p1 and p2:
-                o1 = _score_outcome(p1[0], p1[1])
-                o2 = _score_outcome(p2[0], p2[1])
-                if o1 == had_pref and o2 != had_pref:
+                out1 = _score_outcome(p1[0], p1[1])
+                out2 = _score_outcome(p2[0], p2[1])
+                if out1 == had_pref and out2 != had_pref:
                     meta["reason"] = "had_preference"
                     meta["had_pref"] = had_pref
                     return s1, meta
-                if o2 == had_pref and o1 != had_pref:
+                if out2 == had_pref and out1 != had_pref:
                     meta["reason"] = "had_preference"
                     meta["had_pref"] = had_pref
                     return s2, meta
 
             if hhad_pref and p1 and p2:
-                r1 = _hhad_outcome(p1[0], p1[1], line_val)
-                r2 = _hhad_outcome(p2[0], p2[1], line_val)
-                if r1 == hhad_pref and r2 != hhad_pref:
+                res1 = _hhad_outcome(p1[0], p1[1], line_val)
+                res2 = _hhad_outcome(p2[0], p2[1], line_val)
+                if res1 == hhad_pref and res2 != hhad_pref:
                     meta["reason"] = "hhad_preference"
                     meta["hhad_pref"] = hhad_pref
                     return s1, meta
-                if r2 == hhad_pref and r1 != hhad_pref:
+                if res2 == hhad_pref and res1 != hhad_pref:
                     meta["reason"] = "hhad_preference"
                     meta["hhad_pref"] = hhad_pref
                     return s2, meta
-
-            o_s1 = _crs_odd(crs, s1)
-            o_s2 = _crs_odd(crs, s2)
-            if o_s1 is not None and o_s2 is not None and o_s1 != o_s2:
-                meta["reason"] = "crs_odds"
-                return (s1 if o_s1 < o_s2 else s2), meta
 
             meta["reason"] = "fallback_a"
             return s1, meta
@@ -282,6 +289,8 @@ class MarketFlowEngine:
             "matchup_style": matchup_style,
             "goal_priority": priorities,
             "candidate_goals": candidate_goals,
+            "ttg_used": ttg_used,
+            "goal_sort_keys": goal_sort_keys,
             "selected_goals": {"best": best_g, "second": second_g},
             "selected_scores": {"best": best_score, "second": second_score},
             "tiebreak": {

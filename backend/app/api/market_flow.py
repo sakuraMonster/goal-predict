@@ -41,6 +41,20 @@ def _norm_score(v: object) -> str | None:
     return out or None
 
 
+def _validate_engine_result(result: object) -> tuple[bool, list[str]]:
+    if not isinstance(result, dict):
+        return False, ["result"]
+    missing: list[str] = []
+    for key in ["best_total_goals", "second_total_goals"]:
+        if key not in result or result.get(key) is None:
+            missing.append(key)
+    for key in ["best_score", "second_score"]:
+        v = result.get(key) if key in result else None
+        if not isinstance(v, str) or not v.strip():
+            missing.append(key)
+    return (len(missing) == 0), missing
+
+
 @router.post("/odds-snapshots")
 async def create_odds_snapshot(payload: dict = Body(...), db: AsyncSession = Depends(get_db)):
     match_id = payload.get("match_id")
@@ -80,10 +94,14 @@ async def create_odds_snapshot(payload: dict = Body(...), db: AsyncSession = Dep
     ttg = payload.get("ttg")
     if not isinstance(ttg, dict):
         return _err("ttg must be object", 400)
+    if not ttg:
+        return _err("ttg must be non-empty object", 400)
 
     crs = payload.get("crs")
     if not isinstance(crs, dict):
         return _err("crs must be object", 400)
+    if not crs:
+        return _err("crs must be non-empty object", 400)
 
     match_result = await db.execute(select(Match).where(Match.id == match_id))
     match = match_result.scalar_one_or_none()
@@ -169,6 +187,9 @@ async def predict_market_flow(match_id: int, payload: dict = Body(...), db: Asyn
         ttg=snap.ttg_odds_json or {},
         crs=snap.crs_odds_json or {},
     )
+    ok, missing = _validate_engine_result(result)
+    if not ok:
+        return _err(f"marketflow engine result missing fields: {','.join(missing)}", 400)
 
     pred_result = await db.execute(select(MarketFlowPrediction).where(MarketFlowPrediction.match_id == match_id))
     pred = pred_result.scalar_one_or_none()
@@ -304,6 +325,15 @@ async def backtest_market_flow(payload: dict = Body(...), db: AsyncSession = Dep
                 ttg=snap.ttg_odds_json or {},
                 crs=snap.crs_odds_json or {},
             )
+            ok, missing = _validate_engine_result(result)
+            if not ok:
+                skipped += 1
+                skipped_detail.append({
+                    "match_id": match.id,
+                    "reason": "engine_result_incomplete",
+                    "missing": missing,
+                })
+                continue
 
             now = datetime.utcnow()
             if pred:

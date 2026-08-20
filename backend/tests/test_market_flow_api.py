@@ -173,6 +173,30 @@ def test_create_odds_snapshot_missing_ttg_or_crs():
     assert resp.status_code == 400
     assert resp.json()["error"] == "ttg must be object"
 
+    resp = client.post("/api/market-flow/odds-snapshots", json={
+        "match_id": 1,
+        "snapshot_time": "2026-08-20T10:00:00Z",
+        "source": "manual_import",
+        "had": {"home": 1.9, "draw": 3.2, "away": 3.6},
+        "hhad": {"line": -1.0, "home": 3.1, "draw": 3.4, "away": 2.1},
+        "ttg": {},
+        "crs": {"1-0": 7.5},
+    })
+    assert resp.status_code == 400
+    assert resp.json()["error"] == "ttg must be non-empty object"
+
+    resp = client.post("/api/market-flow/odds-snapshots", json={
+        "match_id": 1,
+        "snapshot_time": "2026-08-20T10:00:00Z",
+        "source": "manual_import",
+        "had": {"home": 1.9, "draw": 3.2, "away": 3.6},
+        "hhad": {"line": -1.0, "home": 3.1, "draw": 3.4, "away": 2.1},
+        "ttg": {"2": 3.5},
+        "crs": {},
+    })
+    assert resp.status_code == 400
+    assert resp.json()["error"] == "crs must be non-empty object"
+
 
 def test_predict_market_flow_ok():
     db = _FakeSession()
@@ -233,6 +257,33 @@ def test_predict_market_flow_snapshot_mismatch():
 
     assert resp.status_code == 400
     assert resp.json()["error"] == "odds snapshot mismatch"
+
+
+def test_predict_market_flow_incomplete_engine_result_returns_400():
+    db = _FakeSession()
+    db.matches[1] = Match(id=1, kickoff_time=datetime.utcnow(), home_team_id=10, away_team_id=11)
+    db.snaps[1] = JczqPlayOddsSnapshot(
+        id=1,
+        match_id=1,
+        snapshot_time=datetime.utcnow(),
+        source="manual_import",
+        had_home=1.6,
+        had_draw=3.7,
+        had_away=4.3,
+        hhad_line=-1.0,
+        hhad_home=2.9,
+        hhad_draw=3.4,
+        hhad_away=2.04,
+        ttg_odds_json={"0": 15, "1": 5.85},
+        crs_odds_json={"1-0": 7.5},
+    )
+    app = _build_app(db)
+
+    client = TestClient(app)
+    resp = client.post("/api/market-flow/predict/1", json={"odds_snapshot_id": 1})
+    assert resp.status_code == 400
+    assert "marketflow engine result missing fields:" in resp.json()["error"]
+    assert 1 not in db.preds
 
 
 def test_backtest_market_flow_ok_and_stats():
@@ -405,3 +456,73 @@ def test_backtest_market_flow_skip_existing_and_still_score():
     assert out["goals_hit_top2"] == 1
     assert out["score_hit_best"] == 1
     assert out["score_hit_top2"] == 1
+
+
+def test_backtest_market_flow_skip_incomplete_engine_result():
+    db = _FakeSession()
+    db.matches[1] = Match(
+        id=1,
+        kickoff_time=datetime(2026, 8, 20, 10, 0, 0),
+        home_team_id=10,
+        away_team_id=11,
+        home_score=2,
+        away_score=1,
+    )
+    db.matches[2] = Match(
+        id=2,
+        kickoff_time=datetime(2026, 8, 20, 11, 0, 0),
+        home_team_id=10,
+        away_team_id=11,
+        home_score=1,
+        away_score=0,
+    )
+    db.teams[10] = Team(id=10, name_en="h", style_tag="大开大合")
+    db.teams[11] = Team(id=11, name_en="a", style_tag="大开大合")
+    db.snaps[1] = JczqPlayOddsSnapshot(
+        id=1,
+        match_id=1,
+        snapshot_time=datetime(2026, 8, 20, 9, 30, 0),
+        source="manual_import",
+        had_home=1.6,
+        had_draw=3.7,
+        had_away=4.3,
+        hhad_line=-1.0,
+        hhad_home=2.9,
+        hhad_draw=3.4,
+        hhad_away=2.04,
+        ttg_odds_json={"0": 15, "1": 5.85, "2": 4, "3": 3.5, "4": 5, "5": 8.75},
+        crs_odds_json={"2-1": 7, "1-1": 7.5, "1-0": 8.25, "2-0": 9, "3-1": 12, "2-2": 13, "1-2": 13},
+    )
+    db.snaps[2] = JczqPlayOddsSnapshot(
+        id=2,
+        match_id=2,
+        snapshot_time=datetime(2026, 8, 20, 9, 40, 0),
+        source="manual_import",
+        had_home=1.6,
+        had_draw=3.7,
+        had_away=4.3,
+        hhad_line=-1.0,
+        hhad_home=2.9,
+        hhad_draw=3.4,
+        hhad_away=2.04,
+        ttg_odds_json={"0": 15, "1": 5.85},
+        crs_odds_json={"1-0": 7.5},
+    )
+    app = _build_app(db)
+
+    client = TestClient(app)
+    resp = client.post("/api/market-flow/backtest", json={
+        "start_kickoff": "2026-08-20T00:00:00Z",
+        "end_kickoff": "2026-08-21T00:00:00Z",
+        "source": "manual_import",
+        "overwrite": True,
+    })
+
+    assert resp.status_code == 200
+    out = resp.json()["data"]
+    assert out["total"] == 2
+    assert out["predicted"] == 1
+    assert out["skipped"] == 1
+    assert any(x["match_id"] == 2 and x["reason"] == "engine_result_incomplete" for x in out["skipped_detail"])
+    assert 1 in db.preds
+    assert 2 not in db.preds

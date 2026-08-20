@@ -52,8 +52,8 @@ async def _create_market_flow_tables(conn):
                 hhad_home REAL,
                 hhad_draw REAL,
                 hhad_away REAL,
-                ttg_odds_json TEXT,
-                crs_odds_json TEXT
+                ttg_odds_json JSON,
+                crs_odds_json JSON
             )
         """))
 
@@ -61,16 +61,16 @@ async def _create_market_flow_tables(conn):
             CREATE TABLE IF NOT EXISTS market_flow_predictions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 match_id INTEGER NOT NULL UNIQUE,
-                odds_snapshot_id INTEGER,
+                odds_snapshot_id INTEGER NOT NULL,
                 model_version VARCHAR(50) NOT NULL,
                 created_at DATETIME NOT NULL DEFAULT (datetime('now')),
-                home_style_tag VARCHAR(20),
-                away_style_tag VARCHAR(20),
+                home_style_tag VARCHAR(20) NOT NULL DEFAULT '均衡',
+                away_style_tag VARCHAR(20) NOT NULL DEFAULT '均衡',
                 best_total_goals INTEGER,
                 second_total_goals INTEGER,
                 best_score VARCHAR(20),
                 second_score VARCHAR(20),
-                trace_json TEXT
+                trace_json JSON
             )
         """))
         return
@@ -88,8 +88,8 @@ async def _create_market_flow_tables(conn):
             hhad_home DOUBLE PRECISION,
             hhad_draw DOUBLE PRECISION,
             hhad_away DOUBLE PRECISION,
-            ttg_odds_json JSON,
-            crs_odds_json JSON
+            ttg_odds_json JSONB,
+            crs_odds_json JSONB
         )
     """))
 
@@ -97,18 +97,67 @@ async def _create_market_flow_tables(conn):
         CREATE TABLE IF NOT EXISTS market_flow_predictions (
             id SERIAL PRIMARY KEY,
             match_id INTEGER NOT NULL UNIQUE REFERENCES matches(id),
-            odds_snapshot_id INTEGER REFERENCES jczq_play_odds_snapshots(id),
+            odds_snapshot_id INTEGER NOT NULL REFERENCES jczq_play_odds_snapshots(id),
             model_version VARCHAR(50) NOT NULL,
             created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-            home_style_tag VARCHAR(20),
-            away_style_tag VARCHAR(20),
+            home_style_tag VARCHAR(20) NOT NULL DEFAULT '均衡',
+            away_style_tag VARCHAR(20) NOT NULL DEFAULT '均衡',
             best_total_goals INTEGER,
             second_total_goals INTEGER,
             best_score VARCHAR(20),
             second_score VARCHAR(20),
-            trace_json JSON
+            trace_json JSONB
         )
     """))
+
+    await conn.execute(text("""
+        ALTER TABLE jczq_play_odds_snapshots
+        ALTER COLUMN ttg_odds_json TYPE JSONB
+        USING ttg_odds_json::jsonb
+    """))
+    await conn.execute(text("""
+        ALTER TABLE jczq_play_odds_snapshots
+        ALTER COLUMN crs_odds_json TYPE JSONB
+        USING crs_odds_json::jsonb
+    """))
+    await conn.execute(text("""
+        ALTER TABLE market_flow_predictions
+        ALTER COLUMN trace_json TYPE JSONB
+        USING trace_json::jsonb
+    """))
+
+    await conn.execute(text("""
+        UPDATE market_flow_predictions
+        SET home_style_tag = '均衡'
+        WHERE home_style_tag IS NULL OR home_style_tag = ''
+    """))
+    await conn.execute(text("""
+        UPDATE market_flow_predictions
+        SET away_style_tag = '均衡'
+        WHERE away_style_tag IS NULL OR away_style_tag = ''
+    """))
+    await conn.execute(text("""
+        UPDATE market_flow_predictions p
+        SET odds_snapshot_id = (
+            SELECT s.id
+            FROM jczq_play_odds_snapshots s
+            WHERE s.match_id = p.match_id
+            ORDER BY s.snapshot_time DESC
+            LIMIT 1
+        )
+        WHERE p.odds_snapshot_id IS NULL
+    """))
+    null_count_r = await conn.execute(text("SELECT COUNT(*) FROM market_flow_predictions WHERE odds_snapshot_id IS NULL"))
+    null_count = int(null_count_r.scalar() or 0)
+    if null_count > 0:
+        raise RuntimeError(
+            "market_flow_predictions has NULL odds_snapshot_id rows; cannot enforce NOT NULL safely. "
+            "Please decide whether to delete/fill these rows before retry."
+        )
+
+    await conn.execute(text("ALTER TABLE market_flow_predictions ALTER COLUMN odds_snapshot_id SET NOT NULL"))
+    await conn.execute(text("ALTER TABLE market_flow_predictions ALTER COLUMN home_style_tag SET NOT NULL"))
+    await conn.execute(text("ALTER TABLE market_flow_predictions ALTER COLUMN away_style_tag SET NOT NULL"))
 
 
 async def main():

@@ -1,7 +1,10 @@
 from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, ForeignKey, Text, Enum, JSON, Date, UniqueConstraint
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from .database import Base
+
+_JSON_VARIANT = JSON().with_variant(JSONB, "postgresql")
 
 class League(Base):
     __tablename__ = "leagues"
@@ -104,8 +107,8 @@ class JczqPlayOddsSnapshot(Base):
     hhad_home = Column(Float)
     hhad_draw = Column(Float)
     hhad_away = Column(Float)
-    ttg_odds_json = Column(JSON)
-    crs_odds_json = Column(JSON)
+    ttg_odds_json = Column(_JSON_VARIANT)
+    crs_odds_json = Column(_JSON_VARIANT)
 
 class TeamSeasonStats(Base):
     __tablename__ = "team_season_stats"
@@ -239,16 +242,16 @@ class MarketFlowPrediction(Base):
     __tablename__ = "market_flow_predictions"
     id = Column(Integer, primary_key=True, autoincrement=True)
     match_id = Column(Integer, ForeignKey("matches.id"), nullable=False, unique=True, index=True)
-    odds_snapshot_id = Column(Integer, ForeignKey("jczq_play_odds_snapshots.id"))
+    odds_snapshot_id = Column(Integer, ForeignKey("jczq_play_odds_snapshots.id"), nullable=False)
     model_version = Column(String(50), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
-    home_style_tag = Column(String(20))
-    away_style_tag = Column(String(20))
+    home_style_tag = Column(String(20), nullable=False, default="均衡")
+    away_style_tag = Column(String(20), nullable=False, default="均衡")
     best_total_goals = Column(Integer)
     second_total_goals = Column(Integer)
     best_score = Column(String(20))
     second_score = Column(String(20))
-    trace_json = Column(JSON)
+    trace_json = Column(_JSON_VARIANT)
 
     match = relationship("Match", foreign_keys=[match_id], lazy="joined")
     odds_snapshot = relationship("JczqPlayOddsSnapshot", foreign_keys=[odds_snapshot_id], lazy="joined")

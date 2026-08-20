@@ -131,6 +131,7 @@ class MarketFlowEngine:
         hhad: dict[str, float] | None,
         ttg: dict[str, float] | None,
         crs: dict[str, float] | None,
+        ttg_style_eps: float = 0.2,
         topk: int = 6,
         min_pool: int = 4,
         gap_abs: float = 2.5,
@@ -187,6 +188,21 @@ class MarketFlowEngine:
         candidate_goals.sort(key=_goal_sort_key)
         best_g = candidate_goals[0] if len(candidate_goals) >= 1 else None
         second_g = candidate_goals[1] if len(candidate_goals) >= 2 else None
+
+        ttg_style_applied = False
+        ttg_style_meta: dict[str, Any] = {"before": {"best": best_g, "second": second_g}}
+        if best_g is not None and second_g is not None and float(ttg_style_eps) >= 0:
+            o_best = _ttg_get(ttg, best_g)
+            o_second = _ttg_get(ttg, second_g)
+            ttg_style_meta["odds"] = {"best": o_best, "second": o_second}
+            if o_best is not None and o_second is not None and abs(float(o_best) - float(o_second)) <= float(ttg_style_eps):
+                i_best = priorities.index(best_g) if best_g in priorities else 999
+                i_second = priorities.index(second_g) if second_g in priorities else 999
+                ttg_style_meta["priority_idx"] = {"best": i_best, "second": i_second}
+                if i_second < i_best:
+                    best_g, second_g = second_g, best_g
+                    ttg_style_applied = True
+        ttg_style_meta["after"] = {"best": best_g, "second": second_g}
 
         def _best_score_for_goals(g: int) -> str | None:
             best: tuple[str, float] | None = None
@@ -291,6 +307,9 @@ class MarketFlowEngine:
             "candidate_goals": candidate_goals,
             "ttg_used": ttg_used,
             "goal_sort_keys": goal_sort_keys,
+            "ttg_style_eps": float(ttg_style_eps),
+            "ttg_style_applied": bool(ttg_style_applied),
+            "ttg_style_meta": ttg_style_meta,
             "selected_goals": {"best": best_g, "second": second_g},
             "selected_scores": {"best": best_score, "second": second_score},
             "tiebreak": {

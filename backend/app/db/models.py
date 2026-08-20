@@ -244,7 +244,7 @@ class MarketFlowPrediction(Base):
     match_id = Column(Integer, ForeignKey("matches.id"), nullable=False, unique=True, index=True)
     odds_snapshot_id = Column(Integer, ForeignKey("jczq_play_odds_snapshots.id"), nullable=False)
     model_version = Column(String(50), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, nullable=False, default=datetime.utcnow)
     home_style_tag = Column(String(20), nullable=False, default="均衡")
     away_style_tag = Column(String(20), nullable=False, default="均衡")
     best_total_goals = Column(Integer)

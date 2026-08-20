@@ -32,6 +32,7 @@ class Team(Base):
     short_zh = Column(String(50))
     short_en = Column(String(50))
     logo_url = Column(String(500))
+    style_tag = Column(String(20))
     needs_review = Column(Boolean, default=False, comment="需要人工确认 SportMonks 映射")
     review_reason = Column(String(200), comment="待确认原因")
     created_at = Column(DateTime, default=datetime.utcnow)
@@ -89,6 +90,22 @@ class OddsSnapshot(Base):
     goal_line = Column(Float)
     under_odds = Column(Float)
     is_opening = Column(Boolean, default=False)  # 是否为初盘赔率
+
+class JczqPlayOddsSnapshot(Base):
+    __tablename__ = "jczq_play_odds_snapshots"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    match_id = Column(Integer, ForeignKey("matches.id"), nullable=False, index=True)
+    snapshot_time = Column(DateTime, nullable=False)
+    source = Column(String(50), nullable=False)
+    had_home = Column(Float)
+    had_draw = Column(Float)
+    had_away = Column(Float)
+    hhad_line = Column(Float)
+    hhad_home = Column(Float)
+    hhad_draw = Column(Float)
+    hhad_away = Column(Float)
+    ttg_odds_json = Column(JSON)
+    crs_odds_json = Column(JSON)
 
 class TeamSeasonStats(Base):
     __tablename__ = "team_season_stats"
@@ -217,6 +234,24 @@ class Prediction(Base):
     result_hcp = Column(Integer, default=0, comment="让球胜平负结果 1=中/-1=不中/0=未结算")
     result_goals = Column(Integer, default=0, comment="进球数结果 1=中/-1=不中/0=未结算")
     result_score = Column(Integer, default=0, comment="比分结果 1=中/-1=不中/0=未结算")
+
+class MarketFlowPrediction(Base):
+    __tablename__ = "market_flow_predictions"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    match_id = Column(Integer, ForeignKey("matches.id"), nullable=False, unique=True, index=True)
+    odds_snapshot_id = Column(Integer, ForeignKey("jczq_play_odds_snapshots.id"))
+    model_version = Column(String(50), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    home_style_tag = Column(String(20))
+    away_style_tag = Column(String(20))
+    best_total_goals = Column(Integer)
+    second_total_goals = Column(Integer)
+    best_score = Column(String(20))
+    second_score = Column(String(20))
+    trace_json = Column(JSON)
+
+    match = relationship("Match", foreign_keys=[match_id], lazy="joined")
+    odds_snapshot = relationship("JczqPlayOddsSnapshot", foreign_keys=[odds_snapshot_id], lazy="joined")
 
 class TaskLog(Base):
     __tablename__ = "task_logs"

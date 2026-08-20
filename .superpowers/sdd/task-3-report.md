@@ -41,7 +41,12 @@ curl -X POST "http://localhost:8008/api/market-flow/predict/1" ^
 ```bash
 cd backend
 $env:PYTHONPATH="e:\zhangxuejun\new-thinking\ricking-03\backend"
-C:\Users\zhangxuejun\AppData\Local\Programs\Python\Python312\python.exe -m pytest -q
+C:\Users\zhangxuejun\AppData\Local\Programs\Python\Python312\python.exe -m pytest -q -p no:pytest_asyncio
 ```
 
-结果：进程退出码 0（通过）。
+输出：
+
+```text
+..........                                               [100%]
+10 passed, 8 warnings in 0.93s
+```

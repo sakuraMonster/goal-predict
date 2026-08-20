@@ -1,8 +1,7 @@
 from datetime import datetime
 
-import pytest
-import httpx
 from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
 from app.api.market_flow import router
 from app.db.database import get_db
@@ -73,23 +72,21 @@ def _build_app(fake_db: _FakeSession) -> FastAPI:
     return app
 
 
-@pytest.mark.asyncio
-async def test_create_odds_snapshot_ok():
+def test_create_odds_snapshot_ok():
     db = _FakeSession()
     db.matches[1] = Match(id=1, kickoff_time=datetime.utcnow(), home_team_id=10, away_team_id=11)
     app = _build_app(db)
 
-    transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-        resp = await client.post("/api/market-flow/odds-snapshots", json={
-            "match_id": 1,
-            "snapshot_time": "2026-08-20T10:00:00Z",
-            "source": "manual_import",
-            "had": {"home": 1.9, "draw": 3.2, "away": 3.6},
-            "hhad": {"line": -1.0, "home": 3.1, "draw": 3.4, "away": 2.1},
-            "ttg": {"2": 3.5, "3": 3.6},
-            "crs": {"1-0": 7.5, "2-1": 8.0},
-        })
+    client = TestClient(app)
+    resp = client.post("/api/market-flow/odds-snapshots", json={
+        "match_id": 1,
+        "snapshot_time": "2026-08-20T10:00:00Z",
+        "source": "manual_import",
+        "had": {"home": 1.9, "draw": 3.2, "away": 3.6},
+        "hhad": {"line": -1.0, "home": 3.1, "draw": 3.4, "away": 2.1},
+        "ttg": {"2": 3.5, "3": 3.6},
+        "crs": {"1-0": 7.5, "2-1": 8.0},
+    })
 
     assert resp.status_code == 200
     data = resp.json()["data"]
@@ -98,8 +95,36 @@ async def test_create_odds_snapshot_ok():
     assert db.snaps[1].match_id == 1
 
 
-@pytest.mark.asyncio
-async def test_predict_market_flow_ok():
+def test_create_odds_snapshot_missing_ttg_or_crs():
+    db = _FakeSession()
+    db.matches[1] = Match(id=1, kickoff_time=datetime.utcnow(), home_team_id=10, away_team_id=11)
+    app = _build_app(db)
+
+    client = TestClient(app)
+    resp = client.post("/api/market-flow/odds-snapshots", json={
+        "match_id": 1,
+        "snapshot_time": "2026-08-20T10:00:00Z",
+        "source": "manual_import",
+        "had": {"home": 1.9, "draw": 3.2, "away": 3.6},
+        "hhad": {"line": -1.0, "home": 3.1, "draw": 3.4, "away": 2.1},
+        "ttg": {"2": 3.5, "3": 3.6},
+    })
+    assert resp.status_code == 400
+    assert resp.json()["error"] == "crs must be object"
+
+    resp = client.post("/api/market-flow/odds-snapshots", json={
+        "match_id": 1,
+        "snapshot_time": "2026-08-20T10:00:00Z",
+        "source": "manual_import",
+        "had": {"home": 1.9, "draw": 3.2, "away": 3.6},
+        "hhad": {"line": -1.0, "home": 3.1, "draw": 3.4, "away": 2.1},
+        "crs": {"1-0": 7.5, "2-1": 8.0},
+    })
+    assert resp.status_code == 400
+    assert resp.json()["error"] == "ttg must be object"
+
+
+def test_predict_market_flow_ok():
     db = _FakeSession()
     db.matches[1] = Match(id=1, kickoff_time=datetime.utcnow(), home_team_id=10, away_team_id=11)
     db.teams[10] = Team(id=10, name_en="h", style_tag="大开大合")
@@ -121,9 +146,8 @@ async def test_predict_market_flow_ok():
     )
     app = _build_app(db)
 
-    transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-        resp = await client.post("/api/market-flow/predict/1", json={"odds_snapshot_id": 1})
+    client = TestClient(app)
+    resp = client.post("/api/market-flow/predict/1", json={"odds_snapshot_id": 1})
 
     assert resp.status_code == 200
     out = resp.json()["data"]
@@ -134,8 +158,7 @@ async def test_predict_market_flow_ok():
     assert db.preds[1].odds_snapshot_id == 1
 
 
-@pytest.mark.asyncio
-async def test_predict_market_flow_snapshot_mismatch():
+def test_predict_market_flow_snapshot_mismatch():
     db = _FakeSession()
     db.matches[1] = Match(id=1, kickoff_time=datetime.utcnow(), home_team_id=10, away_team_id=11)
     db.snaps[2] = JczqPlayOddsSnapshot(
@@ -155,10 +178,8 @@ async def test_predict_market_flow_snapshot_mismatch():
     )
     app = _build_app(db)
 
-    transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
-        resp = await client.post("/api/market-flow/predict/1", json={"odds_snapshot_id": 2})
+    client = TestClient(app)
+    resp = client.post("/api/market-flow/predict/1", json={"odds_snapshot_id": 2})
 
     assert resp.status_code == 400
     assert resp.json()["error"] == "odds snapshot mismatch"
-

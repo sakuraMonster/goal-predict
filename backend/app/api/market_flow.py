@@ -1,6 +1,7 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Body, Depends
+from fastapi.responses import JSONResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -9,6 +10,10 @@ from app.db.models import JczqPlayOddsSnapshot, MarketFlowPrediction, Match, Tea
 from app.predictor.models.market_flow import MarketFlowEngine
 
 router = APIRouter(prefix="/api/market-flow", tags=["market_flow"])
+
+
+def _err(msg: str, code: int):
+    return JSONResponse(status_code=code, content={"error": msg})
 
 
 def _parse_dt(raw: object) -> datetime | None:
@@ -33,50 +38,50 @@ def _as_float(v: object) -> float | None:
 async def create_odds_snapshot(payload: dict = Body(...), db: AsyncSession = Depends(get_db)):
     match_id = payload.get("match_id")
     if not isinstance(match_id, int):
-        return {"error": "match_id must be int"}, 400
+        return _err("match_id must be int", 400)
 
     snapshot_time = _parse_dt(payload.get("snapshot_time"))
     if not snapshot_time:
-        return {"error": "snapshot_time must be ISO string"}, 400
+        return _err("snapshot_time must be ISO string", 400)
 
     source = payload.get("source")
     if not isinstance(source, str) or not source:
-        return {"error": "source must be string"}, 400
+        return _err("source must be string", 400)
 
     had = payload.get("had")
     if not isinstance(had, dict):
-        return {"error": "had must be object"}, 400
+        return _err("had must be object", 400)
     had_home = _as_float(had.get("home"))
     had_draw = _as_float(had.get("draw"))
     had_away = _as_float(had.get("away"))
     if had_home is None or had_draw is None or had_away is None:
-        return {"error": "had.home/draw/away must be positive numbers"}, 400
+        return _err("had.home/draw/away must be positive numbers", 400)
 
     hhad = payload.get("hhad")
     if not isinstance(hhad, dict):
-        return {"error": "hhad must be object"}, 400
+        return _err("hhad must be object", 400)
     line_raw = hhad.get("line")
     if not isinstance(line_raw, (int, float)):
-        return {"error": "hhad.line must be number"}, 400
+        return _err("hhad.line must be number", 400)
     hhad_line = float(line_raw)
     hhad_home = _as_float(hhad.get("home"))
     hhad_draw = _as_float(hhad.get("draw"))
     hhad_away = _as_float(hhad.get("away"))
     if hhad_home is None or hhad_draw is None or hhad_away is None:
-        return {"error": "hhad.home/draw/away must be positive numbers"}, 400
+        return _err("hhad.home/draw/away must be positive numbers", 400)
 
     ttg = payload.get("ttg")
-    if ttg is not None and not isinstance(ttg, dict):
-        return {"error": "ttg must be object"}, 400
+    if not isinstance(ttg, dict):
+        return _err("ttg must be object", 400)
 
     crs = payload.get("crs")
-    if crs is not None and not isinstance(crs, dict):
-        return {"error": "crs must be object"}, 400
+    if not isinstance(crs, dict):
+        return _err("crs must be object", 400)
 
     match_result = await db.execute(select(Match).where(Match.id == match_id))
     match = match_result.scalar_one_or_none()
     if not match:
-        return {"error": "match not found"}, 404
+        return _err("match not found", 404)
 
     snap = JczqPlayOddsSnapshot(
         match_id=match_id,
@@ -89,8 +94,8 @@ async def create_odds_snapshot(payload: dict = Body(...), db: AsyncSession = Dep
         hhad_home=hhad_home,
         hhad_draw=hhad_draw,
         hhad_away=hhad_away,
-        ttg_odds_json=ttg or {},
-        crs_odds_json=crs or {},
+        ttg_odds_json=ttg,
+        crs_odds_json=crs,
     )
     try:
         db.add(snap)
@@ -101,7 +106,7 @@ async def create_odds_snapshot(payload: dict = Body(...), db: AsyncSession = Dep
             await db.rollback()
         except Exception:
             pass
-        return {"error": "failed to write odds snapshot"}, 500
+        return _err("failed to write odds snapshot", 500)
 
     return {"data": {"odds_snapshot_id": snap.id}}
 
@@ -110,23 +115,23 @@ async def create_odds_snapshot(payload: dict = Body(...), db: AsyncSession = Dep
 async def predict_market_flow(match_id: int, payload: dict = Body(...), db: AsyncSession = Depends(get_db)):
     odds_snapshot_id = payload.get("odds_snapshot_id")
     if not isinstance(odds_snapshot_id, int):
-        return {"error": "odds_snapshot_id must be int"}, 400
+        return _err("odds_snapshot_id must be int", 400)
 
     model_version = payload.get("model_version") or "marketflow_v1"
     if not isinstance(model_version, str) or not model_version:
-        return {"error": "model_version must be string"}, 400
+        return _err("model_version must be string", 400)
 
     match_result = await db.execute(select(Match).where(Match.id == match_id))
     match = match_result.scalar_one_or_none()
     if not match:
-        return {"error": "match not found"}, 404
+        return _err("match not found", 404)
 
     snap_result = await db.execute(select(JczqPlayOddsSnapshot).where(JczqPlayOddsSnapshot.id == odds_snapshot_id))
     snap = snap_result.scalar_one_or_none()
     if not snap:
-        return {"error": "odds snapshot not found"}, 404
+        return _err("odds snapshot not found", 404)
     if snap.match_id != match_id:
-        return {"error": "odds snapshot mismatch"}, 400
+        return _err("odds snapshot mismatch", 400)
 
     home_style_tag = "均衡"
     away_style_tag = "均衡"
@@ -196,7 +201,7 @@ async def predict_market_flow(match_id: int, payload: dict = Body(...), db: Asyn
             await db.rollback()
         except Exception:
             pass
-        return {"error": "failed to write marketflow prediction"}, 500
+        return _err("failed to write marketflow prediction", 500)
 
     return {"data": {
         "best_total_goals": result.get("best_total_goals"),
@@ -205,4 +210,3 @@ async def predict_market_flow(match_id: int, payload: dict = Body(...), db: Asyn
         "second_score": result.get("second_score"),
         "trace": result.get("trace"),
     }}
-

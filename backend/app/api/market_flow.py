@@ -34,6 +34,13 @@ def _as_float(v: object) -> float | None:
     return None
 
 
+def _norm_score(v: object) -> str | None:
+    if not isinstance(v, str) or not v:
+        return None
+    out = v.strip().replace(":", "-")
+    return out or None
+
+
 @router.post("/odds-snapshots")
 async def create_odds_snapshot(payload: dict = Body(...), db: AsyncSession = Depends(get_db)):
     match_id = payload.get("match_id")
@@ -209,4 +216,162 @@ async def predict_market_flow(match_id: int, payload: dict = Body(...), db: Asyn
         "best_score": result.get("best_score"),
         "second_score": result.get("second_score"),
         "trace": result.get("trace"),
+    }}
+
+
+@router.post("/backtest")
+async def backtest_market_flow(payload: dict = Body(...), db: AsyncSession = Depends(get_db)):
+    start_kickoff = _parse_dt(payload.get("start_kickoff"))
+    end_kickoff = _parse_dt(payload.get("end_kickoff"))
+    if not start_kickoff or not end_kickoff:
+        return _err("start_kickoff/end_kickoff must be ISO string", 400)
+    if start_kickoff >= end_kickoff:
+        return _err("start_kickoff must be before end_kickoff", 400)
+
+    source = payload.get("source")
+    if source is not None and (not isinstance(source, str) or not source):
+        return _err("source must be string", 400)
+
+    overwrite = payload.get("overwrite", False)
+    if not isinstance(overwrite, bool):
+        return _err("overwrite must be bool", 400)
+
+    model_version = "marketflow_v1"
+
+    match_result = await db.execute(
+        select(Match)
+        .where(Match.kickoff_time >= start_kickoff, Match.kickoff_time <= end_kickoff)
+        .order_by(Match.kickoff_time.asc())
+    )
+    matches = match_result.scalars().all()
+
+    total = len(matches)
+    predicted = 0
+    skipped = 0
+    skipped_detail: list[dict] = []
+
+    goals_hit_best = 0
+    goals_hit_top2 = 0
+    score_hit_best = 0
+    score_hit_top2 = 0
+
+    engine = MarketFlowEngine()
+
+    for match in matches:
+        snap_stmt = select(JczqPlayOddsSnapshot).where(JczqPlayOddsSnapshot.match_id == match.id)
+        if source:
+            snap_stmt = snap_stmt.where(JczqPlayOddsSnapshot.source == source)
+        snap_stmt = snap_stmt.order_by(JczqPlayOddsSnapshot.snapshot_time.desc()).limit(1)
+        snap_result = await db.execute(snap_stmt)
+        snap = snap_result.scalar_one_or_none()
+        if not snap:
+            skipped += 1
+            skipped_detail.append({"match_id": match.id, "reason": "missing_odds_snapshot"})
+            continue
+
+        pred_result = await db.execute(select(MarketFlowPrediction).where(MarketFlowPrediction.match_id == match.id))
+        pred = pred_result.scalar_one_or_none()
+
+        if pred and not overwrite:
+            skipped += 1
+            skipped_detail.append({"match_id": match.id, "reason": "prediction_exists"})
+        else:
+            home_style_tag = "均衡"
+            away_style_tag = "均衡"
+
+            if match.home_team_id:
+                home_team_result = await db.execute(select(Team).where(Team.id == match.home_team_id))
+                home_team = home_team_result.scalar_one_or_none()
+                if home_team and home_team.style_tag:
+                    home_style_tag = home_team.style_tag
+
+            if match.away_team_id:
+                away_team_result = await db.execute(select(Team).where(Team.id == match.away_team_id))
+                away_team = away_team_result.scalar_one_or_none()
+                if away_team and away_team.style_tag:
+                    away_style_tag = away_team.style_tag
+
+            result = engine.predict(
+                home_style_tag=home_style_tag,
+                away_style_tag=away_style_tag,
+                had={"home": snap.had_home, "draw": snap.had_draw, "away": snap.had_away},
+                hhad={
+                    "line": snap.hhad_line,
+                    "home": snap.hhad_home,
+                    "draw": snap.hhad_draw,
+                    "away": snap.hhad_away,
+                },
+                ttg=snap.ttg_odds_json or {},
+                crs=snap.crs_odds_json or {},
+            )
+
+            now = datetime.utcnow()
+            if pred:
+                pred.odds_snapshot_id = snap.id
+                pred.model_version = model_version
+                pred.created_at = now
+                pred.home_style_tag = home_style_tag
+                pred.away_style_tag = away_style_tag
+                pred.best_total_goals = result.get("best_total_goals")
+                pred.second_total_goals = result.get("second_total_goals")
+                pred.best_score = result.get("best_score")
+                pred.second_score = result.get("second_score")
+                pred.trace_json = result.get("trace")
+            else:
+                pred = MarketFlowPrediction(
+                    match_id=match.id,
+                    odds_snapshot_id=snap.id,
+                    model_version=model_version,
+                    created_at=now,
+                    home_style_tag=home_style_tag,
+                    away_style_tag=away_style_tag,
+                    best_total_goals=result.get("best_total_goals"),
+                    second_total_goals=result.get("second_total_goals"),
+                    best_score=result.get("best_score"),
+                    second_score=result.get("second_score"),
+                    trace_json=result.get("trace"),
+                )
+                db.add(pred)
+            predicted += 1
+
+        if match.home_score is None or match.away_score is None or not pred:
+            continue
+
+        actual_total_goals = int(match.home_score) + int(match.away_score)
+        actual_score = f"{int(match.home_score)}-{int(match.away_score)}"
+
+        best_total_goals = pred.best_total_goals
+        second_total_goals = pred.second_total_goals
+        if isinstance(best_total_goals, int):
+            if actual_total_goals == best_total_goals:
+                goals_hit_best += 1
+            if actual_total_goals in {best_total_goals, second_total_goals}:
+                goals_hit_top2 += 1
+
+        best_score = _norm_score(pred.best_score)
+        second_score = _norm_score(pred.second_score)
+        if best_score:
+            if actual_score == best_score:
+                score_hit_best += 1
+            if actual_score in {best_score, second_score}:
+                score_hit_top2 += 1
+
+    try:
+        await db.commit()
+    except Exception:
+        try:
+            await db.rollback()
+        except Exception:
+            pass
+        return _err("failed to write marketflow prediction", 500)
+
+    return {"data": {
+        "total": total,
+        "predicted": predicted,
+        "skipped": skipped,
+        "goals_hit_best": goals_hit_best,
+        "goals_hit_top2": goals_hit_top2,
+        "score_hit_best": score_hit_best,
+        "score_hit_top2": score_hit_top2,
+        "skipped_detail": skipped_detail,
     }}

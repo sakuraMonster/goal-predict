@@ -278,7 +278,7 @@ async def get_daily_review(
             else:
                 hcp_miss += 1
 
-            # V4.12 SNAP: λ小数<0.10降级、>0.90升级，2 closest to effective，4=4+
+            # V4.12 SNAP: λ小数<0.10降级、>0.90升级，2 closest to effective（包含实际进球>=5时top2需含5）
             actual_total = (pred.actual_home_score or 0) + (pred.actual_away_score or 0)
             expected_goals = pred.expected_goals or 0
             if expected_goals > 0 and actual_total >= 0:
@@ -293,10 +293,11 @@ async def get_daily_review(
                     effective = math.ceil(eg_clean)
                 else:
                     effective = expected_goals
-                dists = sorted([(abs(effective - i), i) for i in range(5)])
+                # 候选池上限覆盖到 actual（以应对 actual >= 5 的情况）
+                ceiling = max(4, actual_total)
+                dists = sorted([(abs(effective - i), i) for i in range(ceiling + 1)])
                 top2 = {dists[0][1], dists[1][1]}
-                act_capped = min(actual_total, 4)
-                if act_capped in top2:
+                if actual_total in top2:
                     goals_hit += 1
                 else:
                     goals_miss += 1

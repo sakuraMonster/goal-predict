@@ -5,6 +5,7 @@ import MatchDetail from "./pages/MatchDetail";
 import Report from "./pages/Report";
 import Review from "./pages/Review";
 import GoalsPrediction from "./pages/GoalsPrediction";
+import MarketFlowV2 from "./pages/MarketFlowV2";
 import Mapping from "./pages/Mapping";
 import Admin from "./pages/Admin";
 
@@ -31,6 +32,7 @@ function AppLayout() {
           <Link to="/report" className={`hover:text-moss transition-colors ${isActive('/report')}`}>预测报告</Link>
           <Link to="/review" className={`hover:text-moss transition-colors ${isActive('/review')}`}>复盘统计</Link>
           <Link to="/goals" className={`hover:text-moss transition-colors ${isActive('/goals')}`}>进球数预测</Link>
+          <Link to="/market-flow" className={`hover:text-moss transition-colors ${isActive('/market-flow')}`}>V2方向与比分</Link>
           <SystemMenu />
         </div>
         <div className="flex gap-3 items-center text-xs font-body text-ink-muted">
@@ -46,6 +48,7 @@ function AppLayout() {
           <Route path="/report" element={<Report />} />
           <Route path="/review" element={<Review />} />
           <Route path="/goals" element={<GoalsPrediction />} />
+          <Route path="/market-flow" element={<MarketFlowV2 />} />
           <Route path="/mapping" element={<Mapping />} />
           <Route path="/admin" element={<Admin />} />
         </Routes>

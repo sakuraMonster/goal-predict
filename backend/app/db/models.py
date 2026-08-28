@@ -253,8 +253,14 @@ class MarketFlowPrediction(Base):
     second_score = Column(String(20))
     trace_json = Column(_JSON_VARIANT)
 
+    # ── 冗余（与 Prediction 表对齐，方便统计/筛选不 JOIN Match） ──
+    league_id = Column(Integer, ForeignKey("leagues.id"), index=True, comment="冗余，联赛ID，方便按联赛统计")
+    kickoff_time = Column(DateTime, index=True, comment="冗余，比赛开球时间（竞彩 UTC+8 本地口径实际存储列）")
+    matchday_date = Column(Date, index=True, comment="冗余，竞彩比赛日 = kickoff_time - 12h 取 date，按比赛日筛选必用")
+
     match = relationship("Match", foreign_keys=[match_id], lazy="joined")
     odds_snapshot = relationship("JczqPlayOddsSnapshot", foreign_keys=[odds_snapshot_id], lazy="joined")
+    league = relationship("League", foreign_keys=[league_id], lazy="joined")
 
 class TaskLog(Base):
     __tablename__ = "task_logs"

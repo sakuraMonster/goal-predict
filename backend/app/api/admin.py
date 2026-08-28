@@ -124,7 +124,7 @@ async def trigger_sync_matches():
 
 @router.post("/sync-odds")
 async def trigger_sync_odds():
-    """手动触发赔率更新"""
+    """手动触发赔率更新（SportMonks 通用赔率表）"""
     start = time.time()
     try:
         await _run_sync_odds()
@@ -134,6 +134,269 @@ async def trigger_sync_odds():
     except Exception as e:
         duration = int((time.time() - start) * 1000)
         await AppLogger.log("sync_odds", "failed", f"更新失败: {e}", duration)
+        return {"status": "error", "message": str(e)}
+
+
+@router.post("/sync-market-flow-odds")
+async def trigger_sync_market_flow_odds(
+    date: str = Query(None, description="YYYY-MM-DD 竞彩比赛日，不传默认今天起未来7天"),
+    db: AsyncSession = Depends(get_db),
+):
+    """MarketFlow V2 赔率拉取：从竞彩网 getMatchCalculatorV1 拉实时赔率（HAD/HHAD/TTG/CRS 四玩法），写入 JczqPlayOddsSnapshot 表。
+
+    MarketFlow V2 的预测逻辑只认 JczqPlayOddsSnapshot（竞彩收盘/实时赔率，带 TTG/CRS 进球与比分赔率），
+    与通用 sync_odds 写入的 SportMonks odds_snapshots 表是两张完全不同的表。"""
+    start = time.time()
+    try:
+        from tools import fetch_market_flow_odds_live as _live_mod
+        from app.db.models import JczqPlayOddsSnapshot, Match
+        import re as _re
+        from datetime import datetime as _dt
+
+        today = _dt.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        if date:
+            try:
+                start_dt = _dt.strptime(date, "%Y-%m-%d")
+            except ValueError:
+                return {"status": "error", "message": "date 格式错误，应为 YYYY-MM-DD"}
+        else:
+            start_dt = today
+        start_dt = start_dt.replace(hour=12, minute=0, second=0, microsecond=0)
+        end_dt = (start_dt + timedelta(days=7)).replace(hour=11, minute=59, second=59, microsecond=0)
+
+        live = _live_mod.fetch_live()
+        parsed = []
+        for raw in live:
+            p = _live_mod._parse_match(raw)
+            if not p:
+                continue
+            if not (p["kickoff"] and start_dt <= p["kickoff"] <= end_dt):
+                continue
+            parsed.append(p)
+
+        inserted = 0
+        skipped_dup = 0
+        skipped_unmatched = 0
+        matched_local_ids: list[int] = []
+        for p in parsed:
+            matched = None
+            r1 = await db.execute(select(Match).where(Match.jc_match_id == p["jc_match_id"]))
+            matched = r1.scalar_one_or_none()
+            if not matched and p["match_num"]:
+                r2 = await db.execute(
+                    select(Match).where(
+                        Match.match_num == p["match_num"],
+                        Match.kickoff_time >= (p["kickoff"] - timedelta(hours=12)) if p["kickoff"] else True,
+                        Match.kickoff_time <= (p["kickoff"] + timedelta(hours=12)) if p["kickoff"] else True,
+                    )
+                )
+                matched = r2.scalars().first()
+            if not matched:
+                skipped_unmatched += 1
+                continue
+            if matched.id in matched_local_ids:
+                continue
+            matched_local_ids.append(matched.id)
+
+            existing = (await db.execute(
+                select(JczqPlayOddsSnapshot).where(
+                    JczqPlayOddsSnapshot.match_id == matched.id,
+                    JczqPlayOddsSnapshot.source == "sporttery",
+                )
+            )).scalars().all()
+            if any(_live_mod._snap_equal(s, p["had"], p["hhad"], p["ttg"], p["crs"]) for s in existing):
+                skipped_dup += 1
+                continue
+            db.add(JczqPlayOddsSnapshot(
+                match_id=matched.id,
+                snapshot_time=p["snapshot_time"],
+                source="sporttery",
+                had_home=p["had"]["home"], had_draw=p["had"]["draw"], had_away=p["had"]["away"],
+                hhad_line=p["hhad"]["line"], hhad_home=p["hhad"]["home"],
+                hhad_draw=p["hhad"]["draw"], hhad_away=p["hhad"]["away"],
+                ttg_odds_json=p["ttg"], crs_odds_json=p["crs"],
+            ))
+            inserted += 1
+        await db.commit()
+
+        duration = int((time.time() - start) * 1000)
+        msg = (f"MarketFlow 赔率：API {len(live)} 场 → 窗口过滤 {len(parsed)} 场 → 写入 JczqPlayOddsSnapshot {inserted} 条，"
+               f"重复跳过 {skipped_dup}，本地赛事无匹配 {skipped_unmatched}")
+        await AppLogger.log("sync_odds", "success", msg, duration)
+        return {"status": "ok", "message": msg, "data": {
+            "api_total": len(live), "window_total": len(parsed),
+            "inserted": inserted, "skipped_dup": skipped_dup,
+            "skipped_unmatched": skipped_unmatched,
+        }}
+    except Exception as e:
+        duration = int((time.time() - start) * 1000)
+        await AppLogger.log("sync_odds", "failed", f"MarketFlow赔率失败: {e}", duration)
+        return {"status": "error", "message": str(e)}
+
+
+# SportMonks O/U（大小球）market_id 常量 + 博彩公司名映射（与 tools/_backfill_sm_ou.py 一致）
+_SM_OU_MID = 80
+_SM_BOOKMAKER_NAMES = {
+    1: "Pinnacle", 2: "SportPesa", 3: "SBK", 5: "Bet365",
+    9: "Marathonbet", 12: "Betfair", 16: "1xBet", 20: "Betclic",
+    23: "10Bet", 34: "BetVictor", 35: "Betting Exchange",
+}
+
+
+def _sm_safe_float(v):
+    """宽松数值解析：处理 None/字符串含空格/逗号"""
+    if v is None:
+        return None
+    if isinstance(v, (int, float)):
+        return float(v)
+    try:
+        return float(str(v).replace(" ", "").split(",")[0])
+    except (ValueError, TypeError):
+        return None
+
+
+def _parse_sm_ou_odds(odds: list) -> tuple[dict, dict]:
+    """解析 SportMonks 赛前赔率中的 O/U（大小球）行情。
+
+    返回 (ou_rows, bm_names)：
+      ou_rows   {(bookmaker_id, goal_line): {"over": 赔率, "under": 赔率}}，仅保留 0.5~6.5 有效线
+      bm_names  {bookmaker_id: 博彩公司名}
+    """
+    ou_rows: dict = {}
+    bm_names: dict = {}
+    for o in odds:
+        if o.get("market_id") != _SM_OU_MID:
+            continue
+        lab = str(o.get("label", "")).strip().lower()
+        if lab not in ("over", "under"):
+            continue
+        line = _sm_safe_float(o.get("total"))
+        if line is None or not (0.5 <= line <= 6.5):
+            continue
+        val = _sm_safe_float(o.get("value"))
+        if val is None or val <= 1.0:
+            continue
+        bm_id = o.get("bookmaker_id")
+        bm_name = _SM_BOOKMAKER_NAMES.get(bm_id)
+        if not bm_name and isinstance(o.get("bookmaker"), dict):
+            bm_name = o.get("bookmaker", {}).get("name")
+        bm_name = bm_name or str(bm_id)
+        bm_names[bm_id] = bm_name
+        ou_rows.setdefault((bm_id, round(line, 2)), {})[lab] = val
+    return ou_rows, bm_names
+
+
+@router.post("/sync-market-flow-sm-odds")
+async def trigger_sync_market_flow_sm_odds(
+    date: str = Query(None, description="YYYY-MM-DD 比赛日，不传默认今天起未来7天"),
+    db: AsyncSession = Depends(get_db),
+):
+    """MarketFlow V2 SM O/U 盘口拉取：从 SportMonks 拉赛前 O/U（大小球 over/under）赔率，写入 odds_snapshots 表。
+
+    MarketFlow V2 的 O/U 盘口判断（ou_sm）读 odds_snapshots 中 goal_line=2.5 的 over_odds/under_odds 行
+    （Pinnacle 优先、多博彩公司中位数），同时按整半线（0.5~6.5）独立判定并展示多线徽标。
+    竞彩网 sync-market-flow-odds 只覆盖 HAD/HHAD/TTG/CRS，O/U 独立连续盘口需本端点从 SportMonks 补齐。
+    已同步完整多线的比赛自动跳过（不重复拉取）；仅 2.5 单线或缺数据的比赛重新拉取补全其他盘口线。"""
+    start = time.time()
+    try:
+        from app.collector.sportmonks.client import SportMonksClient
+        from app.db.models import Match, OddsSnapshot
+        from datetime import datetime as _dt
+
+        today = _dt.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        if date:
+            try:
+                start_dt = _dt.strptime(date, "%Y-%m-%d")
+            except ValueError:
+                return {"status": "error", "message": "date 格式错误，应为 YYYY-MM-DD"}
+        else:
+            start_dt = today
+        start_dt = start_dt.replace(hour=0, minute=0, second=0, microsecond=0)
+        end_dt = (start_dt + timedelta(days=7)).replace(hour=23, minute=59, second=59, microsecond=0)
+
+        # 窗口内本地比赛（含 7 天未来），需已匹配 SportMonks fixture
+        r = await db.execute(
+            select(Match).where(
+                Match.kickoff_time >= start_dt,
+                Match.kickoff_time <= end_dt,
+                Match.sportmonks_fixture_id.is_not(None),
+            )
+        )
+        matches = r.scalars().all()
+
+        # 已有完整多线 O/U 数据的比赛 → 跳过；仅 2.5 单线或缺 O/U 数据的比赛重新拉取
+        # （SM 越临近开赛盘口线越全，之前只拉到 2.5 的场次需重拉补全其他盘口线）
+        mid_has_ou: set[int] = set()
+        if matches:
+            ro = await db.execute(
+                select(OddsSnapshot.match_id, OddsSnapshot.goal_line)
+                .distinct()
+                .where(
+                    OddsSnapshot.match_id.in_([m.id for m in matches]),
+                    OddsSnapshot.over_odds.is_not(None),
+                    OddsSnapshot.under_odds.is_not(None),
+                    OddsSnapshot.goal_line >= 0.5,
+                    OddsSnapshot.goal_line <= 6.5,
+                )
+            )
+            per_mid: dict = {}
+            for _mid, _gl in ro.all():
+                per_mid.setdefault(_mid, set()).add(float(_gl))
+            for _mid, _gls in per_mid.items():
+                if 2.5 in _gls and len(_gls) >= 2:
+                    mid_has_ou.add(_mid)
+
+        sm = SportMonksClient()
+        now = _dt.utcnow()
+        total = len(matches)
+        inserted = 0
+        skipped_had = 0
+        skipped_empty = 0
+        skipped_no_match = 0
+        errors = 0
+
+        for m in matches:
+            if m.id in mid_has_ou:
+                skipped_had += 1
+                continue
+            try:
+                odds = await sm.get_odds_pre_match(m.sportmonks_fixture_id)
+            except Exception as e:
+                errors += 1
+                print(f"[SM-OU] err mid={m.id} fx={m.sportmonks_fixture_id} {type(e).__name__}: {e}", flush=True)
+                continue
+            ou_rows, bm_names = _parse_sm_ou_odds(odds)
+            if not ou_rows:
+                skipped_empty += 1
+                continue
+            if not ou_rows.get((1, 2.5)) and not any(abs(gl - 2.5) <= 1e-9 for (_, gl) in ou_rows):
+                skipped_no_match += 1
+            for (bm_id, gl), sides in ou_rows.items():
+                db.add(OddsSnapshot(
+                    match_id=m.id,
+                    snapshot_time=now,
+                    bookmaker=bm_names.get(bm_id, str(bm_id)),
+                    over_odds=_sm_safe_float(sides.get("over")),
+                    goal_line=gl,
+                    under_odds=_sm_safe_float(sides.get("under")),
+                    is_opening=False,
+                ))
+                inserted += 1
+        await db.commit()
+        await sm.close()
+
+        duration = int((time.time() - start) * 1000)
+        msg = (f"SM O/U：窗口 {total} 场（完整多线跳过 {skipped_had}，无O/U行情 {skipped_empty}，"
+               f"无2.5线 {skipped_no_match}，拉取失败 {errors}）→ 写入 odds_snapshots {inserted} 行")
+        await AppLogger.log("sync_odds", "success", msg, duration)
+        return {"status": "ok", "message": msg, "data": {
+            "window_total": total, "inserted": inserted,
+            "skipped_had": skipped_had, "skipped_empty": skipped_empty,
+            "skipped_no_match": skipped_no_match, "errors": errors,
+        }}
+    except Exception as e:
+        duration = int((time.time() - start) * 1000)
+        await AppLogger.log("sync_odds", "failed", f"SM O/U拉取失败: {e}", duration)
         return {"status": "error", "message": str(e)}
 
 
@@ -276,6 +539,10 @@ async def trigger_predict():
                 pred.over_2_5_prob = pred_result["over_2_5_prob"]
                 pred.goal_distribution = pred_result["goal_distribution"]
                 pred.snap_top2 = pred_result["snap_top2"]
+                pred.expected_goals_c = pred_result.get("expected_goals_c")
+                pred.expected_goals_d = pred_result.get("expected_goals_d")
+                pred.snap_top2_c = pred_result.get("snap_top2_c")
+                pred.snap_top2_d = pred_result.get("snap_top2_d")
                 pred.score_top5_json = pred_result["score_top5_json"]
                 pred.confidence_level = pred_result["confidence_level"]
                 pred.is_cold_match = pred_result["is_cold_match"]
@@ -299,6 +566,10 @@ async def trigger_predict():
                     over_2_5_prob=pred_result["over_2_5_prob"],
                     goal_distribution=pred_result["goal_distribution"],
                     snap_top2=pred_result["snap_top2"],
+                    expected_goals_c=pred_result.get("expected_goals_c"),
+                    expected_goals_d=pred_result.get("expected_goals_d"),
+                    snap_top2_c=pred_result.get("snap_top2_c"),
+                    snap_top2_d=pred_result.get("snap_top2_d"),
                     score_top5_json=pred_result["score_top5_json"],
                     confidence_level=pred_result["confidence_level"],
                     is_cold_match=pred_result["is_cold_match"],
@@ -598,3 +869,208 @@ async def repredict_model_b(
             "updated": updated, "skipped": skipped, "failed": failed,
             "mode": "full" if full else "backfill",
         }
+
+
+@router.post("/predict-market-flow")
+async def predict_market_flow_batch(
+    date: str = Query(None, description="日期 YYYY-MM-DD，不传默认今天（竞彩比赛日）"),
+    overwrite: bool = Query(False, description="是否覆盖已存在的预测"),
+    db: AsyncSession = Depends(get_db),
+):
+    """MarketFlow V2 批量预测：对指定比赛日（当日12:00 ~ 次日12:00）的所有比赛执行方向+比分预测"""
+    from app.db.models import Match, Team, MarketFlowPrediction, JczqPlayOddsSnapshot, League
+    from app.predictor.models.market_flow import MarketFlowEngineV2
+    from app.api.market_flow import (
+        _validate_engine_result,
+        _apply_v3e_postprocess,
+        _mk_mfp_denorm,
+    )
+    from sqlalchemy.orm import joinedload
+
+    start_time = time.time()
+
+    if date:
+        try:
+            d0 = datetime.strptime(date, "%Y-%m-%d")
+        except ValueError:
+            return {"status": "error", "message": "date 格式错误，应为 YYYY-MM-DD"}
+        query_start = d0.replace(hour=12, minute=0, second=0, microsecond=0)
+        query_end = query_start + timedelta(days=1)
+    else:
+        now = datetime.now(BEIJING_TZ).replace(tzinfo=None)
+        query_start = now.replace(hour=12, minute=0, second=0, microsecond=0)
+        if query_start > now:
+            query_start = query_start - timedelta(days=1)
+        query_end = query_start + timedelta(days=1)
+
+    result = await db.execute(
+        select(Match)
+        .options(
+            joinedload(Match.home_team),
+            joinedload(Match.away_team),
+        )
+        .where(
+            Match.kickoff_time >= query_start,
+            Match.kickoff_time < query_end,
+        )
+        .order_by(Match.kickoff_time.asc())
+    )
+    matches = list(result.unique().scalars().all())
+
+    if not matches:
+        return {"status": "ok", "message": f"{date or '今日'} 无比赛数据"}
+
+    engine = MarketFlowEngineV2()
+    model_version = "marketflow_v2_tuned7_0821"
+    created = 0
+    updated = 0
+    skipped = 0
+    failed = 0
+    skipped_reasons: dict[str, int] = {}
+
+    for m in matches:
+        try:
+            snap_stmt = (
+                select(JczqPlayOddsSnapshot)
+                .where(JczqPlayOddsSnapshot.match_id == m.id)
+                .order_by(JczqPlayOddsSnapshot.snapshot_time.desc())
+                .limit(1)
+            )
+            snap_result = await db.execute(snap_stmt)
+            snap = snap_result.scalar_one_or_none()
+            if not snap:
+                skipped += 1
+                skipped_reasons["missing_odds_snapshot"] = skipped_reasons.get("missing_odds_snapshot", 0) + 1
+                continue
+
+            existing_result = await db.execute(
+                select(MarketFlowPrediction).where(MarketFlowPrediction.match_id == m.id)
+            )
+            pred = existing_result.scalar_one_or_none()
+
+            if pred and not overwrite:
+                skipped += 1
+                skipped_reasons["prediction_exists"] = skipped_reasons.get("prediction_exists", 0) + 1
+                continue
+
+            home_style_tag = "均衡"
+            away_style_tag = "均衡"
+            if m.home_team and m.home_team.style_tag:
+                home_style_tag = m.home_team.style_tag
+            if m.away_team and m.away_team.style_tag:
+                away_style_tag = m.away_team.style_tag
+
+            had = {"home": snap.had_home, "draw": snap.had_draw, "away": snap.had_away}
+            hhad = {
+                "line": snap.hhad_line,
+                "home": snap.hhad_home,
+                "draw": snap.hhad_draw,
+                "away": snap.hhad_away,
+            }
+            ttg = snap.ttg_odds_json or {}
+            crs = snap.crs_odds_json or {}
+
+            if not (had["home"] and had["draw"] and had["away"]):
+                skipped += 1
+                skipped_reasons["incomplete_had_odds"] = skipped_reasons.get("incomplete_had_odds", 0) + 1
+                continue
+            if not (hhad["home"] and hhad["draw"] and hhad["away"]):
+                skipped += 1
+                skipped_reasons["incomplete_hhad_odds"] = skipped_reasons.get("incomplete_hhad_odds", 0) + 1
+                continue
+            if not ttg or not crs:
+                skipped += 1
+                skipped_reasons["missing_ttg_or_crs"] = skipped_reasons.get("missing_ttg_or_crs", 0) + 1
+                continue
+
+            engine_result = engine.predict(
+                home_style_tag=home_style_tag,
+                away_style_tag=away_style_tag,
+                had=had,
+                hhad=hhad,
+                ttg=ttg,
+                crs=crs,
+            )
+
+            ok, missing = _validate_engine_result(engine_result)
+            if not ok:
+                failed += 1
+                skipped_reasons[f"engine_missing_{','.join(missing)}"] = skipped_reasons.get(f"engine_missing_{','.join(missing)}", 0) + 1
+                continue
+
+            league_name_zh = None
+            if m.league_id:
+                _lg_res = await db.execute(select(League.name_zh).where(League.id == m.league_id))
+                league_name_zh = _lg_res.scalar_one_or_none()
+            engine_result = _apply_v3e_postprocess(engine_result, snap, league_name_zh=league_name_zh, matchday_date=getattr(m, "matchday_date", None))
+
+            now_utc = datetime.utcnow()
+            denorm = _mk_mfp_denorm(m)
+
+            if pred:
+                pred.odds_snapshot_id = snap.id
+                pred.model_version = model_version
+                pred.created_at = now_utc
+                pred.home_style_tag = home_style_tag
+                pred.away_style_tag = away_style_tag
+                pred.best_total_goals = engine_result.get("best_total_goals")
+                pred.second_total_goals = engine_result.get("second_total_goals")
+                pred.best_score = engine_result.get("best_score")
+                pred.second_score = engine_result.get("second_score")
+                pred.trace_json = engine_result.get("trace")
+                pred.league_id = denorm["league_id"]
+                pred.kickoff_time = denorm["kickoff_time"]
+                pred.matchday_date = denorm["matchday_date"]
+                updated += 1
+            else:
+                db.add(MarketFlowPrediction(
+                    match_id=m.id,
+                    odds_snapshot_id=snap.id,
+                    model_version=model_version,
+                    created_at=now_utc,
+                    home_style_tag=home_style_tag,
+                    away_style_tag=away_style_tag,
+                    best_total_goals=engine_result.get("best_total_goals"),
+                    second_total_goals=engine_result.get("second_total_goals"),
+                    best_score=engine_result.get("best_score"),
+                    second_score=engine_result.get("second_score"),
+                    trace_json=engine_result.get("trace"),
+                    league_id=denorm["league_id"],
+                    kickoff_time=denorm["kickoff_time"],
+                    matchday_date=denorm["matchday_date"],
+                ))
+                created += 1
+
+        except Exception as e:
+            failed += 1
+            skipped_reasons[f"exception: {type(e).__name__}"] = skipped_reasons.get(f"exception: {type(e).__name__}", 0) + 1
+            if failed <= 5:
+                print(f"[predict-market-flow] match_id={m.id} 失败: {e}", flush=True)
+            continue
+
+    try:
+        await db.commit()
+    except Exception as e:
+        try:
+            await db.rollback()
+        except Exception:
+            pass
+        duration = int((time.time() - start_time) * 1000)
+        await AppLogger.log("predict", "failed", f"MarketFlow 批量预测失败: {e}", duration)
+        return {"status": "error", "message": f"保存数据库失败: {e}"}
+
+    duration = int((time.time() - start_time) * 1000)
+    msg = f"MarketFlow V2 预测完成: 新增 {created}, 更新 {updated}, 跳过 {skipped}, 失败 {failed}（共 {len(matches)} 场）"
+    await AppLogger.log("predict", "success", msg, duration)
+    return {
+        "status": "ok",
+        "message": msg,
+        "data": {
+            "total": len(matches),
+            "created": created,
+            "updated": updated,
+            "skipped": skipped,
+            "failed": failed,
+            "skipped_reasons": skipped_reasons,
+        }
+    }

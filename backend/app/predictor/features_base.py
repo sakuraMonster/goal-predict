@@ -100,8 +100,22 @@ class BaseDataFetcher:
     @staticmethod
     def _is_stats_valid(stats: TeamSeasonStats) -> bool:
         """校验赛季统计数据是否合理，过滤 SportMonks 返回的腐败数据
-        （如 played=1 但 GA=59 / GF=67，实际是赛季累计值误标为单场）"""
+        （如 played=1 但 GA=59 / GF=67，实际是赛季累计值误标为单场）
+
+        L3(2026-08-21) 修正：recent_matches 是独立写入的 JSON，
+        不依赖 played/W/D/L 的一致性。只要 recent_matches 非空且结构合法，
+        即使 WDL/场均校验不通过，也视为 valid（否则会落到 rm=0 的旧赛季）。
+        """
         p = stats.played
+        # 先看 recent_matches 是否有合格数据：有则直接视为 valid（至少能提供近6场状态）
+        rm = stats.recent_matches
+        if isinstance(rm, list) and len(rm) >= 4:
+            sample_ok = 0
+            for m in rm[:4]:
+                if isinstance(m, dict) and m.get("date") and m.get("score") is not None:
+                    sample_ok += 1
+            if sample_ok >= 2:
+                return True
         if not p or p <= 0:
             return False
         # W+D+L 应与 played 大致相等（允许±25%容差，考虑加时赛等特殊情况）
@@ -119,15 +133,30 @@ class BaseDataFetcher:
     @staticmethod
     def _season_rank(stats) -> int:
         """赛季分层优先级：
-        2 = 4位数字年份赛季标记（'2025'/'2026'，真实赛季）
+        2 = 4位数字年份赛季标记（'2025'/'2026'，或跨年'2026/2027'等真实赛季）
         1 = SportMonks 数字赛季ID（'26741' 等，多为不完整/脏数据）
         0 = 'latest' 等非标准标记（最低）
+
+        L3(2026-08-21) 修正：兼容 2026/2027、2026-2027 等跨年格式，
+        提取起始年份；能解析为 4 位数字的统一归入 rank=2。
         """
         s = stats.season
-        if s and s.isdigit() and len(s) == 4:
-            return 2
+        if not s:
+            return 1
         if s == "latest":
             return 0
+        # 纯4位数字：直接 rank=2
+        if s.isdigit() and len(s) == 4:
+            return 2
+        # 跨年格式：2026/2027、2026-2027、2026~2027 等
+        for sep in ("/", "-", "~"):
+            if sep in s:
+                first = s.split(sep)[0]
+                if first.isdigit() and len(first) == 4:
+                    return 2
+        # 全是数字但长度 != 4：视为 SportMonks ID
+        if s.isdigit():
+            return 1
         return 1
 
     async def _filter_cross_league_rm(self, stats_list: list, team_id: int, league_id: int = None) -> list:
@@ -135,11 +164,14 @@ class BaseDataFetcher:
 
         recent_matches 正常应包含本联赛对手（杯赛对手可跨联赛但占比低）；
         串台记录（如波尔图 recent 全是英格兰业余队）对本队无效。
-        阈值：可判别联赛的对手中，同联赛占比 < 30% 判定串台。
+        阈值：可判别联赛的对手中，同联赛占比 < 10% 判定串台。
 
         L2.1(2026-08-10) 修正：league_id 由调用方从 match.league_id 传入
         （matches 表联赛归属干净），不再反查 teams.league_id ——
         该字段被批量写入系统性污染（1190 队被标成韩K=6）。
+        L3(2026-08-21) 修正：同联赛占比阈值 30% → 10%；
+        杯赛/欧冠/欧联队伍跨联赛对手占比高（30% 同联赛都未必满足），
+        10% 阈值可识别真正的垃圾串台（如 0/10、1/10 这种异常）。
         """
         my_league = league_id
         if not my_league or not stats_list:
@@ -162,11 +194,15 @@ class BaseDataFetcher:
         )
         opp_league = {sm_id: lg_id for sm_id, lg_id in r.all()}
 
+        def _has_rm(s):
+            rm = s.recent_matches
+            return isinstance(rm, list) and len(rm) > 0
+
         kept = []
         for s in stats_list:
             rm = s.recent_matches
             if not isinstance(rm, list) or not rm:
-                kept.append(s)  # 无 rm 无法判定，保留
+                kept.append(s)  # 无 rm 无法判定，保留（但会被后面的排序优先级打下去）
                 continue
             same = total = 0
             for m in rm:
@@ -177,8 +213,13 @@ class BaseDataFetcher:
                     total += 1
                     if lg == my_league:
                         same += 1
-            if total == 0 or (same / total) >= 0.3:
+            if total == 0 or (same / total) >= 0.10:
                 kept.append(s)
+        # L3 终极 fallback：若过滤后没有任何一条有 rm 数据的记录，
+        # 回退到过滤前的 stats_list（宁有跨联赛数据也不用空壳）
+        if not any(_has_rm(s) for s in kept):
+            if any(_has_rm(s) for s in stats_list):
+                return list(stats_list)
         return kept
 
     async def _get_team_stats(self, team_id: int, league_id: int = None):
@@ -190,6 +231,8 @@ class BaseDataFetcher:
         3. 同层内：recent_matches 非空优先（保证近6场特征有值），再按 played DESC
         L2.1(2026-08-10) 修正：串台过滤后池为空 → 返回 None（宁缺毋滥，
         特征层走 league baseline fallback），不再回退到未过滤的垃圾记录。
+        L3(2026-08-21) 修正：若 year_stats（rank=2）池全是 rm=0 的空壳，
+        放宽到与 rank=1 的 valid_stats 合并，避免有数据的 2026/2027 跨年赛季被浪费。
         """
         if not team_id:
             return None
@@ -205,9 +248,23 @@ class BaseDataFetcher:
             # 全部无效：返回最新记录兜底（特征层有 fallback）
             return all_stats[0]
 
-        # 存在合法年份赛季记录时，仅在其中选择（否则放宽到全部有效记录）
+        # 存在合法年份赛季记录时，先在其中选择（否则放宽到全部有效记录）
         year_stats = [s for s in valid_stats if self._season_rank(s) == 2]
-        pool = year_stats if year_stats else valid_stats
+
+        # L3 fallback: 检查 year_stats 池中是否存在至少一条有 recent_matches 数据
+        def _has_rm(s):
+            rm = s.recent_matches
+            return isinstance(rm, list) and len(rm) >= 4
+
+        if year_stats:
+            year_has_rm = any(_has_rm(s) for s in year_stats)
+            if not year_has_rm:
+                # rank=2 的赛季全是空壳，与 rank=1 的 valid_stats 合并取并集
+                pool = valid_stats
+            else:
+                pool = year_stats
+        else:
+            pool = valid_stats
 
         # 串台过滤（仅对有 rm 的记录有效，无 rm 记录保留）
         pool = await self._filter_cross_league_rm(pool, team_id, league_id)

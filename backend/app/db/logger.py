@@ -4,15 +4,20 @@
 import logging
 import sys
 from datetime import datetime
+from io import TextIOWrapper
 from sqlalchemy import text
 from app.db.database import async_session
 from app.db.models import TaskLog
 
-# 控制台 logger
+# 强制控制台 logger
 console_logger = logging.getLogger("football_prediction")
 console_logger.setLevel(logging.INFO)
+console_logger.propagate = False  # 避免重复输出
 
-handler = logging.StreamHandler(sys.stdout)
+# Windows/PowerShell 5 GBK 乱码强制绕开：直接用二进制buffer包 UTF-8 TextIOWrapper
+_stdout_buffer = getattr(sys.stdout, "buffer", sys.stdout)
+_utf8_stdout = TextIOWrapper(_stdout_buffer, encoding="utf-8", errors="backslashreplace", line_buffering=True)
+handler = logging.StreamHandler(stream=_utf8_stdout)
 handler.setFormatter(logging.Formatter(
     "[%(asctime)s] %(levelname)-5s | %(message)s",
     datefmt="%H:%M:%S",

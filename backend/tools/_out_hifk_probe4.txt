@@ -1,8 +1,0 @@
-[SEARCH HIFK] 1 条:
-   id=912 name=HIFK country=None
-[SEARCH Helsinki IFK] 0 条:
-[SEARCH Tampere United] 1 条:
-   id=8998 name=Tampere United country=None
-[SEARCH Tampere Ilves] 0 条:
-[BETWEEN] 248 场按联赛: 1 个联赛
-   未知: 248

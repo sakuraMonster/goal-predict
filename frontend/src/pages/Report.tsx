@@ -13,6 +13,10 @@ function getYesterdayStr(): string {
   return toDateStr(d);
 }
 
+function getTodayStr(): string {
+  return toDateStr(new Date());
+}
+
 function fmtDateCN(dateStr: string): string {
   const d = new Date(dateStr + "T00:00:00");
   return d.toLocaleDateString("zh-CN");
@@ -96,7 +100,7 @@ export default function Report() {
   const coldMatches = report.filter((m: any) => m.is_cold_match);
   const hotMatches = report.filter((m: any) => m.is_hot_match);
   const displayDate = summary.display_date || selectedDate;
-  const isToday = selectedDate === getYesterdayStr();
+  const isToday = selectedDate === getTodayStr();
 
   if (error) return <ErrorState message={error} onRetry={() => fetchData(selectedDate)} />;
 
@@ -145,7 +149,7 @@ export default function Report() {
                   type="date"
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  max={getYesterdayStr()}
+                  max={getTodayStr()}
                   className="font-mono text-xs text-ink bg-transparent border-none outline-none px-1 py-0.5 w-[120px] text-center [color-scheme:light]"
                 />
                 <button

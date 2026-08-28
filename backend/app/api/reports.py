@@ -685,8 +685,8 @@ async def get_report_range(
         snap_for_hit = pred.snap_top2_c if pred.snap_top2_c else pred.snap_top2
         if pred.actual_total_goals is not None and snap_for_hit:
             settled += 1
-            act_capped = min(pred.actual_total_goals, 4)
-            if act_capped in snap_for_hit:
+            # 精确命中：SNAP Top2 必须包含 actual_total_goals 的真实值；5 球只有 top2 含 5 才算命中
+            if pred.actual_total_goals in snap_for_hit:
                 goals_hit += 1
             else:
                 goals_miss += 1
@@ -744,8 +744,8 @@ async def get_league_accuracy(
             by_league[lg_name]["settled"] += 1
             snap = pred.snap_top2_c if pred.snap_top2_c else pred.snap_top2
             if snap:
-                act_capped = min(pred.actual_total_goals, 4)
-                if act_capped in snap:
+                # 精确命中：actual_total_goals 真实值必须在 snap top2 中
+                if pred.actual_total_goals in snap:
                     by_league[lg_name]["hit"] += 1
                 else:
                     by_league[lg_name]["miss"] += 1
@@ -814,7 +814,7 @@ def _build_history_stats(rows) -> dict:
     """由历史已结算预测构建各维命中率统计。
 
     rows: [(league_name, egc, snap_top2_c, actual_total_goals), ...]
-    命中口径：min(actual_total_goals, 4) 落在 snap_top2_c 内。
+    命中口径：actual_total_goals 的真实值必须落在 snap_top2_c 内（精确匹配，5球只有 snap 含 5 才算命中）。
     """
     from collections import defaultdict
 
@@ -829,10 +829,9 @@ def _build_history_stats(rows) -> dict:
     for league_name, egc, snap, act in rows:
         if not snap or len(snap) != 2:
             continue
-        act_capped = min(act, 4) if act is not None else None
-        if act_capped is None:
+        if act is None:
             continue
-        hit = int(act_capped in snap)
+        hit = int(act in snap)
 
         lg = league_name or "未知联赛"
         bucket = _lambda_bucket(egc)
@@ -1070,7 +1069,7 @@ async def get_goal_picks_history(
     """
     进球数优选历史命中率：按比赛日统计推荐场次的进球数命中情况。
 
-    命中口径与 goal-picks 一致：min(actual_total_goals, 4) 落在推荐时的 snap_top2_c 快照内。
+    命中口径与 goal-picks 一致：actual_total_goals 真实值必须落在推荐时的 snap_top2_c 快照内（精确匹配；5 球只有 top2 含 5 才算命中）。
     返回按日期倒序的每日统计 + 累计汇总。
     """
     from collections import defaultdict

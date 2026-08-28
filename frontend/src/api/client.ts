@@ -308,6 +308,12 @@ export const predictModelC = () =>
 export const syncOdds = () =>
   api.post("/admin/sync-odds").then((r) => r.data);
 
+export const syncMarketFlowOdds = (params?: { date?: string }) =>
+  api.post("/admin/sync-market-flow-odds", null, { params }).then((r) => r.data);
+
+export const syncMarketFlowSmOdds = (params?: { date?: string }) =>
+  api.post("/admin/sync-market-flow-sm-odds", null, { params }).then((r) => r.data);
+
 export const updateTeams = () =>
   api.post("/admin/update-teams").then((r) => r.data);
 
@@ -316,5 +322,244 @@ export const repredictModelB = (date: string) =>
 
 export const repredictModelC = (date: string) =>
   api.post("/admin/repredict-model-c", null, { params: { date } }).then((r) => r.data);
+
+export interface OuDirectionVerdict {
+  p_big: number;
+  p_small: number;
+  goal_line?: number;
+  direction: "over" | "under" | "skip";
+  confidence: number;
+  bucket: string;
+  top2_ints: number[];
+  tier: string;
+}
+
+export interface OuSmVerdict {
+  p_big: number;
+  p_small: number;
+  goal_line?: number;
+  direction: "over" | "under" | "skip";
+  confidence: number;
+  delta: number;
+  n_books: number;
+  source: string;
+  tiers: Record<string, "over" | "under" | "skip">;
+  /** 各整半线独立判定（0.5/1.5/2.5/3.5/4.5...），主判定仍为 goal_line */
+  lines?: Record<string, {
+    p_big: number;
+    p_small: number;
+    goal_line: number;
+    direction: "over" | "under" | "skip";
+    confidence: number;
+    delta: number;
+    n_books: number;
+  }>;
+}
+
+export interface MarketFlowPredictionItem {
+  id: number;
+  match_id: number;
+  match_num?: string | null;
+  league_name?: string | null;
+  league_id?: number | null;
+  kickoff_time: string;
+  home_team: string;
+  away_team: string;
+  model_version: string;
+  is_cfusion?: boolean;
+  had_pref?: string | null;
+  allowed_outcomes: Array<"home" | "draw" | "away">;
+  excluded_outcomes: Array<"home" | "draw" | "away">;
+  preferred_outcome?: "home" | "draw" | "away" | string | null;
+  enforce_excluded: string[];
+  total_goals_top2: number[];
+  total_goals_top3?: number[];
+  score_top2: string[];
+  score_top3: string[];
+  actual_outcome?: string | null;
+  actual_score?: string | null;
+  actual_total_goals?: number | null;
+  outcome_hit?: boolean | null;
+  preferred_hit?: boolean | null;
+  total_hit_top2?: boolean | null;
+  total_hit_top3?: boolean | null;
+  score_hit_top2?: boolean | null;
+  score_hit_top3?: boolean | null;
+  prediction_created_at?: string | null;
+  snapshot_time?: string | null;
+  snapshot_source?: string | null;
+  pool?: "favorite" | "ambiguous" | "upset" | "unpooled" | null;
+  cold_dir?: "home" | "draw" | "away" | string | null;
+  cold_signal?: boolean | null;
+  cold_type?: "strong" | "warn" | null;
+  pref_bucket?: string | null;
+  hhad_pref?: string | null;
+  hhad_pref_odd?: number | null;
+  fusion?: {
+    source: string;
+    expected_goals_c?: number | null;
+    snap_top2_c?: number[] | null;
+    total_goals_top3_c?: number[] | null;
+  } | null;
+  ou_direction?: OuDirectionVerdict | null;
+  ou_hit?: boolean | null;
+  ou_tier?: string | null;
+  ou_sm?: OuSmVerdict | null;
+  ou_sm_hit?: boolean | null;
+  ou_sm_tier?: string | null;
+}
+
+export interface OuTierStats {
+  signal: number;
+  bet: number;
+  skip: number;
+  settled: number;
+  hit: number;
+}
+
+export interface MarketFlowLiveSummary {
+  window_start: string;
+  window_end: string;
+  default_date: string;
+  n_predicted: number;
+  n_with_results: number;
+  outcome_keep_one: number;
+  outcome_hit: number;
+  preferred_hit?: number;
+  total_top2_hit: number;
+  total_top3_hit?: number;
+  score_top2_hit?: number;
+  score_top3_hit: number;
+  ou_tier?: string;
+  ou_signal?: number;
+  ou_bet?: number;
+  ou_skip?: number;
+  ou_hit?: number;
+  ou_settled?: number;
+  ou_rate?: number | null;
+  ou_tiers?: Record<string, OuTierStats>;
+  ou_sm_tier?: string;
+  ou_sm_signal?: number;
+  ou_sm_bet?: number;
+  ou_sm_skip?: number;
+  ou_sm_hit?: number;
+  ou_sm_settled?: number;
+  ou_sm_rate?: number | null;
+  ou_sm_tiers?: Record<string, OuTierStats>;
+  model_versions: string[];
+}
+
+export const getMarketFlowLive = (params?: { date?: string; model_version?: string; source?: string; ou_tier?: string; ou_sm_tier?: string }) =>
+  api.get("/market-flow/predictions/live", { params }).then((r) => r.data as { data: MarketFlowPredictionItem[]; summary: MarketFlowLiveSummary });
+
+export interface MarketFlowHistorySummary {
+  window_start: string | null;
+  window_end: string | null;
+  n_total: number;
+  n_settled: number;
+  n_pick_total?: number;
+  outcome_hit_total?: number;
+  preferred_hit_total?: number;
+  total_goals_top2_hit_total?: number;
+  total_goals_top3_hit_total?: number;
+  score_top2_hit_total?: number;
+  score_top3_hit_total?: number;
+  ou_tier?: string;
+  ou_signal?: number;
+  ou_bet?: number;
+  ou_skip?: number;
+  ou_hit?: number;
+  ou_settled?: number;
+  ou_rate?: number | null;
+  ou_tiers?: Record<string, OuTierStats>;
+  ou_sm_tier?: string;
+  ou_sm_signal?: number;
+  ou_sm_bet?: number;
+  ou_sm_skip?: number;
+  ou_sm_hit?: number;
+  ou_sm_settled?: number;
+  ou_sm_rate?: number | null;
+  ou_sm_tiers?: Record<string, OuTierStats>;
+  model_versions: string[];
+  by_model_version: Array<Record<string, any>>;
+  by_date: Array<Record<string, any>>;
+  by_league?: Array<Record<string, any>>;
+  by_model_version_date: Array<Record<string, any>>;
+}
+
+export const getMarketFlowHistory = (params?: { start_date?: string; end_date?: string; model_version?: string; source?: string; ou_tier?: string; ou_sm_tier?: string }) =>
+  api.get("/market-flow/predictions/history", { params }).then((r) => r.data as { data: MarketFlowPredictionItem[]; summary: MarketFlowHistorySummary });
+
+export interface MarketFlowPoolStat {
+  key: "favorite" | "ambiguous" | "upset" | "unpooled";
+  label: string;
+  desc: string;
+  n: number;
+  hit: number;
+  rate: number | null;
+  both_hit: number;
+  both_rate: number | null;
+  cold_sig_n: number;
+  cold_sig_hit: number;
+  cold_sig_rate: number | null;
+  strong_n: number;
+  strong_hit: number;
+  strong_rate: number | null;
+  warn_n: number;
+  warn_hit: number;
+  warn_rate: number | null;
+  today_n: number;
+}
+
+export interface PoolDayStat {
+  n: number;
+  hit: number;
+  both_hit: number;
+  cold_hit: number;
+  cold_n: number;
+  strong_n: number;
+  strong_hit: number;
+  warn_n: number;
+  warn_hit: number;
+}
+
+export interface MarketFlowPoolsTrendDay {
+  date: string;
+  favorite: PoolDayStat;
+  ambiguous: PoolDayStat;
+  upset: PoolDayStat;
+  unpooled: PoolDayStat;
+}
+
+export interface MarketFlowPoolsResponse {
+  date: string;
+  days: number;
+  trend_days: number;
+  window: { start: string; end: string };
+  pools: MarketFlowPoolStat[];
+  today: {
+    favorite: MarketFlowPredictionItem[];
+    ambiguous: MarketFlowPredictionItem[];
+    upset: MarketFlowPredictionItem[];
+    unpooled: MarketFlowPredictionItem[];
+  };
+  trend: MarketFlowPoolsTrendDay[];
+}
+
+export const getMarketFlowPools = (params?: { date?: string; days?: number; trend_days?: number }) =>
+  api.get("/market-flow/predictions/pools", { params }).then((r) => r.data as MarketFlowPoolsResponse);
+
+export interface MarketFlowModelVersionItem {
+  model_version: string;
+  count: number;
+  min_kickoff?: string | null;
+  max_kickoff?: string | null;
+}
+
+export const getMarketFlowModelVersions = () =>
+  api.get("/market-flow/predictions/model-versions").then((r) => r.data as { data: MarketFlowModelVersionItem[] });
+
+export const predictMarketFlow = (params?: { date?: string; overwrite?: boolean }) =>
+  api.post("/admin/predict-market-flow", null, { params }).then((r) => r.data);
 
 export default api;

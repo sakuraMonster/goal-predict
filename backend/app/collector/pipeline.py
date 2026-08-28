@@ -427,6 +427,7 @@ class SyncPipeline:
 
                         fx_id = None
                         is_swapped = False
+                        fixture_pool = sm_fixtures
 
                         # ── 策略 A：双方有 SM ID 时，用参与者 ID 精确匹配 ──
                         home_sm_id = match.home_team.sportmonks_id if match.home_team else None
@@ -623,6 +624,72 @@ class SyncPipeline:
                                     is_swapped = True
                                     break
 
+                        if not fx_id and home_sm_id and away_sm_id:
+                            try:
+                                date_from = (d - timedelta(days=10)).strftime("%Y-%m-%d")
+                                date_to = (d + timedelta(days=10)).strftime("%Y-%m-%d")
+                                extra = await self.sm.get_fixtures_between_for_team(
+                                    date_from, date_to, home_sm_id, includes="participants"
+                                )
+                                extra += await self.sm.get_fixtures_between_for_team(
+                                    date_from, date_to, away_sm_id, includes="participants"
+                                )
+                                if extra:
+                                    seen = {f.get("id") for f in fixture_pool if f.get("id")}
+                                    deduped_extra = []
+                                    for fx in extra:
+                                        fxid = fx.get("id")
+                                        if fxid and fxid not in seen:
+                                            seen.add(fxid)
+                                            deduped_extra.append(fx)
+                                    if deduped_extra:
+                                        fixture_pool = fixture_pool + deduped_extra
+                                        kickoff_utc = match.kickoff_time.replace(tzinfo=None) - timedelta(hours=8)
+                                        best = None
+                                        for fx in deduped_extra:
+                                            participants = fx.get("participants", [])
+                                            if len(participants) < 2:
+                                                continue
+                                            pids = {p.get("id") for p in participants if isinstance(p, dict)}
+                                            if home_sm_id not in pids or away_sm_id not in pids:
+                                                continue
+                                            try:
+                                                start_raw = fx.get("starting_at") or ""
+                                                fx_dt = (
+                                                    datetime.fromisoformat(start_raw.replace("Z", "+00:00")).replace(tzinfo=None)
+                                                    if start_raw.endswith("Z")
+                                                    else datetime.strptime(start_raw[:19], "%Y-%m-%d %H:%M:%S")
+                                                )
+                                            except (ValueError, TypeError):
+                                                fx_dt = None
+                                            diff = abs((fx_dt - kickoff_utc).total_seconds()) if fx_dt else 10**18
+                                            if best is None or diff < best[0]:
+                                                best = (diff, fx, participants)
+                                        if best:
+                                            fx_id = best[1]["id"]
+                                            participants = best[2]
+                                            has_location = False
+                                            for p in participants:
+                                                if not isinstance(p, dict):
+                                                    continue
+                                                pid = p.get("id")
+                                                loc = (p.get("meta") or {}).get("location", "")
+                                                if loc:
+                                                    has_location = True
+                                                if pid == home_sm_id and loc == "away":
+                                                    is_swapped = True
+                                                    break
+                                                if pid == away_sm_id and loc == "home":
+                                                    is_swapped = True
+                                                    break
+                                            if not has_location and not is_swapped:
+                                                if (participants[0].get("id") == away_sm_id and
+                                                    participants[1].get("id") == home_sm_id):
+                                                    is_swapped = True
+                            except Exception as e:
+                                api_errors += 1
+                                AppLogger.warning("match_fixtures", f"SportMonks team/between 查询失败: {e}")
+
                         if fx_id:
                             match.sportmonks_fixture_id = fx_id
                             total_matched += 1
@@ -632,7 +699,7 @@ class SyncPipeline:
                                 AppLogger.warning("match_fixtures",
                                     f"赛事 {match.jc_match_id} 主客互换（SportMonks vs 竞彩网 顺序相反，赔率将自动修正）")
                             # 提取球队 logo（image_path）并回填 Team.logo_url
-                            matched_fx = next((f for f in sm_fixtures if f.get("id") == fx_id), None)
+                            matched_fx = next((f for f in fixture_pool if f.get("id") == fx_id), None)
                             if matched_fx:
                                 for p in matched_fx.get("participants", []):
                                     if not isinstance(p, dict):

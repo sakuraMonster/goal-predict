@@ -1342,7 +1342,7 @@ function HistoryReportView() {
                     : "-";
                   // 基于 Model C SNAP 计算命中
                   const cGoalsHit = r.actual_total_goals != null && r.snap_top2_c?.length === 2
-                    ? r.snap_top2_c.includes(Math.min(r.actual_total_goals, 4))
+                    ? r.snap_top2_c.includes(r.actual_total_goals)
                     : null; // null = 无Model C数据或无赛果
                   return (
                     <tr key={i} className="border-t border-parchment hover:bg-highlight">

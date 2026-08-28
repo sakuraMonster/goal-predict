@@ -1,4 +1,0 @@
-1202={"id": 1202, "name_zh": "Alverca", "name_en": "Alverca", "sportmonks_id": 35867, "league_id": 21, "h": 8, "a": 9}
-402_h2h_count=32
-402_match_ref={"h": 14, "a": 18}
-recent_tasks=[{"task_type": "match_fixtures", "status": "success", "start_time": "2026-08-15 01:30:28.144409", "duration_ms": 27054, "msg": "\u6210\u529f\u5339\u914d 0/5 \u573a\u8d5b\u4e8b\u5230 SportMonks\uff0c5 \u573a\u9700\u4eba\u5de5\u5904\u7406"}, {"task_type": "match_fixtures", "status": "success", "start_time": "2026-08-15 01:24:23.068428", "duration_ms": 42584, "msg": "\u624b\u52a8\u8d5b\u4e8b\u5339\u914d\u5b8c\u6210"}, {"task_type": "match_fixtures", "status": "success", "start_time": "2026-08-15 01:24:23.064439", "duration_ms": 41254, "msg": "\u6210\u529f\u5339\u914d 23/28 \u573a\u8d5b\u4e8b\u5230 SportMonks\uff0c5 \u573a\u9700\u4eba\u5de5\u5904\u7406"}]

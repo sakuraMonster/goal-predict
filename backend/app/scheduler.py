@@ -97,6 +97,18 @@ async def _run_update_results():
     print(f"[SCHEDULER] update_results 完成: 比赛日 {date_str}，抓取 {len(results)} 条，更新 {updated} 场", flush=True)
 
 
+async def _run_predict():
+    """赛程同步后自动补跑预测：对未来 48h 内已同步且未开赛的场次生成/更新预测。
+
+    预测不在 sync_matches 之后串行触发（避免锁冲突与长任务阻塞），
+    而是错峰调度在两次 sync_matches（09:00/12:00）之后执行。
+    """
+    print(f"[SCHEDULER] predict 触发", flush=True)
+    from app.api import admin
+    result = await admin.trigger_predict()
+    print(f"[SCHEDULER] predict 完成: {result}", flush=True)
+
+
 def init_scheduler():
     """初始化并启动所有定时任务（在 FastAPI startup 事件中调用，确保事件循环已就绪）"""
     from pytz import timezone
@@ -106,6 +118,10 @@ def init_scheduler():
 
     scheduler.add_job(_run_sync_matches, CronTrigger(hour=9, minute=0, timezone=tz), id="sync_matches_09")
     scheduler.add_job(_run_sync_matches, CronTrigger(hour=12, minute=0, timezone=tz), id="sync_matches_12")
+
+    # 赛程同步后自动补跑预测（覆盖两次同步新增的场次）
+    scheduler.add_job(_run_predict, CronTrigger(hour=9, minute=10, timezone=tz), id="predict_0910")
+    scheduler.add_job(_run_predict, CronTrigger(hour=12, minute=10, timezone=tz), id="predict_1210")
 
     scheduler.add_job(_run_sync_odds, CronTrigger(minute="*/30"), id="sync_odds_30m")
 

@@ -90,6 +90,22 @@ class SportMonksClient:
         data = await self._get_paginated(f"/fixtures/between/{date_from}/{date_to}", params)
         return data
 
+    async def get_fixtures_between_for_team(
+        self, date_from: str, date_to: str, team_id: int, includes: Optional[str] = None
+    ) -> List[Dict]:
+        params = {}
+        if includes:
+            params["include"] = includes
+        data = await self._get_paginated(f"/fixtures/between/{date_from}/{date_to}/{team_id}", params)
+        return data
+
+    async def search_fixtures(self, name: str, includes: Optional[str] = None) -> List[Dict]:
+        params = {}
+        if includes:
+            params["include"] = includes
+        data = await self._get_paginated(f"/fixtures/search/{quote(name)}", params)
+        return data
+
     # ───────────── Leagues ─────────────
 
     async def get_all_leagues(self) -> List[Dict]:

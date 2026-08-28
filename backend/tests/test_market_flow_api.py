@@ -232,6 +232,55 @@ def test_predict_market_flow_ok():
     assert db.preds[1].odds_snapshot_id == 1
 
 
+def test_predict_market_flow_v2_persists_model_version_and_trace_config():
+    db = _FakeSession()
+    db.matches[1] = Match(id=1, kickoff_time=datetime.utcnow(), home_team_id=10, away_team_id=11)
+    db.teams[10] = Team(id=10, name_en="h", style_tag="双弱")
+    db.teams[11] = Team(id=11, name_en="a", style_tag="守差攻中")
+    db.snaps[1] = JczqPlayOddsSnapshot(
+        id=1,
+        match_id=1,
+        snapshot_time=datetime.utcnow(),
+        source="manual_import",
+        had_home=3.45,
+        had_draw=3.16,
+        had_away=1.91,
+        hhad_line=1.0,
+        hhad_home=1.68,
+        hhad_draw=3.6,
+        hhad_away=3.9,
+        ttg_odds_json={"0": 10.5, "1": 4.5, "2": 3, "3": 3.65, "4": 6.5, "5": 14},
+        crs_odds_json={
+            "1-0": 10.5,
+            "2-0": 17,
+            "2-1": 11,
+            "0-0": 10.5,
+            "1-1": 6,
+            "0-1": 7.5,
+            "0-2": 9,
+            "1-2": 7,
+            "0-3": 19,
+            "1-3": 16,
+        },
+    )
+    app = _build_app(db)
+
+    client = TestClient(app)
+    resp = client.post("/api/market-flow/predict/1", json={
+        "odds_snapshot_id": 1,
+        "engine_version": "v2",
+        "config": {"pool_topk": 6},
+    })
+
+    assert resp.status_code == 200
+    out = resp.json()["data"]
+    assert out["trace"]["version"] == "v2"
+    assert out["trace"]["config"]["pool_topk"] == 6
+    assert db.preds[1].model_version == "marketflow_v2"
+    assert isinstance(db.preds[1].trace_json, dict)
+    assert "config" in db.preds[1].trace_json
+
+
 def test_predict_market_flow_snapshot_mismatch():
     db = _FakeSession()
     db.matches[1] = Match(id=1, kickoff_time=datetime.utcnow(), home_team_id=10, away_team_id=11)

@@ -1,2 +1,0 @@
-35867_holder={"id": 1202, "name_zh": "Alverca", "name_en": "Alverca", "sportmonks_id": 35867, "league_id": 21}
-null_sm_count=6

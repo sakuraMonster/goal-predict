@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   getMarketFlowLive,
   getMarketFlowHistory,
@@ -587,7 +587,7 @@ function PredictionCard({ row, onlyPreferred = false, onlyCold = false, ouActive
               <div className="w-full flex items-center gap-1 flex-wrap pt-0.5">
                 {Object.entries(row.ou_sm.lines)
                   .map(([gl, l]) => ({ gl: parseFloat(gl), l }))
-                  .filter(({ gl, l }) => l.direction !== "skip" && Math.abs(gl - (row.ou_sm.goal_line ?? 2.5)) > 1e-9)
+                  .filter(({ gl, l }) => l.direction !== "skip" && Math.abs(gl - (row.ou_sm?.goal_line ?? 2.5)) > 1e-9)
                   .sort((a, b) => a.gl - b.gl)
                   .map(({ gl, l }) => (
                     <span
@@ -688,8 +688,6 @@ function HistoryView() {
   // 按日期统计表格分页：每页 5 天
   const [page, setPage] = useState(1);
   const PAGE_SIZE = 5;
-  // 请求序号守卫：丢弃过期响应，防快速切换档位/日期时的竞态
-  const fetchSeq = useRef(0);
 
   // 用户点 by_date 时，当前日期快速筛选：近3/近7/近14/近30/自定义
   const [quickRange, setQuickRange] = useState<"3d" | "7d" | "14d" | "30d" | "custom">("7d");

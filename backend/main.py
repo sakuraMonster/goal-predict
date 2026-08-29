@@ -28,9 +28,15 @@ if sys.platform == "win32":
 
 app = FastAPI(title="竞彩足球预测系统", version="0.1.0")
 
+def _parse_cors_origins(raw: str | None) -> list[str]:
+    """解析 CORS_ORIGINS 环境变量（逗号分隔），留空时回退本地开发地址"""
+    if not raw:
+        return ["http://localhost:5173"]
+    return [o.strip() for o in raw.split(",") if o.strip()]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=_parse_cors_origins(os.getenv("CORS_ORIGINS")),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

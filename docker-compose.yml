@@ -1,33 +1,70 @@
-version: "3.9"
+# 生产部署编排：PostgreSQL + Redis + 后端 API + 前端 Nginx
+# 使用前：在项目根目录创建 .env（参考下方变量），然后 docker compose up -d --build
+# 必需环境变量：
+#   POSTGRES_PASSWORD  - 数据库密码（务必修改）
+#   REDIS_PASSWORD     - Redis 密码（务必修改）
+#   SPORTMONKS_API_KEY - SportMonks 数据源 Key
+# 可选：
+#   CORS_ORIGINS       - 逗号分隔的允许来源，留空则仅允许 http://localhost:5173
+name: ricking
+
 services:
   db:
     image: postgres:16-alpine
+    restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请在 .env 中设置 POSTGRES_PASSWORD}
       POSTGRES_DB: football_prediction
-    ports:
-      - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d football_prediction"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--requirepass", "${REDIS_PASSWORD:?请在 .env 中设置 REDIS_PASSWORD}"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"${REDIS_PASSWORD}\" ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   backend:
     build: ./backend
-    ports:
-      - "8000:8000"
+    restart: unless-stopped
     environment:
-      DATABASE_URL: postgresql+asyncpg://postgres:postgres@db:5432/football_prediction
-      REDIS_URL: redis://:hdpos4@172.17.2.84:6379/2
+      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD}@db:5432/football_prediction
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      SPORTMONKS_API_KEY: ${SPORTMONKS_API_KEY:?请在 .env 中设置 SPORTMONKS_API_KEY}
+      SPORTMONKS_BASE_URL: https://api.sportmonks.com/v3
+      CORS_ORIGINS: ${CORS_ORIGINS:-}
     depends_on:
-      - db
-    volumes:
-      - ./backend:/app
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health', timeout=5)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
 
   frontend:
     build: ./frontend
+    restart: unless-stopped
     ports:
-      - "5173:5173"
+      - "80:80"
     depends_on:
       - backend
 
 volumes:
   pgdata:
+  redisdata:

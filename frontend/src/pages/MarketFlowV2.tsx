@@ -1,14 +1,24 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Component, Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   getMarketFlowLive,
   getMarketFlowHistory,
+  getMarketFlowOuHistory,
+  getMarketFlowParlay,
+  getMarketFlowParlayD,
+  getMarketFlowParlayDir,
   getMarketFlowPools,
+  getPlanReadiness,
   predictMarketFlow,
   syncMarketFlowOdds,
   syncMarketFlowSmOdds,
   type MarketFlowLiveSummary,
   type MarketFlowPredictionItem,
   type MarketFlowHistorySummary,
+  type MarketFlowOuHistoryResponse,
+  type MarketFlowOuMatch,
+  type MarketFlowParlayResponse,
+  type MarketFlowParlayLeg,
+  type MarketFlowPlanReadiness,
   type MarketFlowPoolsResponse,
 } from "../api/client";
 import SkeletonCard from "../components/Skeleton";
@@ -16,13 +26,15 @@ import EmptyState from "../components/EmptyState";
 import ErrorState from "../components/ErrorState";
 import { useToast } from "../components/Toast";
 
-type TabKey = "live" | "history" | "pools";
+type TabKey = "live" | "history" | "ou_history" | "pools" | "parlay";
 type HistoryView = "by_league" | "by_date";
 
 const TAB_LABELS: Record<TabKey, string> = {
   live: "当日预测",
   history: "历史报告",
+  ou_history: "大小球/盘口报告",
   pools: "池化分析",
+  parlay: "串关推荐",
 };
 
 const OUTCOME_LABEL: Record<string, string> = {
@@ -63,25 +75,35 @@ function outcomeColor(outcome: "home" | "draw" | "away" | string, hit?: boolean 
 
 export default function MarketFlowV2Page() {
   const [tab, setTab] = useState<TabKey>("live");
+  // 懒挂载 + 保持挂载：首次访问某 tab 时才加载，之后切走/切回不再重新请求（CSS hidden 保留 DOM 与状态）
+  const [mountedTabs, setMountedTabs] = useState<Set<TabKey>>(new Set(["live"]));
+  const switchTab = (k: TabKey) => {
+    setTab(k);
+    setMountedTabs((prev) => (prev.has(k) ? prev : new Set(prev).add(k)));
+  };
   return (
     <div className="p-4 max-w-[1440px] mx-auto">
       <div className="flex items-center gap-4 mb-4 flex-wrap">
         <h1 className="text-lg font-bold font-heading tracking-wide text-ink">MarketFlow V2 · 方向与比分预测</h1>
         <div className="flex gap-0.5 bg-parchment-dark rounded p-0.5 font-body text-xs">
-          {(["live", "history", "pools"] as const).map((k) => (
+          {(["live", "history", "ou_history", "pools", "parlay"] as const).map((k) => (
             <span
               key={k}
               className={`px-3.5 py-1.5 rounded cursor-pointer transition-colors ${
                 tab === k ? "bg-white text-ink font-semibold shadow-sm" : "text-ink-muted"
               }`}
-              onClick={() => setTab(k)}
+              onClick={() => switchTab(k)}
             >
               {TAB_LABELS[k]}
             </span>
           ))}
         </div>
       </div>
-      {tab === "live" ? <LiveView /> : tab === "history" ? <HistoryView /> : <PoolsView />}
+      <div className={tab === "live" ? "" : "hidden"}>{mountedTabs.has("live") && <LiveView />}</div>
+      <div className={tab === "history" ? "" : "hidden"}>{mountedTabs.has("history") && <HistoryView />}</div>
+      <div className={tab === "ou_history" ? "" : "hidden"}>{mountedTabs.has("ou_history") && <OuHistoryView />}</div>
+      <div className={tab === "pools" ? "" : "hidden"}>{mountedTabs.has("pools") && <PoolsView />}</div>
+      <div className={tab === "parlay" ? "" : "hidden"}>{mountedTabs.has("parlay") && <ParlayBoundary><ParlayView /></ParlayBoundary>}</div>
     </div>
   );
 }
@@ -1143,6 +1165,586 @@ function HistoryView() {
       </div>
     </div>
   );
+}
+
+// =========== 大小球方向 / O/U 盘口 · 独立历史报告（标准 / 严格两档） ===========
+function OuHistoryView() {
+  const [start, setStart] = useState<string>(() => {
+    const d = new Date(); d.setDate(d.getDate() - 6);
+    return d.toISOString().slice(0, 10);
+  });
+  const [end, setEnd] = useState<string>(() => {
+    const d = new Date();
+    return d.toISOString().slice(0, 10);
+  });
+  const [data, setData] = useState<MarketFlowOuHistoryResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [quickRange, setQuickRange] = useState<"7d" | "30d" | "custom">("7d");
+  // 展开的按比赛日明细（记录已展开的日期）
+  const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+
+  const fetchData = useCallback(() => {
+    setLoading(true);
+    setError(null);
+    getMarketFlowOuHistory({ start_date: start, end_date: end })
+      .then(setData)
+      .catch(() => setError("加载失败"))
+      .finally(() => setLoading(false));
+  }, [start, end]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  // 快速日期范围切换（改变 start/end 后自动触发 fetchData）
+  useEffect(() => {
+    if (quickRange === "custom") return;
+    const days = quickRange === "7d" ? 7 : 30;
+    const today = new Date();
+    const d = new Date(); d.setDate(d.getDate() - (days - 1));
+    const newStart = d.toISOString().slice(0, 10);
+    const newEnd = today.toISOString().slice(0, 10);
+    if (newStart !== start) setStart(newStart);
+    if (newEnd !== end) setEnd(newEnd);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [quickRange]);
+
+  const rateOf = (st?: any) => (st && st.settled > 0 ? (st.hit / st.settled) * 100 : null);
+  const coverageOf = (st?: any) => (st && st.signal > 0 ? (st.bet / st.signal) * 100 : null);
+
+  if (loading) return <div className="h-64 bg-parchment-light rounded animate-pulse" />;
+  if (error) return <ErrorState message={error} onRetry={fetchData} />;
+  if (!data) return <EmptyState icon="📊" message="暂无大小球/O/U 历史报告数据" />;
+
+  const card = (title: string, desc: string, st?: any, highlight = false) => {
+    const rate = rateOf(st);
+    const cov = coverageOf(st);
+    const color = rate == null ? "text-ink-light" : rate >= 70 ? "text-moss" : rate >= 60 ? "text-amber" : "text-rust";
+    return (
+      <div className={`flex-1 min-w-[170px] bg-white rounded-md border p-3 text-center font-body ${highlight ? "border-moss shadow-sm bg-moss/[0.03]" : "border-border"}`}>
+        <div className="text-[10px] tracking-wide text-ink-light">{title}</div>
+        <div className={`text-2xl font-bold font-heading mt-0.5 leading-tight ${color}`}>
+          {rate == null ? "-" : `${rate.toFixed(1)}%`}
+        </div>
+        <div className="text-[10px] text-ink-muted mt-0.5">
+          {st && st.signal > 0
+            ? `命中 ${st.hit}/${st.settled} · 跳过 ${st.skip} · 覆盖 ${cov == null ? "-" : cov.toFixed(0)}%`
+            : "无信号"}
+        </div>
+        <div className="text-[9px] text-ink-light mt-0.5">{desc}</div>
+      </div>
+    );
+  };
+
+  const cell = (st?: any) => {
+    const rate = rateOf(st);
+    const color = rate == null
+      ? "text-ink-light"
+      : rate >= 70
+        ? "bg-moss/20 text-moss font-bold"
+        : rate >= 60
+          ? "bg-moss/10 text-moss font-semibold"
+          : "bg-rust/10 text-rust";
+    return (
+      <td className="px-4 py-2 whitespace-nowrap">
+        {st && st.signal > 0 ? (
+          <span className={`px-1.5 py-0.5 rounded border border-current/30 ${color}`}>
+            {st.hit}/{st.settled} <span className="opacity-70">({rate == null ? "-" : rate.toFixed(0)}%)</span>
+          </span>
+        ) : (
+          <span className="text-ink-light">-</span>
+        )}
+      </td>
+    );
+  };
+
+  // 场次明细单元格：方向（大/小/跳过）+ 命中着色（绿=命中 · 红=未命中 · 灰=跳过/未结算）
+  const dirCell = (c?: { direction: string; hit: boolean | null } | null) => {
+    let inner: React.ReactNode;
+    if (!c) {
+      inner = <span className="text-ink-light">-</span>;
+    } else if (c.direction === "skip") {
+      inner = <span className="px-1.5 py-0.5 rounded bg-parchment-light text-ink-muted">跳过</span>;
+    } else {
+      const label = c.direction === "over" ? "大" : "小";
+      const cls = c.hit === true
+        ? "bg-moss/20 text-moss font-bold"
+        : c.hit === false
+          ? "bg-rust/10 text-rust font-semibold"
+          : "bg-parchment-light text-ink-muted";
+      inner = <span className={`px-1.5 py-0.5 rounded border border-current/30 ${cls}`}>{label}</span>;
+    }
+    return <td className="px-4 py-2 whitespace-nowrap">{inner}</td>;
+  };
+
+  // 是否有信号（至少一个档位给出方向，非全跳过）
+  const hasPred = (m: MarketFlowOuMatch) =>
+    (["ou", "ou_sm"] as const).some((k) =>
+      Object.values(m[k] || {}).some((c) => c && c.direction !== "skip")
+    );
+
+  // 单场明细行
+  const matchRow = (m: MarketFlowOuMatch, idx: number) => (
+    <tr key={idx} className="border-t border-highlight/60 hover:bg-highlight/40">
+      <td className="px-4 pl-8 py-2 whitespace-nowrap">
+        <span className="font-mono text-[11px] text-ink">{m.match_num || "-"}</span>
+        <span className="text-[10px] text-ink-light ml-1.5">{m.kickoff_time?.slice(11, 16) || ""}</span>
+      </td>
+      <td className="px-4 py-2 text-[11px] text-ink-light">{m.league_name || "-"}</td>
+      <td className="px-4 py-2 text-[11px] text-ink whitespace-nowrap">
+        {m.home_team || "?"} <span className="text-ink-muted">vs</span> {m.away_team || "?"}
+      </td>
+      <td className="px-4 py-2 font-mono text-[11px] text-ink whitespace-nowrap">{m.actual_score || "-"}</td>
+      {dirCell(m.ou?.standard)}
+      {dirCell(m.ou?.strict)}
+      {dirCell(m.ou_sm?.standard)}
+      {dirCell(m.ou_sm?.strict)}
+    </tr>
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3 px-4 py-3 bg-parchment-dark rounded-lg border border-border-dark flex-wrap">
+        <span className="flex items-center gap-2 text-xs text-moss font-semibold">
+          <span className="w-2 h-2 rounded-full bg-moss" />
+          大小球方向 / O/U 盘口 · 独立历史报告
+        </span>
+        <span className="text-xs text-ink-muted">
+          {data.window_start?.slice(0, 10) || "-"} ~ {data.window_end?.slice(0, 10) || "-"}
+          {" · "} 窗口 {data.n_total} 场 · 已结算 {data.n_settled}
+        </span>
+        <div className="ml-auto flex items-center gap-2 flex-wrap">
+          <select
+            value={quickRange}
+            onChange={(e) => setQuickRange(e.target.value as any)}
+            className="text-xs text-ink bg-white border border-border rounded-md px-2 py-1 outline-none"
+          >
+            <option value="7d">近 7 日</option>
+            <option value="30d">近 30 日</option>
+            <option value="custom">自定义范围</option>
+          </select>
+          <input type="date" value={start} max={end} onChange={(e) => { setStart(e.target.value); setQuickRange("custom"); }}
+            className="font-mono text-xs text-ink bg-white border border-border rounded-md px-2 py-1 outline-none [color-scheme:light]" />
+          <span className="text-ink-muted text-xs">至</span>
+          <input type="date" value={end} onChange={(e) => { setEnd(e.target.value); setQuickRange("custom"); }}
+            className="font-mono text-xs text-ink bg-white border border-border rounded-md px-2 py-1 outline-none [color-scheme:light]" />
+          <button onClick={fetchData}
+            className="px-3 py-1.5 text-xs text-ink-muted border border-border rounded hover:border-moss transition-colors">刷新</button>
+        </div>
+      </div>
+
+      {/* 汇总：大小球方向 / O/U 盘口 × 标准 / 严格 */}
+      <div className="flex gap-3 flex-wrap">
+        {card("大小球方向 · 标准", "P大≥.62 / ≤.38 判向", data.totals.ou?.standard)}
+        {card("大小球方向 · 严格", "P大≥.65 / ≤.35 判向", data.totals.ou?.strict, true)}
+        {card("O/U盘口 · 标准", "|Δ|≥.10 判向", data.totals.ou_sm?.standard)}
+        {card("O/U盘口 · 严格", "|Δ|≥.15 判向", data.totals.ou_sm?.strict, true)}
+      </div>
+
+      <div className="bg-white rounded-md border border-border overflow-hidden">
+        <div className="px-4 py-3 border-b border-highlight bg-parchment-light/60 flex items-center gap-3 flex-wrap">
+          <span className="text-xs font-bold text-ink-light uppercase tracking-wide">按比赛日统计</span>
+          <span className="text-[10px] text-ink-light">命中/结算(命中率) · 绿≥60% · 深绿≥70% · 红{"<"}60%</span>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-xs font-body">
+            <thead>
+              <tr className="bg-parchment-dark/60 text-ink-muted">
+                <th className="text-left font-semibold px-4 py-2 whitespace-nowrap">日期</th>
+                <th className="text-left font-semibold px-4 py-2 whitespace-nowrap">场次</th>
+                <th className="text-left font-semibold px-4 py-2 whitespace-nowrap">大小球·标准</th>
+                <th className="text-left font-semibold px-4 py-2 whitespace-nowrap">大小球·严格</th>
+                <th className="text-left font-semibold px-4 py-2 whitespace-nowrap">O/U盘口·标准</th>
+                <th className="text-left font-semibold px-4 py-2 whitespace-nowrap">O/U盘口·严格</th>
+              </tr>
+            </thead>
+            <tbody>
+              {data.by_date.map((d) => (
+                <Fragment key={d.date}>
+                  <tr
+                    className={`border-t border-highlight cursor-pointer transition-colors ${expanded[d.date] ? "bg-parchment-light/70" : "hover:bg-highlight/60"}`}
+                    onClick={() => setExpanded((prev) => ({ ...prev, [d.date]: !prev[d.date] }))}
+                  >
+                    <td className="px-4 py-2 whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span className={`text-[9px] text-ink-muted transition-transform ${expanded[d.date] ? "rotate-90" : ""}`}>▶</span>
+                        <span className="font-mono text-[11px] text-ink">{d.date}</span>
+                      </span>
+                    </td>
+                    <td className="px-4 py-2 text-ink-muted">{d.n}</td>
+                    {cell(d.ou?.standard)}
+                    {cell(d.ou?.strict)}
+                    {cell(d.ou_sm?.standard)}
+                    {cell(d.ou_sm?.strict)}
+                  </tr>
+                  {expanded[d.date] && (
+                    <tr className="border-t border-highlight/50 bg-highlight/20">
+                      <td colSpan={6} className="px-0 py-0">
+                        <table className="min-w-full text-xs font-body">
+                          <thead>
+                            <tr className="bg-parchment-dark/40 text-ink-muted">
+                              <th className="text-left font-semibold px-4 pl-8 py-1.5 whitespace-nowrap">场次</th>
+                              <th className="text-left font-semibold px-4 py-1.5 whitespace-nowrap">联赛</th>
+                              <th className="text-left font-semibold px-4 py-1.5 whitespace-nowrap">对阵</th>
+                              <th className="text-left font-semibold px-4 py-1.5 whitespace-nowrap">比分</th>
+                              <th className="text-left font-semibold px-4 py-1.5 whitespace-nowrap">大小球·标准</th>
+                              <th className="text-left font-semibold px-4 py-1.5 whitespace-nowrap">大小球·严格</th>
+                              <th className="text-left font-semibold px-4 py-1.5 whitespace-nowrap">O/U盘口·标准</th>
+                              <th className="text-left font-semibold px-4 py-1.5 whitespace-nowrap">O/U盘口·严格</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {d.matches.filter(hasPred).map((m, i) => matchRow(m, i))}
+                            {d.matches.every((m) => !hasPred(m)) && (
+                              <tr><td colSpan={8} className="px-4 py-3 text-center text-ink-light">该日无有信号场次（全部跳过）</td></tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+              ))}
+              {data.by_date.length === 0 && (
+                <tr><td colSpan={6} className="px-4 py-8 text-center text-ink-light">该区间暂无已结算预测</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// =========== 串关推荐（3串1 = 2场进球数3选 + 1场方向优选胜平负单关） ===========
+function ParlayView() {
+  const today = () => { const d = new Date(); return d.toISOString().slice(0, 10); };
+  const [mode, setMode] = useState<"day" | "range">("range");
+  const [subTab, setSubTab] = useState<"all" | "d" | "dir">("all");  // 方案：全方向 / 进球+半全场+方向 / 方向二串一
+  const [date, setDate] = useState<string>(today);
+  const [start, setStart] = useState<string>(() => { const d = new Date(); d.setDate(d.getDate() - 6); return d.toISOString().slice(0, 10); });
+  const [end, setEnd] = useState<string>(today);
+  const [data, setData] = useState<MarketFlowParlayResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  // 生成方案：同步当日赔率 → 执行预测 → 生成三方案；无方案时显示就绪度原因（不自动回退历史）
+  const [planBoard, setPlanBoard] = useState<{ date: string; a: MarketFlowParlayResponse; d: MarketFlowParlayResponse; c: MarketFlowParlayResponse; readiness?: MarketFlowPlanReadiness | null } | null>(null);
+  const [generating, setGenerating] = useState(false);
+
+  // 方案切换缓存：按「方案 + 窗口」缓存，切 tab 命中缓存不重新查询，仅「刷新」强制重查
+  const cacheRef = useRef<Map<string, MarketFlowParlayResponse>>(new Map());
+  const cacheKey = useMemo(() => {
+    const win = mode === "day" ? `day:${date}` : `range:${start}:${end}`;
+    return `${subTab}:${win}`;
+  }, [mode, subTab, date, start, end]);
+
+  const fetchData = useCallback((force = false) => {
+    if (!force) {
+      const cached = cacheRef.current.get(cacheKey);
+      if (cached) {
+        setData(cached);
+        setError(null);
+        setLoading(false);
+        return;
+      }
+    }
+    setLoading(true);
+    setError(null);
+    const base = mode === "day" ? { date } : { start_date: start, end_date: end };
+    const req = subTab === "dir"
+      ? getMarketFlowParlayDir(base)
+      : subTab === "d"
+        ? getMarketFlowParlayD(base)
+        : getMarketFlowParlay(base);
+    req
+      .then((res) => {
+        cacheRef.current.set(cacheKey, res);
+        setData(res);
+      })
+      .catch(() => setError("加载失败"))
+      .finally(() => setLoading(false));
+  }, [cacheKey, mode, subTab, date, start, end]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
+
+  // 生成方案：同步当日赔率（TTG/HAFU + SM O/U）→ 执行 MarketFlow 预测 → 生成 A/D/C 三方案；
+  // 有方案无推荐时拉取就绪度接口，在卡片上显示缺失原因（不自动回退历史日期）
+  const genPlans = useCallback(async () => {
+    setGenerating(true);
+    setError(null);
+    try {
+      const d = mode === "day" ? date : today();
+      // 1) 同步当日赔率（竞彩 TTG/HAD/HAFU + SportMonks O/U）
+      await syncMarketFlowOdds({ date: d });
+      await syncMarketFlowSmOdds({ date: d });
+      // 2) 执行 MarketFlow 批量预测（覆盖式）
+      await predictMarketFlow({ date: d, overwrite: true });
+      // 3) 拉取三方案
+      const [a, dRes, c] = await Promise.all([
+        getMarketFlowParlay({ date: d }),
+        getMarketFlowParlayD({ date: d }),
+        getMarketFlowParlayDir({ date: d }),
+      ]);
+      // 4) 任一方案为空 → 获取就绪度原因展示
+      let readiness: MarketFlowPlanReadiness | null = null;
+      if (a.picks.length === 0 || dRes.picks.length === 0 || c.picks.length === 0) {
+        try {
+          readiness = await getPlanReadiness({ date: d });
+        } catch {
+          readiness = null;
+        }
+      }
+      setPlanBoard({ date: d, a, d: dRes, c, readiness });
+    } catch {
+      setError("生成方案失败");
+    } finally {
+      setGenerating(false);
+    }
+  }, [mode, date]);
+
+  if (loading) return <div className="h-64 bg-parchment-light rounded animate-pulse" />;
+  if (error) return <ErrorState message={error} onRetry={fetchData} />;
+  if (!data) return <EmptyState icon="🧩" message="暂无串关推荐数据" />;
+
+  const st = data.stats;
+
+  const legCard = (lg: MarketFlowParlayLeg) => (
+    <div className="flex-1 min-w-[220px] bg-parchment-light/50 rounded-md border border-highlight p-3">
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="font-mono text-[11px] text-ink">{lg.match_num || "-"}</span>
+        <span className="text-[10px] text-ink-light">{lg.league_name || ""}</span>
+        <span className={`ml-auto text-[10px] px-1.5 py-0.5 rounded ${lg.kind === "goals"
+            ? "bg-amber/15 text-amber"
+            : lg.kind === "hafu" || lg.source === "favorite_hafu" ? "bg-sand/15 text-sand" : "bg-moss/15 text-moss"
+          }`}>
+          {lg.kind === "goals" ? `进球${lg.top3?.length ?? 3}选` : lg.kind === "hafu" || lg.source === "favorite_hafu" ? "半全场" : "方向优选"}
+        </span>
+      </div>
+      <div className="text-[12px] text-ink mt-1">{lg.home_team || "?"} <span className="text-ink-muted text-[10px]">vs</span> {lg.away_team || "?"}</div>
+      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+        <span className="font-heading font-bold text-[15px] text-ink">{lg.pick}</span>
+        <span className="text-[10px] text-ink-muted">赔率 {lg.odds.toFixed(2)}</span>
+        <span className="text-[10px] text-ink-muted">p_hat {Math.round(lg.p_hat * 100)}%</span>
+        {lg.kind === "goals" && (
+          <span className="text-[10px] text-ink-light">
+            {lg.dir === "over" ? "判大" : "判小"}{lg.exp_total != null ? ` · 期望${lg.exp_total.toFixed(1)}球` : ""}
+          </span>
+        )}
+        {lg.hit == null ? (
+          <span className="text-[10px] text-ink-light bg-parchment-dark rounded px-1.5 py-0.5">未结算</span>
+        ) : lg.hit ? (
+          <span className="text-[10px] text-moss font-bold bg-moss/10 rounded px-1.5 py-0.5">命中 {lg.actual}</span>
+        ) : (
+          <span className="text-[10px] text-rust font-bold bg-rust/10 rounded px-1.5 py-0.5">未中 {lg.actual}</span>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center gap-3 px-4 py-3 bg-parchment-dark rounded-lg border border-border-dark flex-wrap">
+        <span className="flex items-center gap-2 text-xs text-moss font-semibold">
+          <span className="w-2 h-2 rounded-full bg-moss" />
+          {subTab === "dir"
+            ? "串关推荐 · 方向优选二串一（2串1，串关赔率 4~10 倍）"
+            : subTab === "d"
+              ? "串关推荐 · 3串1（1场进球数3选 + 1场半全场 + 1场方向优选）· 方案D，串关赔率 5~15 倍"
+              : "串关推荐 · 3串1（2场进球数3选 + 1场高置信方向优选）· 方案A：进球腿大小球均可"}
+        </span>
+        <span className="text-xs text-ink-muted">窗口 {data.window_start?.slice(0, 10) || "-"} ~ {data.window_end?.slice(0, 10) || "-"}</span>
+        <button onClick={genPlans} disabled={generating}
+          className="px-3 py-1.5 text-xs bg-amber text-white rounded hover:bg-amber/90 transition-colors disabled:opacity-50 font-semibold"
+          title="同步当日赔率（TTG/HAFU + SM O/U）→ 执行 MarketFlow 预测 → 生成方案A/D/C推荐">
+          {generating ? "同步赔率生成中..." : "生成方案"}
+        </button>
+        <div className="ml-auto flex items-center gap-2 flex-wrap">
+          <div className="flex gap-0.5 bg-white rounded p-0.5 border border-border text-[11px]">
+            {([["all", "方案A·全方向"], ["d", "方案D·进球半全场"], ["dir", "方案C·方向二串一"]] as const).map(([k, label]) => (
+              <span key={k} className={`px-2 py-0.5 rounded cursor-pointer ${subTab === k ? "bg-amber text-white font-semibold" : "text-ink-muted"}`}
+                onClick={() => setSubTab(k)}>{label}</span>
+            ))}
+          </div>
+          <div className="flex gap-0.5 bg-white rounded p-0.5 border border-border text-[11px]">
+            {(["range", "day"] as const).map((m) => (
+              <span key={m} className={`px-2 py-0.5 rounded cursor-pointer ${mode === m ? "bg-moss text-white" : "text-ink-muted"}`}
+                onClick={() => setMode(m)}>{m === "range" ? "区间回测" : "单日推荐"}</span>
+            ))}
+          </div>
+          {mode === "day" ? (
+            <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
+              className="font-mono text-xs text-ink bg-white border border-border rounded-md px-2 py-1 outline-none [color-scheme:light]" />
+          ) : (
+            <>
+              <input type="date" value={start} max={end} onChange={(e) => setStart(e.target.value)}
+                className="font-mono text-xs text-ink bg-white border border-border rounded-md px-2 py-1 outline-none [color-scheme:light]" />
+              <span className="text-ink-muted text-xs">至</span>
+              <input type="date" value={end} onChange={(e) => setEnd(e.target.value)}
+                className="font-mono text-xs text-ink bg-white border border-border rounded-md px-2 py-1 outline-none [color-scheme:light]" />
+            </>
+          )}
+          <button onClick={() => fetchData(true)}
+            className="px-3 py-1.5 text-xs text-ink-muted border border-border rounded hover:border-moss transition-colors">刷新</button>
+        </div>
+      </div>
+
+      {/* 汇总 */}
+      <div className="flex gap-3 flex-wrap">
+        <StatBox label="已结算串关" value={String(st.n)} sub={`命中 ${st.hit}`} />
+        <StatBox label="串关命中率 p_hit" value={st.p_hit == null ? "-" : `${(st.p_hit * 100).toFixed(1)}%`}
+          sub={`盈亏平衡 ${st.avg_odds ? `${(100 / st.avg_odds).toFixed(1)}%` : "-"}`} highlight={st.p_hit != null && st.p_hit >= 0.4} />
+        <StatBox label="平均赔率" value={st.avg_odds == null ? "-" : st.avg_odds.toFixed(2)} />
+        <StatBox label="ROI（返奖/下注）" value={st.roi == null ? "-" : `${(st.roi * 100).toFixed(1)}%`}
+          sub={st.roi != null ? (st.roi > 1 ? "正收益" : st.roi < 1 ? "负收益" : "盈亏平衡") : undefined}
+          highlight={st.roi != null && st.roi > 1} />
+      </div>
+
+      {/* 今日三方案（生成方案按钮结果） */}
+      {planBoard && (
+        <div className="bg-white rounded-md border border-border overflow-hidden">
+          <div className="px-4 py-3 border-b border-highlight bg-parchment-light/60 flex items-center gap-3 flex-wrap">
+            <span className="text-xs font-bold text-ink-light uppercase tracking-wide">方案生成 · {planBoard.date}</span>
+            <span className="text-[10px] text-ink-light">流程：同步当日赔率 → 执行预测 → 生成三方案 · 每串按竞彩复式实际返奖口径（进球3选=3注）</span>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-3">
+            {([
+              ["A", planBoard.a, "方案A · 全方向", "2进球3选 + 1方向"],
+              ["D", planBoard.d, "方案D · 进球半全场", "1进球3选 + 1半全场 + 1方向"],
+              ["C", planBoard.c, "方案C · 方向二串一", "1半全场 + 1胜平负"],
+            ] as const).map(([k, res, label, sub]) => {
+              const s = res.stats;
+              const reason = planBoard.readiness
+                ? planBoard.readiness.plans[k === "A" ? "plan_a" : k === "D" ? "plan_d" : "plan_c"].reason
+                : null;
+              return (
+                <div key={k} className="border border-highlight rounded-md p-3 bg-parchment-light/30">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="text-xs font-bold text-ink">{label}</span>
+                    <span className="text-[10px] text-ink-light">{s.hit}/{s.n} 命中</span>
+                  </div>
+                  <div className="text-[10px] text-ink-light mt-0.5">{sub}</div>
+                  {res.picks.length === 0 ? (
+                    <div className="text-[11px] text-rust mt-2">{reason ?? "当日无推荐"}</div>
+                  ) : (
+                    <div className="mt-2 space-y-2">
+                      {res.picks.map((p) => (
+                        <div key={p.pick_id ?? `${k}-${p.matchday}`} className="border-t border-highlight pt-2 first:border-t-0 first:pt-0">
+                          <div className="flex items-center gap-1.5 flex-wrap text-[11px]">
+                            <span className={`font-bold ${p.hit === true ? "text-moss" : p.hit === false ? "text-rust" : "text-ink-light"}`}>
+                              {p.hit === true ? "✓ 命中" : p.hit === false ? "✗ 未中" : "· 未结算"}
+                            </span>
+                            <span className="text-ink">串关 {p.parlay_odds.toFixed(2)}</span>
+                            <span className="text-ink-muted">p_hat {(p.parlay_p_hat * 100).toFixed(1)}%</span>
+                            {p.roi != null && <span className="text-ink-light">单场ROI {p.roi.toFixed(2)}</span>}
+                          </div>
+                          <div className="text-[10px] text-ink-muted mt-1">
+                            {p.legs.map((lg) => `${lg.home_team ?? "?"}vs${lg.away_team ?? "?"} ${lg.pick}@${lg.odds.toFixed(2)}`).join(" × ")}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 串关列表 */}
+      <div className="bg-white rounded-md border border-border overflow-hidden">
+        <div className="px-4 py-3 border-b border-highlight bg-parchment-light/60 flex items-center gap-3 flex-wrap">
+          <span className="text-xs font-bold text-ink-light uppercase tracking-wide">按比赛日推荐</span>
+          {subTab === "dir" ? (
+            <span className="text-[10px] text-ink-light">半全场腿：不限池，市场隐含概率最高且赔率≥2.0 · 胜平负腿：模糊池正路单选≥1.8 · 每日 1 半全场 + 1 胜平负，串关赔率 {data.min_odds ?? 4}~{data.max_odds ?? 10} 倍</span>
+          ) : subTab === "d" ? (
+            <span className="text-[10px] text-ink-light">进球腿：仅判大，盘口3.5线分层选数 · 半全场腿：不限池，隐含最高且赔率≥2.0 · 方向腿：正路池胜胜/负负 或 模糊池正路单选≥1.8 · 每日 1 进球 + 1 半全场 + 1 方向，串关赔率 {data.min_odds ?? 5}~{data.max_odds ?? 15} 倍</span>
+          ) : (
+            <span className="text-[10px] text-ink-light">进球腿：TTG大小球方向 或 SM O/U盘口 任一信号即可（矛盾跳过）· 方向侧市场Top3选数 · 方向腿：正路池半全场胜胜/负负 或 模糊池正路单选，赔率≥1.8</span>
+          )}
+        </div>
+        {data.picks.length === 0 ? (
+          <div className="px-4 py-8 text-center text-xs text-ink-light">窗口内无满足条件的串关（{subTab === "dir" ? "每日需 ≥2 场高置信方向优选" : subTab === "d" ? "每日需 ≥1 场判大进球 + ≥1 场半全场 + ≥1 场高置信方向" : "每日需 ≥2 场双O/U门控进球 + ≥1 场高置信方向"}）</div>
+        ) : (
+          <div className="divide-y divide-highlight">
+            {[...data.picks].sort((a, b) => b.matchday.localeCompare(a.matchday)).map((p, pi) => (
+              <div key={p.pick_id ?? `${p.matchday}-${pi}`} className="px-4 py-3">
+                <div className="flex items-center gap-3 flex-wrap mb-2">
+                  <span className="font-mono text-xs text-ink font-semibold">{p.matchday}</span>
+                  {p.hit === true ? (
+                    <span className="text-[12px] px-2.5 py-1 rounded bg-red-600 text-white font-extrabold shadow-sm">✓ 全中</span>
+                  ) : p.hit === false ? (
+                    <span className="text-[11px] px-2 py-0.5 rounded bg-rust/10 text-rust font-bold">✗ 未中</span>
+                  ) : (
+                    <span className="text-[11px] px-2 py-0.5 rounded bg-parchment-dark text-ink-muted">未结算</span>
+                  )}
+                  <span className="text-xs text-ink">串关赔率 {p.parlay_odds.toFixed(2)}</span>
+                  {subTab !== "dir" && p.combo_level === "loose" && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber/15 text-amber font-semibold" title="异联赛组合凑不齐，降级为仅两进球腿异联赛">宽松组合</span>
+                  )}
+                  {subTab !== "dir" && p.combo_level === "fallback" && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-rust/10 text-rust font-semibold" title="异联赛约束无法满足，兜底无约束组合">兜底组合</span>
+                  )}
+                  {subTab !== "dir" && p.combo_level === "strict" && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-moss/10 text-moss font-semibold" title="三腿全部不同联赛">全异联赛</span>
+                  )}
+                  {subTab !== "dir" && p.combo_level === "goal_backfill" && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-sand/15 text-sand font-semibold" title="大小球方向信号不足，用第二方向腿候补（1进球 + 2方向）">进球候补</span>
+                  )}
+                  {subTab === "dir" && p.in_range === false && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber/15 text-amber font-semibold">赔率偏离 {data.min_odds ?? 4}~{data.max_odds ?? 10}（退化）</span>
+                  )}
+                  {subTab === "d" && p.in_range === false && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber/15 text-amber font-semibold">赔率偏离 {data.min_odds ?? 5}~{data.max_odds ?? 15}（退化）</span>
+                  )}
+                  <span className="text-xs text-ink-muted">预估 p_hat {(p.parlay_p_hat * 100).toFixed(1)}%</span>
+                </div>
+                {p.hit === true && (
+                  <div className="mb-2 text-[11px] font-bold text-red-700 bg-red-50 rounded px-2 py-1 inline-block">
+                    命中赔率计算：{p.legs.map((lg) => `${lg.pick}@${lg.odds.toFixed(2)}`).join(" × ")} = {p.parlay_odds.toFixed(2)}
+                  </div>
+                )}
+                <div className="flex gap-2 flex-wrap">{p.legs.map((lg, i) => (
+                  <Fragment key={`${i}-${lg.match_num ?? ""}-${lg.kind}-${lg.pick}`}>{legCard(lg)}</Fragment>
+                ))}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** 串关推荐错误边界：防止列表渲染异常（如 React commit 阶段 DOM 冲突）导致整页白屏 */
+class ParlayBoundary extends Component<{ children: React.ReactNode }, { error: Error | null }> {
+  state: { error: Error | null } = { error: null };
+
+  static getDerivedStateFromError(error: Error) {
+    return { error };
+  }
+
+  render() {
+    if (this.state.error) {
+      return (
+        <div className="flex items-center justify-center py-20">
+          <div className="text-center bg-white rounded-lg p-8 border border-border max-w-md">
+            <div className="text-4xl mb-2 opacity-30">!</div>
+            <div className="text-base font-bold text-ink mb-1">串关推荐渲染异常</div>
+            <div className="font-body text-xs text-ink-light leading-relaxed mb-3">
+              {String(this.state.error.message || this.state.error)}
+            </div>
+            <button
+              onClick={() => this.setState({ error: null })}
+              className="bg-moss text-white px-4 py-1.5 rounded text-xs hover:bg-moss/90 transition-colors"
+            >
+              重试
+            </button>
+          </div>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
 }
 
 function StatBox({ label, value, sub, highlight }: { label: string; value: string; sub?: string; highlight?: boolean }) {

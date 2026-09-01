@@ -189,6 +189,7 @@ async def _match_and_update(db: AsyncSession, results: list[dict]) -> tuple[int,
     """
     updated = 0
     updated_ids: list[int] = []
+    dirty = False  # 是否有任何改动（含半场比分回填）需要 commit
 
     for r in results:
         home_name = r["home_team"]
@@ -277,6 +278,9 @@ async def _match_and_update(db: AsyncSession, results: list[dict]) -> tuple[int,
         if not matched_pred:
             continue
 
+        half_home = r.get("half_home_score")
+        half_away = r.get("half_away_score")
+
         # 已结算过的不重复更新 Prediction，但 Match 状态/比分仍需同步（幂等）
         if matched_pred.result_spf != 0:
             m = matched_pred.match
@@ -284,6 +288,12 @@ async def _match_and_update(db: AsyncSession, results: list[dict]) -> tuple[int,
                 m.status = "finished"
                 m.home_score = matched_pred.actual_home_score
                 m.away_score = matched_pred.actual_away_score
+                dirty = True
+            # 补充半场比分（串关半全场腿命中判断依赖）
+            if m and (m.half_home_score is None or m.half_away_score is None) and (half_home is not None or half_away is not None):
+                m.half_home_score = half_home
+                m.half_away_score = half_away
+                dirty = True
             continue
 
         actual_score_str = f"{r['home_score']}:{r['away_score']}"
@@ -308,16 +318,19 @@ async def _match_and_update(db: AsyncSession, results: list[dict]) -> tuple[int,
         matched_pred.result_score = _judge_score(actual_score_str, matched_pred.score_top5_json)
 
         # 同步更新 Match 状态与比分（此前只回写 Prediction，导致已完场比赛 status 恒为 scheduled，
-        # 被预测接口当作待预测场次反复重算覆盖）
+        # 被预测接口当作待预测场次反复重算覆盖）；同时写入半场比分供串关半全场腿命中判断
         if matched_pred.match:
             matched_pred.match.status = "finished"
             matched_pred.match.home_score = r["home_score"]
             matched_pred.match.away_score = r["away_score"]
+            if half_home is not None or half_away is not None:
+                matched_pred.match.half_home_score = half_home
+                matched_pred.match.half_away_score = half_away
 
         updated += 1
         updated_ids.append(matched_pred.id)
 
-    if updated > 0:
+    if updated > 0 or dirty:
         await db.commit()
 
     return updated, updated_ids

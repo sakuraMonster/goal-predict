@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Body, Depends
@@ -10,6 +11,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.database import get_db
 from app.db.models import JczqPlayOddsSnapshot, League, MarketFlowPrediction, Match, OddsSnapshot, Prediction, Team
+from app.db.redis_client import (
+    acquire_lock,
+    cache_bump_version,
+    cache_get_json,
+    cache_set_json,
+    cache_version,
+    release_lock,
+)
 from app.predictor.models.market_flow import MarketFlowEngine, MarketFlowEngineV2, _hhad_signal_v2
 from app.predictor.models.ou_direction import DEFAULT_TIER, TIERS, ou_direction_all_tiers
 from app.predictor.models.ou_market import (
@@ -24,6 +33,31 @@ router = APIRouter(prefix="/api/market-flow", tags=["market_flow"])
 
 def _err(msg: str, code: int):
     return JSONResponse(status_code=code, content={"error": msg})
+
+
+def _stake_amount(legs) -> int:
+    """下注注数 = Π(进球腿选数个数)；无进球腿 → 1 注（等额 1 元/注口径）。"""
+    stake = 1
+    for lg in legs:
+        if lg.get("kind") == "goals":
+            stake *= max(1, len(lg.get("top3") or []))
+    return stake
+
+
+def _payout_amount(legs) -> float:
+    """实际返奖金额（等额 1 元/注口径）：任一腿未中 → 0；
+    进球腿按实际命中进球数的单项赔率计算（3选复式，命中数对应的赔率），其余单选腿按自身赔率。"""
+    for lg in legs:
+        if lg["hit"] is not True:
+            return 0.0
+    payout = 1.0
+    for lg in legs:
+        if lg.get("kind") == "goals":
+            po = (lg.get("pick_odds") or {}).get(str(lg.get("actual")))
+            payout *= po if po else lg["odds"]
+        else:
+            payout *= lg["odds"]
+    return round(payout, 4)
 
 
 def _parse_dt(raw: object) -> datetime | None:
@@ -74,6 +108,28 @@ def _mk_mfp_denorm(match: Match) -> dict:
         return {"league_id": match.league_id, "kickoff_time": None, "matchday_date": None}
     md_date = (kdt - timedelta(hours=12)).date()
     return {"league_id": match.league_id, "kickoff_time": kdt, "matchday_date": md_date}
+
+
+def _matchday_date(kickoff_iso: str, match_num: str | None = None) -> str:
+    """竞彩比赛日：优先用 match_num（"周五003"这种）前缀做权威判定。
+    带"周X"前缀的所有场次 = 周X 比赛日（销售期从 12:00 起算，凌晨场归前一天）。
+    无前缀时兜底：kt - 12h 取 date。
+    """
+    import re
+
+    kt = None
+    try:
+        kt = datetime.fromisoformat(kickoff_iso.replace("Z", "+00:00").replace("+00:00", ""))
+    except Exception:
+        return kickoff_iso[:10]
+    if kt.tzinfo is not None:
+        kt = kt.astimezone(timezone.utc).replace(tzinfo=None)
+    if match_num:
+        _m = re.match(r"^(周[一二三四五六日])", match_num)
+        if _m:
+            # 周X 前缀：hr<12 为周X 凌晨场，算前一天的比赛日；否则直接算 kt 日期
+            return (kt - timedelta(days=1)).strftime("%Y-%m-%d") if kt.hour < 12 else kt.strftime("%Y-%m-%d")
+    return (kt - timedelta(hours=12)).strftime("%Y-%m-%d")
 
 
 @router.post("/odds-snapshots")
@@ -153,6 +209,7 @@ async def create_odds_snapshot(payload: dict = Body(...), db: AsyncSession = Dep
         except Exception:
             pass
         return _err("failed to write odds snapshot", 500)
+    await cache_bump_version()  # 赔率快照写入 → 统计缓存失效
 
     return {"data": {"odds_snapshot_id": snap.id}}
 
@@ -293,6 +350,7 @@ async def predict_market_flow(match_id: int, payload: dict = Body(...), db: Asyn
         except Exception:
             pass
         return _err("failed to write marketflow prediction", 500)
+    await cache_bump_version()  # 预测写入 → 统计缓存失效
 
     return {"data": {
         "best_total_goals": result.get("best_total_goals"),
@@ -503,6 +561,7 @@ async def backtest_market_flow(payload: dict = Body(...), db: AsyncSession = Dep
         except Exception:
             pass
         return _err("failed to write marketflow prediction", 500)
+    await cache_bump_version()  # 批量预测写入 → 统计缓存失效
 
     return {"data": {
         "total": total,
@@ -1214,7 +1273,73 @@ def _c_ttg_top3(expected_goals_c, snap_top2_c):
     return base[:3]
 
 
-async def _market_flow_query(db, *, start=None, end=None, model_version=None, source=None, ou_tier=DEFAULT_TIER, ou_sm_tier=OU_M_DEFAULT):
+async def _market_flow_query(db, *, start=None, end=None, model_version=None, source=None, ou_tier=DEFAULT_TIER, ou_sm_tier=OU_M_DEFAULT, use_cache=True):
+    """history 查询入口（带 Redis 缓存）。
+
+    统计类接口（pools/history/ou_history/parlay/parlay-d/parlay-dir）共用本函数，
+    历史窗口内的重算结果是确定性的（预测与赔率快照不变），因此按窗口做 TTL 缓存：
+      - key 带全局版本号（cache_version）→ 预测/赔率/结果写入时 bump 版本号即全部失效；
+      - TTL 兜底非 API 路径的外部写入（定时任务回写比赛结果等）；
+      - Redis 不可用时透明降级为直接查库。
+    use_cache=False 时（当日预测等实时视图）跳过缓存，直接查库。
+    """
+    import asyncio
+    import hashlib
+
+    async def _cache_key() -> str:
+        parts = [
+            start.isoformat() if start else "",
+            end.isoformat() if end else "",
+            model_version or "",
+            source or "",
+            ou_tier,
+            ou_sm_tier,
+        ]
+        digest = hashlib.md5("|".join(parts).encode()).hexdigest()
+        return f"mf:query:v{await cache_version()}:{digest}"
+
+    async def _compute() -> tuple:
+        return await _market_flow_query_raw(
+            db, start=start, end=end, model_version=model_version, source=source,
+            ou_tier=ou_tier, ou_sm_tier=ou_sm_tier,
+        )
+
+    if use_cache:
+        key = await _cache_key()
+        cached = await cache_get_json(key)
+        if cached is not None and isinstance(cached, dict):
+            return cached["items"], cached["ou_stats"], cached["ou_sm_stats"]
+        # 单飞锁：同一窗口的并发请求（如串关 A/D/D 三方案并行拉取）只让一个计算，其余轮询等待读缓存，
+        # 避免同窗口重复跑 1~2s 的 OU 查询。Redis 异常时 acquire 抛错 → 按未抢到锁走兜底计算。
+        lock_key = f"{key}:lock"
+        try:
+            acquired = await acquire_lock(lock_key, expire_seconds=30)
+        except Exception:
+            acquired = False
+        if acquired:
+            try:
+                result = await _compute()
+                await cache_set_json(key, {"items": result[0], "ou_stats": result[1], "ou_sm_stats": result[2]})
+                return result
+            finally:
+                try:
+                    await release_lock(lock_key)
+                except Exception:
+                    pass
+        # 未抢到锁：最多轮询 ~5s 等计算方写入；超时则自己算兜底
+        for _ in range(100):
+            await asyncio.sleep(0.05)
+            cached = await cache_get_json(key)
+            if cached is not None and isinstance(cached, dict):
+                return cached["items"], cached["ou_stats"], cached["ou_sm_stats"]
+        result = await _compute()
+        await cache_set_json(key, {"items": result[0], "ou_stats": result[1], "ou_sm_stats": result[2]})
+        return result
+
+    return await _compute()
+
+
+async def _market_flow_query_raw(db, *, start=None, end=None, model_version=None, source=None, ou_tier=DEFAULT_TIER, ou_sm_tier=OU_M_DEFAULT):
     """history 查询：默认合并『同一算法家族所有批次 MV』（tuned7 + tuned7_0821 ...）。
 
     如果调用方显式传了 model_version = 单一值，则按单一 MV 过滤（兼容旧行为）。
@@ -1280,7 +1405,9 @@ async def _market_flow_query(db, *, start=None, end=None, model_version=None, so
     ou_stats = {t: {"signal": 0, "bet": 0, "skip": 0, "settled": 0, "hit": 0} for t in TIERS}
     ou_sm_stats = {t: {"signal": 0, "bet": 0, "skip": 0, "settled": 0, "hit": 0} for t in OU_M_TIERS}
 
-    # 批量取每场 SportMonks O/U 2.5线行（快照升序传入 → ou_market_from_rows 取最新快照）
+    # 批量取每场 SportMonks O/U 行（ou_market_from_rows 只需每个 (bookmaker, goal_line) 的最新快照）。
+    # 原实现取全量快照（180 天窗口可高达 87 万行 → 750ms+ 传输），改为 DISTINCT ON 每组只取最新行：
+    # 行数从 87 万降到 ~7.5 万（10 倍+），语义等价（同 (bm,line) 多快照后写覆盖 = 取最新）。
     ou_map: dict[int, list] = {}
     if rows:
         mids = [int(row[0].match_id) for row in rows]
@@ -1295,7 +1422,13 @@ async def _market_flow_query(db, *, start=None, end=None, model_version=None, so
                 OddsSnapshot.over_odds.is_not(None),
                 OddsSnapshot.under_odds.is_not(None),
             )
-            .order_by(OddsSnapshot.match_id.asc(), OddsSnapshot.snapshot_time.asc())
+            .distinct(OddsSnapshot.match_id, OddsSnapshot.bookmaker, OddsSnapshot.goal_line)
+            .order_by(
+                OddsSnapshot.match_id.asc(),
+                OddsSnapshot.bookmaker.asc(),
+                OddsSnapshot.goal_line.asc(),
+                OddsSnapshot.snapshot_time.desc(),
+            )
         )
         for r in ou_res:
             ou_map.setdefault(r.match_id, []).append(
@@ -1511,11 +1644,19 @@ async def _market_flow_query(db, *, start=None, end=None, model_version=None, so
             "hhad_pref_odd": hhad_sig.get("pref_odd"),
             "fusion": fused_meta,
             "ou_direction": ou_dir,
+            "ou_all": ou_all,
             "ou_hit": ou_hit,
             "ou_tier": ou_tier,
             "ou_sm": ou_sm_public,
             "ou_sm_hit": ou_sm_hit,
             "ou_sm_tier": ou_sm_tier,
+            "had_odds": {k: _as_float(getattr(snap, f"had_{k}", None)) for k in ("home", "draw", "away")},
+            "ttg_odds": getattr(snap, "ttg_odds_json", None),
+            "hafu_odds": getattr(snap, "hafu_odds_json", None),
+            "half_home_score": getattr(match, "half_home_score", None),
+            "half_away_score": getattr(match, "half_away_score", None),
+            "home_team_id": getattr(match, "home_team_id", None),
+            "away_team_id": getattr(match, "away_team_id", None),
         }
         items.append(item)
     return items, ou_stats, ou_sm_stats
@@ -1543,6 +1684,7 @@ async def market_flow_live_predictions(
     items, ou_stats, ou_sm_stats = await _market_flow_query(
         db, start=start, end=end, model_version=model_version, source=source,
         ou_tier=ou_tier, ou_sm_tier=ou_sm_tier,
+        use_cache=False,  # 当日预测为实时视图，绕过统计缓存
     )
     _ou = ou_stats.get(ou_tier) or {}
     _osm = ou_sm_stats.get(ou_sm_tier) or {}
@@ -1757,39 +1899,6 @@ async def market_flow_history_report(
         ou_tier=ou_tier, ou_sm_tier=ou_sm_tier,
     )
 
-    def _matchday_date(kickoff_iso: str, match_num: str | None = None) -> str:
-        # 竞彩比赛日：优先用 match_num（"周五003"这种）前缀做权威判定
-        # 含义：带"周五"前缀的所有场次 = 周五比赛日，不管开球时间是周五18:00还是周六03:00
-        CN_PREFIX_TO_SHIFT_DAY = {
-            "周一": 0, "周二": 0, "周三": 0, "周四": 0, "周五": 0, "周六": 0, "周日": 0,
-        }
-        if match_num:
-            import re
-            _m = re.match(r"^(周[一二三四五六日])", match_num)
-            if _m:
-                try:
-                    kt = datetime.fromisoformat(kickoff_iso.replace("Z", "+00:00").replace("+00:00", ""))
-                except Exception:
-                    return kickoff_iso[:10]
-                if kt.tzinfo is not None:
-                    kt = kt.astimezone(timezone.utc).replace(tzinfo=None)
-                hr = kt.hour
-                # 周X 前缀的比赛：如果 hr < 12，是周X 凌晨场，算前一天的比赛日（周X 销售期，周X-1的日期）
-                # 如果 hr >= 12，是周X 下午/晚间场，直接算 kt 日期（即 kt[:10]）
-                if hr < 12:
-                    return (kt - _td(days=1)).strftime("%Y-%m-%d")
-                else:
-                    return kt.strftime("%Y-%m-%d")
-        # 兜底：没带 match_num 前缀的，用 D日 12:00 ~ D+1日 11:59 = D比赛日（kt-12h）
-        try:
-            kt = datetime.fromisoformat(kickoff_iso.replace("Z", "+00:00").replace("+00:00", ""))
-        except Exception:
-            return kickoff_iso[:10]
-        if kt.tzinfo is not None:
-            kt = kt.astimezone(timezone.utc).replace(tzinfo=None)
-        kt_shifted = kt - _td(hours=12)
-        return kt_shifted.strftime("%Y-%m-%d")
-
     # 按 (model_version, 比赛日) 做二维汇总，按 league_name 做联赛分组
     group_by_mv: dict[str, dict] = {}
     group_by_date: dict[str, dict] = {}
@@ -1960,6 +2069,1286 @@ async def market_flow_history_report(
         "by_model_version_date": _summary(group_by_mv_date, ("mv", "date")),
     }
     return {"data": items, "summary": overall}
+
+
+@router.get("/predictions/ou-history")
+async def market_flow_ou_history_report(
+    start_date: str | None = None,
+    end_date: str | None = None,
+    model_version: str | None = None,
+    source: str | None = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """大小球方向（TTG 市场定价）与 O/U 盘口（SportMonks）独立历史报告。
+
+    与 /history 区分：固定统计 standard / strict 两档门槛，
+    按比赛日聚合每个组合的 注数/跳过/结算/命中（口径与 _market_flow_query 的 ou_stats 一致）。
+    """
+    if start_date or end_date:
+        try:
+            s0 = datetime.fromisoformat(start_date) if start_date else None
+            e0 = datetime.fromisoformat(end_date) if end_date else None
+        except ValueError:
+            return _err("start_date/end_date must be ISO date string", 400)
+        start = s0.replace(hour=12, minute=0, second=0, microsecond=0) if s0 else None
+        end = (e0.replace(hour=11, minute=59, second=59, microsecond=0) + timedelta(days=1)) if e0 else None
+    else:
+        end = datetime.now().replace(hour=12, minute=0, second=0, microsecond=0)
+        start = end - timedelta(days=28)
+
+    items, _ou_stats, _ou_sm_stats = await _market_flow_query(
+        db, start=start, end=end, model_version=model_version, source=source,
+        ou_tier=DEFAULT_TIER, ou_sm_tier=OU_M_DEFAULT,
+    )
+
+    OU_TIER_KEYS = ("standard", "strict")
+
+    def _blank() -> dict:
+        return {t: {"signal": 0, "bet": 0, "skip": 0, "settled": 0, "hit": 0} for t in OU_TIER_KEYS}
+
+    totals: dict[str, dict] = {"ou": _blank(), "ou_sm": _blank()}
+    by_date: dict[str, dict] = {}
+    n_settled = 0
+
+    def _match_cell(direction, actual_over):
+        # 单档位场次明细：direction + 命中标记（skip / 未结算时 hit=None）
+        hit = None
+        if direction != "skip" and actual_over is not None:
+            hit = (direction == "over") == actual_over
+        return {"direction": direction, "hit": hit}
+
+    for it in items:
+        if it["actual_outcome"] is None:
+            continue
+        n_settled += 1
+        d = by_date.setdefault(
+            _matchday_date(it["kickoff_time"], match_num=it.get("match_num")),
+            {"n": 0, "ou": _blank(), "ou_sm": _blank(), "matches": []},
+        )
+        d["n"] += 1
+        actual_tg = it.get("actual_total_goals")
+        actual_over = actual_tg > 2.5 if actual_tg is not None else None
+        # TTG 大小球方向：全档位方向（ou_all）
+        ou_all = it.get("ou_all") or {}
+        for t in OU_TIER_KEYS:
+            v = ou_all.get(t)
+            if not v:
+                continue
+            for bucket in (totals["ou"], d["ou"]):
+                _st = bucket[t]
+                _st["signal"] += 1
+                if v["direction"] == "skip":
+                    _st["skip"] += 1
+                elif actual_over is not None:
+                    _st["bet"] += 1
+                    _st["settled"] += 1
+                    if (v["direction"] == "over") == actual_over:
+                        _st["hit"] += 1
+                else:
+                    _st["bet"] += 1
+        # SportMonks O/U 盘口：主判定线各档位方向（tiers）
+        sm_tiers = (it.get("ou_sm") or {}).get("tiers") or {}
+        for t in OU_TIER_KEYS:
+            sd = sm_tiers.get(t)
+            if not sd:
+                continue
+            for bucket in (totals["ou_sm"], d["ou_sm"]):
+                _st = bucket[t]
+                _st["signal"] += 1
+                if sd == "skip":
+                    _st["skip"] += 1
+                elif actual_over is not None:
+                    _st["bet"] += 1
+                    _st["settled"] += 1
+                    if (sd == "over") == actual_over:
+                        _st["hit"] += 1
+                else:
+                    _st["bet"] += 1
+        # 场次明细：单场比赛在两套模型 × 两档门槛下的方向与命中
+        match_rec = {
+            "match_num": it.get("match_num"),
+            "kickoff_time": it["kickoff_time"],
+            "home_team": it.get("home_team"),
+            "away_team": it.get("away_team"),
+            "league_name": it.get("league_name"),
+            "actual_score": it.get("actual_score"),
+            "ou": {t: _match_cell(ou_all[t]["direction"], actual_over) for t in OU_TIER_KEYS if ou_all.get(t)},
+            "ou_sm": {t: _match_cell(sm_tiers[t], actual_over) for t in OU_TIER_KEYS if sm_tiers.get(t)},
+        }
+        d["matches"].append(match_rec)
+
+    by_date_list = [{"date": k, **v} for k, v in sorted(by_date.items(), reverse=True)]
+    return {
+        "window_start": start.isoformat() if start else None,
+        "window_end": end.isoformat() if end else None,
+        "n_total": len(items),
+        "n_settled": n_settled,
+        "totals": totals,
+        "by_date": by_date_list,
+    }
+
+
+@router.get("/predictions/parlay")
+async def market_flow_parlay_recommend(
+    date: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    model_version: str | None = None,
+    source: str | None = None,
+    goals_only: str | None = None,
+    goal_pick_mode: str = "layer",
+    db: AsyncSession = Depends(get_db),
+):
+    """串关推荐（3串1 = 2场 进球数3选 + 1场 方向优选）。
+
+    进球腿（3选）：
+      - 场次门控：TTG 大小球方向(standard) 或 SportMonks O/U(standard) 任一非跳过即可；
+        两者方向矛盾（验证 0% 命中）则跳过；方向以 TTG 优先、缺 TTG 用 SM；
+      - goals_only="over" 时只保留判大场次（不加入小球），默认 None = 大小球均可；
+      - 选数：方向侧 TTG 隐含概率 Top3（判大→>2.5 中取3个，判小→≤2 中取3个）；
+        判大默认分层（goal_pick_mode=layer）：期望总进球 exp≥3.6→5/6/7，3.0~3.6→4/5/6，<3.0→3/4/5；
+        显式 goal_pick_mode=uniform 时判大统一市场 Top3（3/4/5）；
+      - 赔率 = 3 选合成 1/(1/o1+1/o2+1/o3)。
+    方向腿（单选，赔率>=1.8，选正路）：
+      - 来源A 正路池（pool=favorite）→ 半全场 胜胜(hh)/负负(aa)，hafu 收盘赔率>=1.8（>=1.8 天然避开超热门）；
+      - 来源B 模糊池（pool=ambiguous，均双选）→ 选正路方向 fav（HAD 赔率>=1.8），按 fav_ip（相对置信度，越接近0.58越有把握）排序取最高。
+    约束：进球腿与方向腿不同场次；每个比赛日取进球腿 p_hat 最高 2 场 + 方向腿 p_hat 最高 1 场。
+    stats 仅统计已结算且可验证（半全场需半场比分）的串关 p_hit / 均赔 / ROI。
+    """
+    if date:
+        try:
+            d0 = datetime.fromisoformat(date)
+        except ValueError:
+            return _err("date must be ISO date string", 400)
+        start = d0.replace(hour=12, minute=0, second=0, microsecond=0)
+        end = start + timedelta(days=1)
+    elif start_date or end_date:
+        try:
+            s0 = datetime.fromisoformat(start_date) if start_date else None
+            e0 = datetime.fromisoformat(end_date) if end_date else None
+        except ValueError:
+            return _err("start_date/end_date must be ISO date string", 400)
+        start = s0.replace(hour=12, minute=0, second=0, microsecond=0) if s0 else None
+        end = (e0.replace(hour=11, minute=59, second=59, microsecond=0) + timedelta(days=1)) if e0 else None
+    else:
+        end = datetime.now().replace(hour=12, minute=0, second=0, microsecond=0)
+        start = end - timedelta(days=28)
+
+    items, _os, _osm = await _market_flow_query(
+        db, start=start, end=end, model_version=model_version, source=source,
+        ou_tier=DEFAULT_TIER, ou_sm_tier=OU_M_DEFAULT,
+    )
+
+    DIR_ZH = {"home": "主", "draw": "平", "away": "客"}
+
+    def _parse_ttg(raw):
+        if raw is None:
+            return {}
+        data = raw
+        if isinstance(data, str):
+            try:
+                data = json.loads(data)
+            except (ValueError, TypeError):
+                return {}
+        if not isinstance(data, dict):
+            return {}
+        out = {}
+        for k, v in data.items():
+            try:
+                o = float(v)
+            except (TypeError, ValueError):
+                continue
+            if o > 0:
+                out[int(k)] = o
+        return out
+
+    def _implied(odds_map):
+        inv = {k: 1.0 / v for k, v in odds_map.items() if v and v > 0}
+        if not inv:
+            return None
+        tot = sum(inv.values())
+        return {k: v / tot for k, v in inv.items()}
+
+    def _parse_hafu(raw):
+        if raw is None:
+            return {}
+        data = raw
+        if isinstance(data, str):
+            try:
+                data = json.loads(data)
+            except (ValueError, TypeError):
+                return {}
+        if not isinstance(data, dict):
+            return {}
+        return {k: float(v) for k, v in data.items() if v and float(v) > 0}
+
+    def _half_dir(it) -> str | None:
+        hh, ha = it.get("half_home_score"), it.get("half_away_score")
+        if not isinstance(hh, int) or not isinstance(ha, int):
+            return None
+        return "home" if hh > ha else "away" if hh < ha else "draw"
+
+    # ===== 球队攻守特性（判大进球腿分级选场 + 分层选数的信号） =====
+    from app.db.models import TeamSeasonStats
+    _team_avg: dict[int, tuple] = {}  # team_id -> (场均进球, 场均失球)
+    _tids: set[int] = set()
+    for it in items:
+        if it.get("home_team_id"):
+            _tids.add(int(it["home_team_id"]))
+        if it.get("away_team_id"):
+            _tids.add(int(it["away_team_id"]))
+    if _tids:
+        _tss = (await db.execute(
+            select(TeamSeasonStats.team_id, TeamSeasonStats.goals_for,
+                   TeamSeasonStats.goals_against, TeamSeasonStats.played)
+            .where(TeamSeasonStats.team_id.in_(_tids), TeamSeasonStats.played > 0)
+        )).all()
+        _best: dict[int, tuple] = {}
+        for _tid, _gf, _ga, _played in _tss:
+            _tid = int(_tid)
+            if _tid not in _best or _played > _best[_tid][2]:
+                _best[_tid] = (_gf, _ga, _played)
+        for _tid, (_gf, _ga, _played) in _best.items():
+            if _played and _played > 0:
+                _team_avg[_tid] = (_gf / _played, _ga / _played)
+
+    def _home_attack_strong(it) -> bool | None:
+        """主队攻强守弱：场均净进球 gf-ga >= 0"""
+        tid = it.get("home_team_id")
+        if tid is None:
+            return None
+        avg = _team_avg.get(int(tid))
+        return (avg[0] - avg[1] >= 0) if avg else None
+
+    def _exp_total(it) -> float | None:
+        """期望总进球 = (主进+客失)/2 + (客进+主失)/2（赛季场均）"""
+        h = _team_avg.get(int(it["home_team_id"])) if it.get("home_team_id") else None
+        a = _team_avg.get(int(it["away_team_id"])) if it.get("away_team_id") else None
+        if not h or not a:
+            return None
+        return (h[0] + a[1]) / 2 + (a[0] + h[1]) / 2
+
+    by_day: dict[str, dict] = {}
+    for it in items:
+        d = by_day.setdefault(
+            _matchday_date(it["kickoff_time"], match_num=it.get("match_num")),
+            {"goals": [], "dirs": []},
+        )
+        settled = it.get("actual_outcome") is not None
+        actual_tg = it.get("actual_total_goals")
+        actual_outcome = it.get("actual_outcome")
+
+        # TTG 大小球方向（strict 优先，无严格信号退档 standard）
+        _ttg_all = it.get("ou_all") or {}
+        ttg_strict = (_ttg_all.get("strict") or {}).get("direction")
+        ttg_dir = ttg_strict if ttg_strict in ("over", "under") else (_ttg_all.get("standard") or {}).get("direction")
+        # SportMonks O/U 方向（strict 优先，无严格信号退档 standard）
+        _sm_tiers = ((it.get("ou_sm") or {}).get("tiers") or {})
+        sm_dir = _sm_tiers.get("strict")
+        if sm_dir not in ("over", "under"):
+            sm_dir = _sm_tiers.get("standard")
+
+        # ===== 进球腿：TTG 或 SM 任一信号即可（方向矛盾跳过）+ 方向侧市场 Top3 =====
+        # 验证口径（08-25~08-31，方向侧Top3）：双同向63% / 仅TTG100% / 仅SM75% / 矛盾0% → 任一信号 66.7%
+        ttg_valid = ttg_dir if ttg_dir in ("over", "under") else None
+        sm_valid = sm_dir if sm_dir in ("over", "under") else None
+        if ttg_valid and sm_valid and ttg_valid != sm_valid:
+            dirn = None  # 双信号方向矛盾（验证 0% 命中）→ 跳过
+        else:
+            dirn = ttg_valid or sm_valid
+        # 门控档位：方向达到 strict 门槛（TTG 或 SM strict 同向）→ strict；否则退档 standard
+        gate = "standard"
+        if dirn and (ttg_strict == dirn or _sm_tiers.get("strict") == dirn):
+            gate = "strict"
+        if goals_only == "over" and dirn != "over":
+            dirn = None  # 仅大球方案：剔除判小场次
+        if dirn:
+            ttg_odds = _parse_ttg(it.get("ttg_odds"))
+            mkt = _implied(ttg_odds) if ttg_odds else None
+            if mkt:
+                cand = [k for k in mkt if (k > 2.5 if dirn == "over" else k <= 2)]
+                # 选数：判小固定 0/1/2；判大：方案B(仅大球)按盘口3.5线分层，方案A温和分层(exp>=3.6才升档)；显式 goal_pick_mode=uniform 时用市场 Top3(3/4/5)
+                if dirn == "over" and goal_pick_mode != "uniform":
+                    if goals_only == "over":
+                        # 方案B：盘口 3.5 线分层（SM O/U P(>=4球)，缺线回退 exp），保持 3 选结构不稀释赔率
+                        _p35 = None
+                        _l35 = ((it.get("ou_sm") or {}).get("lines") or {}).get("3.5")
+                        if _l35:
+                            _p35 = _l35.get("p_big")
+                        if _p35 is None:
+                            exp = _exp_total(it)
+                            if exp is not None and exp >= 3.6:
+                                chosen = [5, 6, 7]
+                            elif exp is not None and exp >= 3.0:
+                                chosen = [4, 5, 6]
+                            else:
+                                chosen = [3, 4, 5]
+                        elif _p35 >= 0.45:
+                            chosen = [4, 5, 6]  # 高档：市场预期 >=4球 概率高，进球分布右移，升档 456
+                        else:
+                            chosen = [3, 4, 5]  # 低档：标准 3 选
+                        pick = [c for c in chosen if c in mkt]
+                        if len(pick) < 3:
+                            extra = [c for c in cand if c not in pick]
+                            extra.sort(key=lambda c: mkt[c], reverse=True)
+                            pick = (pick + extra)[:3]
+                    else:
+                        # 方案A：温和分层（7+8月验证：exp>=3.6 才升档 456，其余固定 345）
+                        exp = _exp_total(it)
+                        chosen = [4, 5, 6] if (exp is not None and exp >= 3.6) else [3, 4, 5]
+                        pick = [c for c in chosen if c in mkt]
+                        if len(pick) < 3:
+                            extra = [c for c in cand if c not in pick]
+                            extra.sort(key=lambda c: mkt[c], reverse=True)
+                            pick = (pick + extra)[:3]
+                else:
+                    pick = sorted(cand, key=mkt.get, reverse=True)[:3]
+                if len(pick) >= 3:
+                    inv = {k: 1.0 / v for k, v in ttg_odds.items() if v > 0}
+                    p_hat = sum(mkt[c] for c in pick)
+                    # 判大分级（选场信号，越小越优）：主队让球+攻强守弱 > 攻强守弱 > 主队让球 > 其他
+                    tier = 0
+                    if dirn == "over":
+                        home_fav = it.get("fav") == "home"
+                        attack = _home_attack_strong(it)
+                        if home_fav and attack is True:
+                            tier = 0
+                        elif attack is True:
+                            tier = 1
+                        elif home_fav:
+                            tier = 2
+                        else:
+                            tier = 3
+                    d["goals"].append({
+                        "match_num": it.get("match_num"),
+                        "home_team": it.get("home_team"),
+                        "away_team": it.get("away_team"),
+                        "league_name": it.get("league_name"),
+                        "kickoff_time": it["kickoff_time"],
+                        "kind": "goals",
+                        "pick": "/".join(str(x) for x in pick),
+                        "top3": list(pick),
+                        "pick_odds": {str(c): round(ttg_odds[c], 4) for c in pick if c in ttg_odds},
+                        "dir": dirn,
+                        "gate": gate,
+                        "tier": tier,
+                        "p_hat": round(p_hat, 4),
+                        "odds": round(1.0 / sum(inv[c] for c in pick), 4),
+                        "hit": (actual_tg in pick) if settled else None,
+                        "actual": str(actual_tg) if settled else None,
+                    })
+
+        # ===== 方向腿（单选，赔率>=1.8，选正路） =====
+        pool = it.get("pool")
+        had = it.get("had_odds") or {}
+        if pool == "favorite":
+            # 来源A：正路池 → 半全场 胜胜(hh)/负负(aa)；>=1.8 门控天然避开超热门（巴萨胜胜1.44 之类不入选）
+            fav = it.get("fav")
+            hafu = _parse_hafu(it.get("hafu_odds"))
+            if fav in ("home", "away") and hafu:
+                key = "hh" if fav == "home" else "aa"
+                odd = hafu.get(key)
+                ip = _implied(hafu) if hafu else None
+                if odd and odd >= 1.8 and ip and ip.get(key):
+                    hd = _half_dir(it)
+                    hit = None
+                    if settled:
+                        hit = (hd == "home" and actual_outcome == "home") if fav == "home" else (hd == "away" and actual_outcome == "away")
+                        if hd is None:
+                            hit = None  # 半场比分缺失无法验证，视为未结算
+                    d["dirs"].append({
+                        "match_num": it.get("match_num"),
+                        "home_team": it.get("home_team"),
+                        "away_team": it.get("away_team"),
+                        "league_name": it.get("league_name"),
+                        "kickoff_time": it["kickoff_time"],
+                        "kind": "dir",
+                        "source": "favorite_hafu",
+                        "pick": "胜胜" if key == "hh" else "负负",
+                        "hafu_key": key,
+                        "p_hat": round(ip[key], 4),
+                        "odds": round(odd, 4),
+                        "hit": hit,
+                        "actual": (f"半{it.get('half_home_score')}-{it.get('half_away_score')} 全{it.get('actual_score')}"
+                                   if settled and hd is not None else None),
+                    })
+        elif pool == "ambiguous":
+            # 来源B：模糊池（均双选）→ 选正路方向 fav，HAD 赔率>=1.8；相对置信度用 fav_ip 排序（越接近0.58越有把握）
+            fav = it.get("fav")
+            fav_ip = it.get("fav_ip")
+            if fav and fav in had and had.get(fav) and had[fav] >= 1.8 and isinstance(fav_ip, (int, float)):
+                d["dirs"].append({
+                    "match_num": it.get("match_num"),
+                    "home_team": it.get("home_team"),
+                    "away_team": it.get("away_team"),
+                    "league_name": it.get("league_name"),
+                    "kickoff_time": it["kickoff_time"],
+                    "kind": "dir",
+                    "source": "ambiguous_had",
+                    "pick": DIR_ZH[fav],
+                    "pref": fav,
+                    "confidence": round(float(fav_ip), 4),
+                    "p_hat": round(float(fav_ip), 4),
+                    "odds": round(had[fav], 4),
+                    "hit": (actual_outcome == fav) if settled else None,
+                    "actual": DIR_ZH.get(actual_outcome, actual_outcome) if settled else None,
+                })
+
+    picks = []
+    for matchday, grp in sorted(by_day.items()):
+        # 分级回退：tier 越小越优先（判大主队让球+攻强守弱 0 > 攻强守弱 1 > 主队让球 2 > 其他 3；判小默认 0）
+        # 进球腿排序：判小最优先（tier=0 保持现状）→ strict 门槛判大 → standard 门槛判大 → tier → p_hat
+        gs = sorted(grp["goals"], key=lambda x: (
+            0 if x["dir"] == "under" else 1,
+            0 if x.get("gate") == "strict" else 1,
+            x.get("tier", 0),
+            -x["p_hat"],
+        ))
+        ds = sorted(grp["dirs"], key=lambda x: x["p_hat"], reverse=True)
+        if not ds:
+            continue
+        d0 = ds[0]
+        # 同场次判定：双方都有 match_num → match_num 相同即同场；否则退化为 kickoff_time 相同
+        def _not_same(g, dd):
+            return not (
+                (g["match_num"] and dd.get("match_num") and g["match_num"] == dd.get("match_num"))
+                or (not (g["match_num"] and dd.get("match_num")) and g["kickoff_time"] == dd.get("kickoff_time"))
+            )
+        def _find_pair(avail_):
+            for i in range(len(avail_)):
+                for j in range(i + 1, len(avail_)):
+                    if avail_[i].get("league_name") != avail_[j].get("league_name"):
+                        return (avail_[i], avail_[j])
+            return None
+        def _plp(legs3):
+            p = 1.0
+            for l in legs3:
+                p *= l["p_hat"]
+            return p
+        chosen = None
+        level = "strict"
+        if len(gs) >= 2:
+            # 标准组合：2 进球 + 1 方向，三级降级异联赛（strict 三腿全异联赛 → loose → fallback）
+            avail = [g for g in gs if _not_same(g, d0)]
+            if len(avail) >= 2:
+                for dd in ds:
+                    aa_s = [g for g in gs if _not_same(g, dd) and g.get("league_name") != dd.get("league_name")]
+                    pair = _find_pair(aa_s)
+                    if pair:
+                        chosen = (pair[0], pair[1], dd)
+                        break
+                if chosen is None:
+                    pair = _find_pair(avail)
+                    if pair:
+                        level = "loose"
+                        chosen = (pair[0], pair[1], d0)
+                    else:
+                        level = "fallback"
+                        chosen = (avail[0], avail[1], d0)
+        # 进球腿不足 2（仅 1 条）→ 方向候补：1 进球 + 2 方向（优先三腿全异联赛，其次 p_hat 最高）
+        if chosen is None and len(gs) >= 1 and len(ds) >= 2:
+            g0 = gs[0]
+            best = None
+            for need_diff in (True, False):
+                for i in range(len(ds)):
+                    for j in range(i + 1, len(ds)):
+                        da, db_ = ds[i], ds[j]
+                        if not _not_same(da, db_) or not _not_same(g0, da) or not _not_same(g0, db_):
+                            continue
+                        legs3 = [g0, da, db_]
+                        if need_diff and len({g0.get("league_name"), da.get("league_name"), db_.get("league_name")}) != 3:
+                            continue
+                        if best is None or _plp(legs3) > _plp(best):
+                            best = legs3
+                if best is not None:
+                    break
+            if best is not None:
+                chosen = best
+                level = "goal_backfill"
+        if chosen is None:
+            continue
+        legs = list(chosen)
+        pl_odds = 1.0
+        pl_p_hat = 1.0
+        pl_hit = True
+        for lg in legs:
+            pl_odds *= lg["odds"]
+            pl_p_hat *= lg["p_hat"]
+            if lg["hit"] is None:
+                pl_hit = None
+            elif pl_hit is not None:
+                pl_hit = pl_hit and lg["hit"]
+        picks.append({
+            "matchday": matchday,
+            "pick_id": matchday + "-" + "-".join(str(l.get("match_num") or l.get("kickoff_time") or "") for l in legs),
+            "combo_level": level,
+            "settled": all(lg["hit"] is not None for lg in legs),
+            "parlay_odds": round(pl_odds, 4),
+            "parlay_p_hat": round(pl_p_hat, 4),
+            "stake": _stake_amount(legs),
+            "payout": _payout_amount(legs),
+            "roi": round(_payout_amount(legs) / _stake_amount(legs), 4),
+            "hit": pl_hit,
+            "legs": legs,
+        })
+
+    settled_picks = [p for p in picks if p["settled"]]
+    n = len(settled_picks)
+    total_stake = sum(p["stake"] for p in settled_picks)
+    total_payout = sum(p["payout"] for p in settled_picks)
+    stats = {
+        "n": n,
+        "hit": sum(1 for p in settled_picks if p["hit"]),
+        "p_hit": round(sum(1 for p in settled_picks if p["hit"]) / n, 4) if n else None,
+        "avg_odds": round(sum(p["parlay_odds"] for p in settled_picks) / n, 4) if n else None,
+        "total_stake": total_stake,
+        "total_payout": round(total_payout, 4),
+        "roi": round(total_payout / total_stake, 4) if total_stake else None,
+    }
+
+    return {
+        "window_start": start.isoformat() if start else None,
+        "window_end": end.isoformat() if end else None,
+        "picks": picks,
+        "stats": stats,
+    }
+
+
+@router.get("/predictions/parlay-d")
+async def market_flow_parlay_d_recommend(
+    date: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    model_version: str | None = None,
+    source: str | None = None,
+    min_odds: float = 5.0,
+    max_odds: float = 15.0,
+    db: AsyncSession = Depends(get_db),
+):
+    """方案D：进球+半全场+方向三串一（1进球数3选 + 1半全场 + 1方向，串关赔率>=5）。
+
+    每比赛日强制 1 进球腿 + 1 半全场腿 + 1 方向腿，组合成 3串1：
+      - 进球腿：仅判大（TTG/SM strict 优先退 standard），盘口3.5线分层选数（4/5/6 或 3/4/5，缺线回退 exp）；
+      - 半全场腿：不限池，选市场隐含概率最高且 hafu 收盘赔率>=2.0 的选项（9 选 1）；
+      - 方向腿：正路池→半全场 胜胜/负负（hafu>=1.8）；模糊池→正路 fav（HAD>=1.8）。
+    组合：三腿不同场次；三级降级（strict 三腿全异联赛 → loose → fallback 兜底）；
+          串关赔率 [min_odds, max_odds]（默认 5~15 倍），区间外 in_range=false 标记（结构仍强制）。
+    stats 仅统计已结算且可验证（半全场需半场比分）的串关 p_hit / 均赔 / ROI。
+    """
+    if date:
+        try:
+            d0 = datetime.fromisoformat(date)
+        except ValueError:
+            return _err("date must be ISO date string", 400)
+        start = d0.replace(hour=12, minute=0, second=0, microsecond=0)
+        end = start + timedelta(days=1)
+    elif start_date or end_date:
+        try:
+            s0 = datetime.fromisoformat(start_date) if start_date else None
+            e0 = datetime.fromisoformat(end_date) if end_date else None
+        except ValueError:
+            return _err("start_date/end_date must be ISO date string", 400)
+        start = s0.replace(hour=12, minute=0, second=0, microsecond=0) if s0 else None
+        end = (e0.replace(hour=11, minute=59, second=59, microsecond=0) + timedelta(days=1)) if e0 else None
+    else:
+        end = datetime.now().replace(hour=12, minute=0, second=0, microsecond=0)
+        start = end - timedelta(days=28)
+
+    items, _os, _osm = await _market_flow_query(
+        db, start=start, end=end, model_version=model_version, source=source,
+        ou_tier=DEFAULT_TIER, ou_sm_tier=OU_M_DEFAULT,
+    )
+
+    DIR_ZH = {"home": "主", "draw": "平", "away": "客"}
+    HAFU_ZH = {"hh": "胜胜", "hd": "胜平", "ha": "胜负", "dh": "平胜", "dd": "平平",
+               "da": "平负", "ah": "负胜", "ad": "负平", "aa": "负负"}
+    _DIR_KEY = {"home": "h", "draw": "d", "away": "a"}
+
+    def _parse_ttg(raw):
+        if raw is None:
+            return {}
+        data = raw
+        if isinstance(data, str):
+            try:
+                data = json.loads(data)
+            except (ValueError, TypeError):
+                return {}
+        if not isinstance(data, dict):
+            return {}
+        out = {}
+        for k, v in data.items():
+            try:
+                o = float(v)
+            except (TypeError, ValueError):
+                continue
+            if o > 0:
+                out[int(k)] = o
+        return out
+
+    def _parse_hafu(raw):
+        if raw is None:
+            return {}
+        data = raw
+        if isinstance(data, str):
+            try:
+                data = json.loads(data)
+            except (ValueError, TypeError):
+                return {}
+        if not isinstance(data, dict):
+            return {}
+        return {k: float(v) for k, v in data.items() if v and float(v) > 0}
+
+    def _implied(odds_map):
+        inv = {k: 1.0 / v for k, v in odds_map.items() if v and v > 0}
+        if not inv:
+            return None
+        tot = sum(inv.values())
+        return {k: v / tot for k, v in inv.items()}
+
+    def _half_dir(it) -> str | None:
+        hh, ha = it.get("half_home_score"), it.get("half_away_score")
+        if not isinstance(hh, int) or not isinstance(ha, int):
+            return None
+        return "home" if hh > ha else "away" if hh < ha else "draw"
+
+    def _actual_hafu_key(it):
+        hd = _half_dir(it)
+        fo = it.get("actual_outcome")
+        if hd is None or fo not in ("home", "draw", "away"):
+            return None
+        return _DIR_KEY[hd] + _DIR_KEY[fo]
+
+    # ===== 球队攻守特性（进球腿 exp 回退分层） =====
+    from app.db.models import TeamSeasonStats
+    _team_avg: dict[int, tuple] = {}
+    _tids: set[int] = set()
+    for it in items:
+        if it.get("home_team_id"):
+            _tids.add(int(it["home_team_id"]))
+        if it.get("away_team_id"):
+            _tids.add(int(it["away_team_id"]))
+    if _tids:
+        _tss = (await db.execute(
+            select(TeamSeasonStats.team_id, TeamSeasonStats.goals_for,
+                   TeamSeasonStats.goals_against, TeamSeasonStats.played)
+            .where(TeamSeasonStats.team_id.in_(_tids), TeamSeasonStats.played > 0)
+        )).all()
+        _best: dict[int, tuple] = {}
+        for _tid, _gf, _ga, _played in _tss:
+            _tid = int(_tid)
+            if _tid not in _best or _played > _best[_tid][2]:
+                _best[_tid] = (_gf, _ga, _played)
+        for _tid, (_gf, _ga, _played) in _best.items():
+            if _played and _played > 0:
+                _team_avg[_tid] = (_gf / _played, _ga / _played)
+
+    def _home_attack_strong(it) -> bool | None:
+        tid = it.get("home_team_id")
+        if tid is None:
+            return None
+        avg = _team_avg.get(int(tid))
+        return (avg[0] - avg[1] >= 0) if avg else None
+
+    def _exp_total(it) -> float | None:
+        h = _team_avg.get(int(it["home_team_id"])) if it.get("home_team_id") else None
+        a = _team_avg.get(int(it["away_team_id"])) if it.get("away_team_id") else None
+        if not h or not a:
+            return None
+        return (h[0] + a[1]) / 2 + (a[0] + h[1]) / 2
+
+    # ===== 构建三类腿 =====
+    by_day: dict[str, dict] = {}
+    for it in items:
+        d = by_day.setdefault(
+            _matchday_date(it["kickoff_time"], match_num=it.get("match_num")),
+            {"goals": [], "hafu": [], "dirs": []},
+        )
+        settled = it.get("actual_outcome") is not None
+        actual_tg = it.get("actual_total_goals")
+        actual_outcome = it.get("actual_outcome")
+        had = it.get("had_odds") or {}
+        pool = it.get("pool")
+
+        # ---- 进球腿（仅判大，3选） ----
+        _ttg_all = it.get("ou_all") or {}
+        ttg_strict = (_ttg_all.get("strict") or {}).get("direction")
+        ttg_dir = ttg_strict if ttg_strict in ("over", "under") else (_ttg_all.get("standard") or {}).get("direction")
+        _sm_tiers = ((it.get("ou_sm") or {}).get("tiers") or {})
+        sm_dir = _sm_tiers.get("strict")
+        if sm_dir not in ("over", "under"):
+            sm_dir = _sm_tiers.get("standard")
+        ttg_valid = ttg_dir if ttg_dir in ("over", "under") else None
+        sm_valid = sm_dir if sm_dir in ("over", "under") else None
+        if ttg_valid and sm_valid and ttg_valid != sm_valid:
+            dirn = None
+        else:
+            dirn = ttg_valid or sm_valid
+        gate = "standard"
+        if dirn and (ttg_strict == dirn or _sm_tiers.get("strict") == dirn):
+            gate = "strict"
+        if dirn == "over":
+            ttg_odds = _parse_ttg(it.get("ttg_odds"))
+            mkt = _implied(ttg_odds) if ttg_odds else None
+            if mkt:
+                cand = [k for k in mkt if k > 2.5]
+                # 盘口3.5线分层（同方案B）：SM O/U P(>=4球)>=0.45 → 456，缺线回退 exp
+                _p35 = None
+                _l35 = ((it.get("ou_sm") or {}).get("lines") or {}).get("3.5")
+                if _l35:
+                    _p35 = _l35.get("p_big")
+                if _p35 is None:
+                    exp = _exp_total(it)
+                    if exp is not None and exp >= 3.6:
+                        chosen = [5, 6, 7]
+                    elif exp is not None and exp >= 3.0:
+                        chosen = [4, 5, 6]
+                    else:
+                        chosen = [3, 4, 5]
+                elif _p35 >= 0.45:
+                    chosen = [4, 5, 6]
+                else:
+                    chosen = [3, 4, 5]
+                pick = [c for c in chosen if c in mkt]
+                if len(pick) < 3:
+                    extra = [c for c in cand if c not in pick]
+                    extra.sort(key=lambda c: mkt[c], reverse=True)
+                    pick = (pick + extra)[:3]
+                if len(pick) >= 3:
+                    inv = {k: 1.0 / v for k, v in ttg_odds.items() if v > 0}
+                    tier = 0
+                    home_fav = it.get("fav") == "home"
+                    attack = _home_attack_strong(it)
+                    if home_fav and attack is True:
+                        tier = 0
+                    elif attack is True:
+                        tier = 1
+                    elif home_fav:
+                        tier = 2
+                    else:
+                        tier = 3
+                    d["goals"].append({
+                        "match_num": it.get("match_num"),
+                        "home_team": it.get("home_team"),
+                        "away_team": it.get("away_team"),
+                        "league_name": it.get("league_name"),
+                        "kickoff_time": it["kickoff_time"],
+                        "kind": "goals",
+                        "pick": "/".join(str(x) for x in pick),
+                        "top3": list(pick),
+                        "pick_odds": {str(c): round(ttg_odds[c], 4) for c in pick if c in ttg_odds},
+                        "gate": gate,
+                        "tier": tier,
+                        "p_hat": round(sum(mkt[c] for c in pick), 4),
+                        "odds": round(1.0 / sum(inv[c] for c in pick), 4),
+                        "hit": (actual_tg in pick) if settled and actual_tg is not None else None,
+                        "actual": str(actual_tg) if settled and actual_tg is not None else None,
+                    })
+
+        # ---- 半全场腿（不限池，隐含最高且>=2.0，9选1） ----
+        hafu = _parse_hafu(it.get("hafu_odds"))
+        if hafu:
+            ip = _implied(hafu)
+            if ip:
+                cand = [(k, v) for k, v in hafu.items() if v >= 2.0]
+                if cand:
+                    key = max(cand, key=lambda kv: ip.get(kv[0], 0.0))[0]
+                    odd = hafu[key]
+                    ahk = _actual_hafu_key(it)
+                    hit = (ahk == key) if (settled and ahk is not None) else None
+                    d["hafu"].append({
+                        "match_num": it.get("match_num"),
+                        "home_team": it.get("home_team"),
+                        "away_team": it.get("away_team"),
+                        "league_name": it.get("league_name"),
+                        "kickoff_time": it["kickoff_time"],
+                        "kind": "hafu",
+                        "pick": HAFU_ZH[key],
+                        "hafu_key": key,
+                        "p_hat": round(ip[key], 4),
+                        "odds": round(odd, 4),
+                        "hit": hit,
+                    })
+
+        # ---- 方向腿（正路池→胜胜/负负 >=1.8；模糊池→fav >=1.8） ----
+        if pool == "favorite":
+            fav = it.get("fav")
+            hafu = _parse_hafu(it.get("hafu_odds"))
+            if fav in ("home", "away") and hafu:
+                key = "hh" if fav == "home" else "aa"
+                odd = hafu.get(key)
+                ip = _implied(hafu) if hafu else None
+                if odd and odd >= 1.8 and ip and ip.get(key):
+                    hd = _half_dir(it)
+                    hit = None
+                    if settled:
+                        hit = (hd == "home" and actual_outcome == "home") if fav == "home" else (hd == "away" and actual_outcome == "away")
+                        if hd is None:
+                            hit = None
+                    d["dirs"].append({
+                        "match_num": it.get("match_num"),
+                        "home_team": it.get("home_team"),
+                        "away_team": it.get("away_team"),
+                        "league_name": it.get("league_name"),
+                        "kickoff_time": it["kickoff_time"],
+                        "kind": "dir",
+                        "source": "favorite_hafu",
+                        "pick": "胜胜" if key == "hh" else "负负",
+                        "p_hat": round(ip[key], 4),
+                        "odds": round(odd, 4),
+                        "hit": hit,
+                    })
+        elif pool == "ambiguous":
+            fav = it.get("fav")
+            fav_ip = it.get("fav_ip")
+            if fav and fav in had and had.get(fav) and had[fav] >= 1.8 and isinstance(fav_ip, (int, float)):
+                d["dirs"].append({
+                    "match_num": it.get("match_num"),
+                    "home_team": it.get("home_team"),
+                    "away_team": it.get("away_team"),
+                    "league_name": it.get("league_name"),
+                    "kickoff_time": it["kickoff_time"],
+                    "kind": "dir",
+                    "source": "ambiguous_had",
+                    "pick": DIR_ZH[fav],
+                    "p_hat": round(float(fav_ip), 4),
+                    "odds": round(had[fav], 4),
+                    "hit": (actual_outcome == fav) if settled else None,
+                })
+
+    # ===== 组合：三腿不同场，三级降级 =====
+    def _same_match(a, b):
+        if a.get("match_num") and b.get("match_num"):
+            return a["match_num"] == b["match_num"]
+        return a["kickoff_time"] == b["kickoff_time"]
+
+    def _pl_odds(legs):
+        o = 1.0
+        for l in legs:
+            o *= l["odds"]
+        return o
+
+    def _pl_p_hat(legs):
+        p = 1.0
+        for l in legs:
+            p *= l["p_hat"]
+        return p
+
+    picks = []
+    for matchday, grp in sorted(by_day.items()):
+        gs = sorted(grp["goals"], key=lambda x: (0 if x.get("gate") == "strict" else 1, x.get("tier", 0), -x["p_hat"]))
+        hs = sorted(grp["hafu"], key=lambda x: -x["p_hat"])
+        ds = sorted(grp["dirs"], key=lambda x: -x["p_hat"])
+        if not gs or not hs or not ds:
+            continue
+        best = None
+        level = "strict"
+        # 1 严格：三腿全异联赛
+        for g in gs:
+            for h in hs:
+                if _same_match(g, h):
+                    continue
+                for dd in ds:
+                    if _same_match(g, dd) or _same_match(h, dd):
+                        continue
+                    legs = [g, h, dd]
+                    o = _pl_odds(legs)
+                    if not (min_odds <= o <= max_odds):
+                        continue
+                    if len({g.get("league_name"), h.get("league_name"), dd.get("league_name")}) == 3:
+                        if best is None or _pl_p_hat(legs) > _pl_p_hat(best):
+                            best = legs
+        if best is None:
+            # 2 宽松：进球腿与方向腿异联赛
+            for g in gs:
+                for h in hs:
+                    if _same_match(g, h):
+                        continue
+                    for dd in ds:
+                        if _same_match(g, dd) or _same_match(h, dd):
+                            continue
+                        legs = [g, h, dd]
+                        o = _pl_odds(legs)
+                        if not (min_odds <= o <= max_odds):
+                            continue
+                        if g.get("league_name") != dd.get("league_name"):
+                            if best is None or _pl_p_hat(legs) > _pl_p_hat(best):
+                                best = legs
+        if best is None:
+            # 3 兜底：无约束
+            level = "fallback"
+            for g in gs:
+                for h in hs:
+                    if _same_match(g, h):
+                        continue
+                    for dd in ds:
+                        if _same_match(g, dd) or _same_match(h, dd):
+                            continue
+                        legs = [g, h, dd]
+                        o = _pl_odds(legs)
+                        if not (min_odds <= o <= max_odds):
+                            continue
+                        if best is None or _pl_p_hat(legs) > _pl_p_hat(best):
+                            best = legs
+        if best is None:
+            continue
+        legs = best
+        pl_odds = _pl_odds(legs)
+        pl_hit = True
+        pl_p_hat = 1.0
+        for lg in legs:
+            pl_p_hat *= lg["p_hat"]
+            if lg["hit"] is None:
+                pl_hit = None
+            elif pl_hit is not None:
+                pl_hit = pl_hit and lg["hit"]
+        picks.append({
+            "matchday": matchday,
+            "pick_id": matchday + "-" + "-".join(str(l.get("match_num") or l.get("kickoff_time") or "") for l in legs),
+            "combo_level": level,
+            "settled": all(lg["hit"] is not None for lg in legs),
+            "in_range": min_odds <= pl_odds <= max_odds,
+            "parlay_odds": round(pl_odds, 4),
+            "parlay_p_hat": round(pl_p_hat, 4),
+            "stake": _stake_amount(legs),
+            "payout": _payout_amount(legs),
+            "roi": round(_payout_amount(legs) / _stake_amount(legs), 4),
+            "hit": pl_hit,
+            "legs": legs,
+        })
+
+    settled_picks = [p for p in picks if p["settled"]]
+    n = len(settled_picks)
+    total_stake = sum(p["stake"] for p in settled_picks)
+    total_payout = sum(p["payout"] for p in settled_picks)
+    stats = {
+        "n": n,
+        "hit": sum(1 for p in settled_picks if p["hit"]),
+        "p_hit": round(sum(1 for p in settled_picks if p["hit"]) / n, 4) if n else None,
+        "avg_odds": round(sum(p["parlay_odds"] for p in settled_picks) / n, 4) if n else None,
+        "total_stake": total_stake,
+        "total_payout": round(total_payout, 4),
+        "roi": round(total_payout / total_stake, 4) if total_stake else None,
+    }
+
+    return {
+        "window_start": start.isoformat() if start else None,
+        "window_end": end.isoformat() if end else None,
+        "picks": picks,
+        "stats": stats,
+    }
+
+
+@router.get("/predictions/parlay-dir")
+async def market_flow_parlay_dir_recommend(
+    date: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    model_version: str | None = None,
+    source: str | None = None,
+    min_odds: float = 4.0,
+    max_odds: float = 10.0,
+    db: AsyncSession = Depends(get_db),
+):
+    """方案C：方向优选二串一（2串1，纯方向腿）。
+
+    每比赛日强制 1 场半全场 + 1 场胜平负，组合成 2串1：
+      - 半全场腿：不限池，选市场隐含概率最高且 hafu 收盘赔率>=2.0 的半全场选项（9 选 1）；
+      - 胜平负腿：不限池——模糊池选让球方正路(fav)，冷门池选高置信度冷门方向(二选内隐含最高)，HAD 赔率>=1.8。
+    组合：串关赔率落在 [min_odds, max_odds]（默认 4~10 倍）；区间外 in_range=false 标记（结构仍强制）。
+    stats 仅统计已结算且可验证（半全场需半场比分）的串关 p_hit / 均赔 / ROI。
+    """
+    if date:
+        try:
+            d0 = datetime.fromisoformat(date)
+        except ValueError:
+            return _err("date must be ISO date string", 400)
+        start = d0.replace(hour=12, minute=0, second=0, microsecond=0)
+        end = start + timedelta(days=1)
+    elif start_date or end_date:
+        try:
+            s0 = datetime.fromisoformat(start_date) if start_date else None
+            e0 = datetime.fromisoformat(end_date) if end_date else None
+        except ValueError:
+            return _err("start_date/end_date must be ISO date string", 400)
+        start = s0.replace(hour=12, minute=0, second=0, microsecond=0) if s0 else None
+        end = (e0.replace(hour=11, minute=59, second=59, microsecond=0) + timedelta(days=1)) if e0 else None
+    else:
+        end = datetime.now().replace(hour=12, minute=0, second=0, microsecond=0)
+        start = end - timedelta(days=28)
+
+    items, _os, _osm = await _market_flow_query(
+        db, start=start, end=end, model_version=model_version, source=source,
+        ou_tier=DEFAULT_TIER, ou_sm_tier=OU_M_DEFAULT,
+    )
+
+    DIR_ZH = {"home": "主", "draw": "平", "away": "客"}
+
+    def _parse_hafu(raw):
+        if raw is None:
+            return {}
+        data = raw
+        if isinstance(data, str):
+            try:
+                data = json.loads(data)
+            except (ValueError, TypeError):
+                return {}
+        if not isinstance(data, dict):
+            return {}
+        return {k: float(v) for k, v in data.items() if v and float(v) > 0}
+
+    def _implied(odds_map):
+        inv = {k: 1.0 / v for k, v in odds_map.items() if v and v > 0}
+        if not inv:
+            return None
+        tot = sum(inv.values())
+        return {k: v / tot for k, v in inv.items()}
+
+    def _half_dir(it) -> str | None:
+        hh, ha = it.get("half_home_score"), it.get("half_away_score")
+        if not isinstance(hh, int) or not isinstance(ha, int):
+            return None
+        return "home" if hh > ha else "away" if hh < ha else "draw"
+
+    HAFU_ZH = {"hh": "胜胜", "hd": "胜平", "ha": "胜负", "dh": "平胜", "dd": "平平",
+               "da": "平负", "ah": "负胜", "ad": "负平", "aa": "负负"}
+    _DIR_KEY = {"home": "h", "draw": "d", "away": "a"}
+
+    def _actual_hafu_key(it):
+        hd = _half_dir(it)
+        fo = it.get("actual_outcome")
+        if hd is None or fo not in ("home", "draw", "away"):
+            return None
+        return _DIR_KEY[hd] + _DIR_KEY[fo]
+
+    # ===== 收集方向腿 =====
+    # 半全场腿：不限池，选市场隐含概率最高且赔率>=2.0 的半全场选项（支撑 4~10 组合）
+    # 胜平负腿：模糊池正路单选（HAD 赔率>=1.8），冷门池高置信冷门方向（无优选时冷门信号兜底）
+    dirs = []
+    for it in items:
+        settled = it.get("actual_outcome") is not None
+        actual_outcome = it.get("actual_outcome")
+        pool = it.get("pool")
+        had = it.get("had_odds") or {}
+
+        # 半全场腿（不限池，选市场隐含概率最高且赔率>=2.0 的选项）
+        hafu = _parse_hafu(it.get("hafu_odds"))
+        if hafu:
+            ip = _implied(hafu)
+            if ip:
+                cand = [(k, v) for k, v in hafu.items() if v >= 2.0]
+                if cand:
+                    key = max(cand, key=lambda kv: ip.get(kv[0], 0.0))[0]
+                    odd = hafu[key]
+                    ahk = _actual_hafu_key(it)
+                    hit = (ahk == key) if (settled and ahk is not None) else None
+                    dirs.append({
+                        "match_num": it.get("match_num"),
+                        "home_team": it.get("home_team"),
+                        "away_team": it.get("away_team"),
+                        "league_name": it.get("league_name"),
+                        "kickoff_time": it["kickoff_time"],
+                        "kind": "dir",
+                        "source": "hafu",
+                        "pick": HAFU_ZH[key],
+                        "hafu_key": key,
+                        "p_hat": round(ip[key], 4),
+                        "odds": round(odd, 4),
+                        "hit": hit,
+                        "actual": (f"半{it.get('half_home_score')}-{it.get('half_away_score')} 全{it.get('actual_score')}"
+                                   if settled and ahk is not None else None),
+                    })
+
+        # 胜平负腿（不限池：模糊池选让球方正路，冷门池选高置信度冷门方向；冷门信号兜底）
+        if pool in ("ambiguous", "upset"):
+            fallback = False
+            if pool == "upset":
+                direction = it.get("preferred_outcome")  # 强冷门方向（二选内非fav隐含最高）
+                if direction is None:
+                    direction = it.get("cold_dir")  # 冷门信号：兜底选冷门方向（优先平局）
+                    fallback = True
+                src = "had_upset"
+            else:
+                direction = it.get("fav")  # 让球方正路
+                src = "ambiguous_had"
+            if direction and direction in had and had.get(direction) and had[direction] >= 1.8:
+                ip_had = _implied(had) if had else None
+                p = ip_had.get(direction) if ip_had else None
+                dirs.append({
+                    "match_num": it.get("match_num"),
+                    "home_team": it.get("home_team"),
+                    "away_team": it.get("away_team"),
+                    "league_name": it.get("league_name"),
+                    "kickoff_time": it["kickoff_time"],
+                    "kind": "dir",
+                    "source": src,
+                    "pick": DIR_ZH[direction],
+                    "pref": direction,
+                    "confidence": round(float(p), 4) if isinstance(p, (int, float)) else None,
+                    "p_hat": round(float(p), 4) if isinstance(p, (int, float)) else round(float(had[direction]), 4),
+                    "odds": round(had[direction], 4),
+                    "fallback": fallback,
+                    "hit": (actual_outcome == direction) if settled else None,
+                    "actual": DIR_ZH.get(actual_outcome, actual_outcome) if settled else None,
+                })
+
+    # ===== 按比赛日分组，强制 1 场半全场(hafu) + 1 场胜平负(ambiguous_had) =====
+    by_day: dict[str, dict] = {}
+    for leg in dirs:
+        d = _matchday_date(leg["kickoff_time"], match_num=leg.get("match_num"))
+        g = by_day.setdefault(d, {"hafu": [], "had": []})
+        if leg["source"] == "hafu":
+            g["hafu"].append(leg)
+        else:
+            g["had"].append(leg)
+
+    def _same_match(a, b):
+        if a.get("match_num") and b.get("match_num"):
+            return a["match_num"] == b["match_num"]
+        return a["kickoff_time"] == b["kickoff_time"]
+
+    picks = []
+    for matchday, grp in sorted(by_day.items()):
+        hafu = sorted(grp["hafu"], key=lambda x: x["p_hat"], reverse=True)
+        had = sorted(grp["had"], key=lambda x: x["p_hat"], reverse=True)
+        if not hafu or not had:
+            continue  # 缺半全场或缺胜平负腿 → 该日不组合
+        # 优先非兜底胜平负腿（模糊池/强冷门），无非兜底腿时才用冷门信号兜底
+        had_normal = [x for x in had if not x.get("fallback")]
+        had_pool = had_normal if had_normal else had
+        # 同场互斥：从置信度最高的半全场腿开始，找第一个能配上不同场胜平负腿的组合
+        legs = None
+        for a in hafu:
+            b = next((x for x in had_pool if not _same_match(a, x)), None)
+            if b is not None:
+                legs = [a, b]
+                break
+        if legs is None:
+            continue
+        a, b = legs
+        pl_odds = a["odds"] * b["odds"]
+        pl_p_hat = a["p_hat"] * b["p_hat"]
+        in_range = min_odds <= pl_odds <= max_odds
+        pl_hit = True
+        for lg in legs:
+            if lg["hit"] is None:
+                pl_hit = None
+            elif pl_hit is not None:
+                pl_hit = pl_hit and lg["hit"]
+        picks.append({
+            "matchday": matchday,
+            "pick_id": matchday + "-" + "-".join(str(l.get("match_num") or l.get("kickoff_time") or "") for l in legs),
+            "settled": all(lg["hit"] is not None for lg in legs),
+            "parlay_odds": round(pl_odds, 4),
+            "parlay_p_hat": round(pl_p_hat, 4),
+            "stake": _stake_amount(legs),
+            "payout": _payout_amount(legs),
+            "roi": round(_payout_amount(legs) / _stake_amount(legs), 4),
+            "hit": pl_hit,
+            "in_range": in_range,
+            "legs": legs,
+        })
+
+    settled_picks = [p for p in picks if p["settled"]]
+    n = len(settled_picks)
+    total_stake = sum(p["stake"] for p in settled_picks)
+    total_payout = sum(p["payout"] for p in settled_picks)
+    stats = {
+        "n": n,
+        "hit": sum(1 for p in settled_picks if p["hit"]),
+        "p_hit": round(sum(1 for p in settled_picks if p["hit"]) / n, 4) if n else None,
+        "avg_odds": round(sum(p["parlay_odds"] for p in settled_picks) / n, 4) if n else None,
+        "total_stake": total_stake,
+        "total_payout": round(total_payout, 4),
+        "roi": round(total_payout / total_stake, 4) if total_stake else None,
+    }
+
+    return {
+        "window_start": start.isoformat() if start else None,
+        "window_end": end.isoformat() if end else None,
+        "min_odds": min_odds,
+        "max_odds": max_odds,
+        "picks": picks,
+        "stats": stats,
+    }
+
+
+@router.get("/predictions/plan-readiness")
+async def market_flow_plan_readiness(
+    date: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """方案生成就绪度诊断：统计指定比赛日的赔率/信号数据，说明三个方案各自能否生成及缺什么（只读）。
+
+    返回每方案的 ok / reason：
+      plan_a: 2进球腿(≥2 大小球方向信号) + 1方向腿
+      plan_d: 1进球腿 + 1半全场腿 + 1方向腿
+      plan_c: 1半全场腿 + 1胜平负腿
+    """
+    try:
+        d0 = datetime.fromisoformat(date)
+    except ValueError:
+        return _err("date must be ISO date string", 400)
+    start = d0.replace(hour=12, minute=0, second=0, microsecond=0)
+    end = start + timedelta(days=1)
+    items, _os, _osm = await _market_flow_query(
+        db, start=start, end=end, ou_tier="standard", ou_sm_tier="standard"
+    )
+
+    n = len(items)
+    n_hafu = 0          # 有半全场赔率的场数
+    n_ttg_sig = 0       # TTG 方向信号（standard 档有效）
+    n_sm_sig = 0        # SM 方向信号
+    n_goals_sig = 0     # 进球腿候选（TTG 或 SM 任一有效且不矛盾）
+    pools = {"favorite": 0, "ambiguous": 0, "upset": 0}
+    for it in items:
+        if it.get("hafu_odds"):
+            n_hafu += 1
+        ou_all = it.get("ou_all") or {}
+        ttg_dir = (ou_all.get("standard") or {}).get("direction")
+        sm_dir = ((it.get("ou_sm") or {}).get("tiers") or {}).get("standard")
+        ttg_valid = ttg_dir if ttg_dir in ("over", "under") else None
+        sm_valid = sm_dir if sm_dir in ("over", "under") else None
+        if ttg_valid:
+            n_ttg_sig += 1
+        if sm_valid:
+            n_sm_sig += 1
+        if ttg_valid and sm_valid and ttg_valid != sm_valid:
+            continue  # 方向矛盾
+        if ttg_valid or sm_valid:
+            n_goals_sig += 1
+        pool = it.get("pool")
+        if pool in pools:
+            pools[pool] += 1
+
+    n_dir_ab = pools["favorite"] + pools["ambiguous"]   # 方案A/D 方向腿来源（正路池+模糊池）
+    n_dir_c = pools["ambiguous"] + pools["upset"]       # 方案C 胜平负腿来源（模糊池+冷门池）
+
+    def _reason(ok, msg):
+        return {"ok": ok, "reason": None if ok else msg}
+
+    plans = {
+        "plan_a": _reason(n_goals_sig >= 2 and n_dir_ab >= 1,
+                          ("大小球方向信号不足（需≥2，实际" + str(n_goals_sig) + "）" if n_goals_sig < 2 else "")
+                          or ("方向优选腿不足（需≥1，正路/模糊池" + str(n_dir_ab) + "场）" if n_dir_ab < 1 else "")),
+        "plan_d": _reason(n_goals_sig >= 1 and n_hafu >= 1 and n_dir_ab >= 1,
+                          ("半全场赔率缺失（" + str(n - n_hafu) + "场无hafu数据）" if n_hafu < 1 else "")
+                          or ("大小球方向信号不足（需≥1，实际" + str(n_goals_sig) + "）" if n_goals_sig < 1 else "")
+                          or ("方向优选腿不足（需≥1，正路/模糊池" + str(n_dir_ab) + "场）" if n_dir_ab < 1 else "")),
+        "plan_c": _reason(n_hafu >= 1 and n_dir_c >= 1,
+                          ("半全场赔率缺失（" + str(n - n_hafu) + "场无hafu数据）" if n_hafu < 1 else "")
+                          or ("胜平负优选腿不足（需≥1，模糊/冷门池" + str(n_dir_c) + "场）" if n_dir_c < 1 else "")),
+    }
+
+    return {
+        "date": date,
+        "matches": n,
+        "hafu_available": n_hafu,
+        "ttg_signal": n_ttg_sig,
+        "sm_signal": n_sm_sig,
+        "goals_signal": n_goals_sig,
+        "pools": pools,
+        "plans": plans,
+    }
 
 
 @router.get("/predictions/model-versions")

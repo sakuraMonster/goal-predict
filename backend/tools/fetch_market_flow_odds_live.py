@@ -38,6 +38,7 @@ HEADERS = {
 
 CRS_RE = re.compile(r"^s(\d{2})s(\d{2})$")
 TTG_KEYS = {"s0": "0", "s1": "1", "s2": "2", "s3": "3", "s4": "4", "s5": "5", "s6": "6", "s7": "7"}
+HAFU_KEYS = ("hh", "hd", "ha", "dh", "dd", "da", "ah", "ad", "aa")
 
 
 def _num(v):
@@ -102,6 +103,18 @@ def parse_crs(obj):
     return out
 
 
+def parse_hafu(obj):
+    """半全场收盘赔率：胜胜hh/胜平hd/胜负ha/平胜dh/平平dd/平负da/负胜ah/负平ad/负负aa"""
+    if not isinstance(obj, dict):
+        return None
+    out = {}
+    for k in HAFU_KEYS:
+        v = _num(obj.get(k))
+        if v is not None:
+            out[k] = v
+    return out or None
+
+
 def _update_time(obj):
     d = (obj.get("updateDate") or "").strip()
     t = (obj.get("updateTime") or "").strip()
@@ -114,7 +127,7 @@ def _update_time(obj):
     return datetime.utcnow()
 
 
-def fetch_live(pool_code: str = "had,hhad,ttg,crs") -> list[dict]:
+def fetch_live(pool_code: str = "had,hhad,ttg,crs,hafu") -> list[dict]:
     r = requests.get(JCZQ_API, params={"poolCode": pool_code, "channel": "c"}, headers=HEADERS, timeout=20)
     r.raise_for_status()
     data = r.json()
@@ -149,6 +162,7 @@ def _parse_match(raw: dict) -> dict | None:
     crs = parse_crs(raw.get("crs"))
     if not (had and hhad and ttg and crs):
         return None
+    hafu = parse_hafu(raw.get("hafu"))
     times = [_update_time(x) for x in [raw.get("had") or {}, raw.get("hhad") or {}, raw.get("ttg") or {}, raw.get("crs") or {}]]
     snapshot_time = max(times)
     match_date = (raw.get("matchDate") or "").strip()
@@ -172,6 +186,7 @@ def _parse_match(raw: dict) -> dict | None:
         "hhad": hhad,
         "ttg": ttg,
         "crs": crs,
+        "hafu": hafu,
         "snapshot_time": snapshot_time,
     }
 
@@ -210,6 +225,7 @@ async def main() -> int:
     async with async_session() as db:
         # 匹配本地 Match：优先 jc_match_id，其次 match_num + kickoff ± 12h
         inserted = 0
+        updated = 0
         skipped_dup = 0
         skipped_unmatched = 0
         skipped_parse = 0
@@ -244,6 +260,14 @@ async def main() -> int:
                 )
             )).scalars().all()
             if any(_snap_equal(s, p["had"], p["hhad"], p["ttg"], p["crs"]) for s in existing):
+                matched_snaps = [s for s in existing if _snap_equal(s, p["had"], p["hhad"], p["ttg"], p["crs"])]
+                target = matched_snaps[0]
+                # 历史快照 hafu 为空而本次拉到 hafu → 仅回填 hafu 字段
+                if p["hafu"] and not target.hafu_odds_json:
+                    target.hafu_odds_json = p["hafu"]
+                    updated += 1
+                    print(f"  [hafu-backfill] {p['match_num']:<10}{str(p['kickoff']):<22}{p['home_team']} vs {p['away_team']} hafu_n={len(p['hafu'])}")
+                    continue
                 skipped_dup += 1
                 print(f"  [dup]       {p['match_num']:<10}{str(p['kickoff']):<22}{p['home_team']} vs {p['away_team']}")
                 continue
@@ -261,6 +285,7 @@ async def main() -> int:
                 hhad_away=p["hhad"]["away"],
                 ttg_odds_json=p["ttg"],
                 crs_odds_json=p["crs"],
+                hafu_odds_json=p["hafu"],
             )
             db.add(snap)
             inserted += 1
@@ -271,7 +296,7 @@ async def main() -> int:
         else:
             await db.rollback()
 
-    print(f"\n完成: 写入 {inserted} 条，dup 跳过 {skipped_dup}，本地无匹配 {skipped_unmatched}，dry_run={args.dry_run}")
+    print(f"\n完成: 写入 {inserted} 条，回填 hafu {updated} 条，dup 跳过 {skipped_dup}，本地无匹配 {skipped_unmatched}，dry_run={args.dry_run}")
     return 0
 
 

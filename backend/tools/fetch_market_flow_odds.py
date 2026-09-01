@@ -99,6 +99,21 @@ def parse_crs(obj):
     return out
 
 
+HAFU_KEYS = ("hh", "hd", "ha", "dh", "dd", "da", "ah", "ad", "aa")
+
+
+def parse_hafu(obj):
+    """半全场收盘赔率：胜胜hh/胜平hd/胜负ha/平胜dh/平平dd/平负da/负胜ah/负平ad/负负aa"""
+    if not isinstance(obj, dict):
+        return None
+    out = {}
+    for k in HAFU_KEYS:
+        v = _num(obj.get(k))
+        if v is not None:
+            out[k] = v
+    return out or None
+
+
 def _update_time(obj):
     d = (obj.get("updateDate") or "").strip()
     t = (obj.get("updateTime") or "").strip()
@@ -126,6 +141,7 @@ def parse_snapshot(value: dict):
     hhad_list = oh.get("hhadList") or []
     ttg_list = oh.get("ttgList") or []
     crs_list = oh.get("crsList") or []
+    hafu_list = oh.get("hafuList") or []
 
     if not (had_list and hhad_list and ttg_list and crs_list):
         return None
@@ -134,6 +150,7 @@ def parse_snapshot(value: dict):
     hhad = parse_hhad(hhad_list[-1])
     ttg = parse_ttg(ttg_list[-1])
     crs = parse_crs(crs_list[-1])
+    hafu = parse_hafu(hafu_list[-1]) if hafu_list else None
 
     if not (had and hhad and ttg and crs):
         return None
@@ -143,6 +160,7 @@ def parse_snapshot(value: dict):
         "hhad": hhad,
         "ttg": ttg,
         "crs": crs,
+        "hafu": hafu,
         "snapshot_time": _update_time(had_list[-1]),
     }
 
@@ -196,6 +214,7 @@ async def main():
     print(f"待拉取 {len(matches)} 场")
 
     inserted = 0
+    updated = 0
     skipped_fetch = 0
     skipped_parse = 0
     skipped_dup = 0
@@ -218,6 +237,7 @@ async def main():
                 continue
 
             had, hhad, ttg, crs = snap_data["had"], snap_data["hhad"], snap_data["ttg"], snap_data["crs"]
+            hafu = snap_data["hafu"]
             snapshot_time = snap_data["snapshot_time"]
 
             existing_r = await db.execute(
@@ -226,7 +246,16 @@ async def main():
                     JczqPlayOddsSnapshot.source == args.source,
                 )
             )
-            if any(_snap_equal(s, had, hhad, ttg, crs) for s in existing_r.scalars().all()):
+            existing = existing_r.scalars().all()
+            matched = [s for s in existing if _snap_equal(s, had, hhad, ttg, crs)]
+            if matched:
+                # 历史快照 hafu 为空而本次拉取到 hafu → 仅回填 hafu 字段
+                target = matched[0]
+                if hafu and not target.hafu_odds_json:
+                    target.hafu_odds_json = hafu
+                    updated += 1
+                    print(f"  [hafu-backfill] {label} hafu_n={len(hafu)}")
+                    continue
                 skipped_dup += 1
                 print(f"  [dup] {label} 已存在相同快照")
                 continue
@@ -244,6 +273,7 @@ async def main():
                 hhad_away=hhad["away"],
                 ttg_odds_json=ttg,
                 crs_odds_json=crs,
+                hafu_odds_json=hafu,
             )
             db.add(snap)
             inserted += 1
@@ -254,7 +284,7 @@ async def main():
         else:
             await db.rollback()
 
-    print(f"\n完成: 写入 {inserted} 条，拉取失败 {skipped_fetch}，解析失败 {skipped_parse}，重复 {skipped_dup}")
+    print(f"\n完成: 写入 {inserted} 条，回填 hafu {updated} 条，拉取失败 {skipped_fetch}，解析失败 {skipped_parse}，重复 {skipped_dup}")
     return 0
 
 

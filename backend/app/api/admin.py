@@ -6,6 +6,7 @@ from sqlalchemy import select
 from app.db.database import get_db
 from app.db.models import TaskLog
 from app.db.logger import AppLogger
+from app.db.redis_client import cache_bump_version
 from app.collector.pipeline import SyncPipeline
 from datetime import datetime, timedelta, timezone
 import time
@@ -175,6 +176,7 @@ async def trigger_sync_market_flow_odds(
             parsed.append(p)
 
         inserted = 0
+        updated = 0
         skipped_dup = 0
         skipped_unmatched = 0
         matched_local_ids: list[int] = []
@@ -205,6 +207,13 @@ async def trigger_sync_market_flow_odds(
                 )
             )).scalars().all()
             if any(_live_mod._snap_equal(s, p["had"], p["hhad"], p["ttg"], p["crs"]) for s in existing):
+                matched_snaps = [s for s in existing if _live_mod._snap_equal(s, p["had"], p["hhad"], p["ttg"], p["crs"])]
+                target = matched_snaps[0]
+                # 历史快照 hafu 为空而本次拉到 hafu → 仅回填 hafu 字段（半全场赔率）
+                if p["hafu"] and not target.hafu_odds_json:
+                    target.hafu_odds_json = p["hafu"]
+                    updated += 1
+                    continue
                 skipped_dup += 1
                 continue
             db.add(JczqPlayOddsSnapshot(
@@ -215,17 +224,20 @@ async def trigger_sync_market_flow_odds(
                 hhad_line=p["hhad"]["line"], hhad_home=p["hhad"]["home"],
                 hhad_draw=p["hhad"]["draw"], hhad_away=p["hhad"]["away"],
                 ttg_odds_json=p["ttg"], crs_odds_json=p["crs"],
+                hafu_odds_json=p["hafu"],
             ))
             inserted += 1
         await db.commit()
+        await cache_bump_version()  # 竞彩赔率（含 hafu）写入 → 统计缓存失效
 
         duration = int((time.time() - start) * 1000)
-        msg = (f"MarketFlow 赔率：API {len(live)} 场 → 窗口过滤 {len(parsed)} 场 → 写入 JczqPlayOddsSnapshot {inserted} 条，"
-               f"重复跳过 {skipped_dup}，本地赛事无匹配 {skipped_unmatched}")
+        msg = (f"MarketFlow 赔率：API {len(live)} 场 → 窗口过滤 {len(parsed)} 场 → 写入 JczqPlayOddsSnapshot {inserted} 条"
+               f"（回填半全场 {updated}）→ 重复跳过 {skipped_dup}，本地赛事无匹配 {skipped_unmatched}")
         await AppLogger.log("sync_odds", "success", msg, duration)
         return {"status": "ok", "message": msg, "data": {
             "api_total": len(live), "window_total": len(parsed),
-            "inserted": inserted, "skipped_dup": skipped_dup,
+            "inserted": inserted, "updated_hafu": updated,
+            "skipped_dup": skipped_dup,
             "skipped_unmatched": skipped_unmatched,
         }}
     except Exception as e:
@@ -383,6 +395,7 @@ async def trigger_sync_market_flow_sm_odds(
                 ))
                 inserted += 1
         await db.commit()
+        await cache_bump_version()  # SportMonks O/U 写入 → 统计缓存失效
         await sm.close()
 
         duration = int((time.time() - start) * 1000)
@@ -1058,6 +1071,7 @@ async def predict_market_flow_batch(
         duration = int((time.time() - start_time) * 1000)
         await AppLogger.log("predict", "failed", f"MarketFlow 批量预测失败: {e}", duration)
         return {"status": "error", "message": f"保存数据库失败: {e}"}
+    await cache_bump_version()  # MarketFlow 预测写入 → 统计缓存失效
 
     duration = int((time.time() - start_time) * 1000)
     msg = f"MarketFlow V2 预测完成: 新增 {created}, 更新 {updated}, 跳过 {skipped}, 失败 {failed}（共 {len(matches)} 场）"

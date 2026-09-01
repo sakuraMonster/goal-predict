@@ -490,6 +490,126 @@ export interface MarketFlowHistorySummary {
 export const getMarketFlowHistory = (params?: { start_date?: string; end_date?: string; model_version?: string; source?: string; ou_tier?: string; ou_sm_tier?: string }) =>
   api.get("/market-flow/predictions/history", { params }).then((r) => r.data as { data: MarketFlowPredictionItem[]; summary: MarketFlowHistorySummary });
 
+// ===== 大小球方向 / O/U 盘口 独立历史报告（standard / strict 两档） =====
+export interface OuHistoryStat {
+  signal: number;
+  bet: number;
+  skip: number;
+  settled: number;
+  hit: number;
+}
+export type OuTierStatMap = Record<string, OuHistoryStat>;
+export interface OuMatchTierCell {
+  direction: "over" | "under" | "skip";
+  hit: boolean | null;
+}
+export interface MarketFlowOuMatch {
+  match_num?: string | null;
+  kickoff_time: string;
+  home_team?: string | null;
+  away_team?: string | null;
+  league_name?: string | null;
+  actual_score?: string | null;
+  ou: Record<string, OuMatchTierCell>;
+  ou_sm: Record<string, OuMatchTierCell>;
+}
+export interface MarketFlowOuHistoryDay {
+  date: string;
+  n: number;
+  ou: OuTierStatMap;
+  ou_sm: OuTierStatMap;
+  matches: MarketFlowOuMatch[];
+}
+export interface MarketFlowOuHistoryResponse {
+  window_start: string | null;
+  window_end: string | null;
+  n_total: number;
+  n_settled: number;
+  totals: { ou: OuTierStatMap; ou_sm: OuTierStatMap };
+  by_date: MarketFlowOuHistoryDay[];
+}
+export const getMarketFlowOuHistory = (params?: { start_date?: string; end_date?: string; model_version?: string; source?: string }) =>
+  api.get("/market-flow/predictions/ou-history", { params }).then((r) => r.data as MarketFlowOuHistoryResponse);
+
+// ===== 串关推荐（3串1 = 2场进球数3选 + 1场方向优选胜平负单关） =====
+export interface MarketFlowParlayLeg {
+  match_num?: string | null;
+  home_team?: string | null;
+  away_team?: string | null;
+  league_name?: string | null;
+  kickoff_time: string;
+  kind: "goals" | "hafu" | "dir";
+  source?: string | null;      // dir 腿来源: favorite_hafu / ambiguous_had
+  pick: string;                // 进球腿: "3/4/5"；方向腿: "胜胜/负负/主/平/客"
+  pref?: string | null;
+  top3?: number[] | null;
+  dir?: string | null;
+  hafu_key?: string | null;
+  exp_total?: number | null;   // 进球腿期望总进球（近6场攻防）
+  p_hat: number;
+  odds: number;
+  keep1?: boolean | null;
+  hit: boolean | null;
+  actual?: string | null;
+}
+export interface MarketFlowParlayPick {
+  matchday: string;
+  pick_id?: string;            // 唯一标识（matchday + 腿场次摘要），前端列表 key 用
+  combo_level?: string;        // 组合级别: strict=三腿全异联赛 / loose=宽松(两进球腿异联赛) / fallback=兜底 / default=无降级
+  settled: boolean;
+  parlay_odds: number;
+  parlay_p_hat: number;
+  stake?: number;              // 下注注数（进球3选复式=3注；方案C=1注）
+  payout?: number;             // 实际返奖金额（命中按进球数单项赔率，未中=0）
+  roi?: number;                // 单场ROI = payout / stake
+  hit: boolean | null;
+  in_range?: boolean;          // 方案C：串关赔率是否落在 [min_odds, max_odds]（false=退化组合）
+  legs: MarketFlowParlayLeg[];
+}
+export interface MarketFlowParlayStats {
+  n: number;
+  hit: number;
+  p_hit: number | null;
+  avg_odds: number | null;
+  total_stake?: number;        // 总下注注数
+  total_payout?: number;       // 总返奖金额
+  roi: number | null;          // 总ROI = 总返奖 / 总下注
+}
+export interface MarketFlowParlayResponse {
+  window_start: string | null;
+  window_end: string | null;
+  min_odds?: number;           // 方案C：串关赔率下界
+  max_odds?: number;           // 方案C：串关赔率上界
+  picks: MarketFlowParlayPick[];
+  stats: MarketFlowParlayStats;
+}
+export const getMarketFlowParlay = (params?: { date?: string; start_date?: string; end_date?: string; model_version?: string; source?: string; goals_only?: string }) =>
+  api.get("/market-flow/predictions/parlay", { params }).then((r) => r.data as MarketFlowParlayResponse);
+
+export const getMarketFlowParlayDir = (params?: { date?: string; start_date?: string; end_date?: string; model_version?: string; source?: string; min_odds?: number; max_odds?: number }) =>
+  api.get("/market-flow/predictions/parlay-dir", { params }).then((r) => r.data as MarketFlowParlayResponse);
+
+export const getMarketFlowParlayD = (params?: { date?: string; start_date?: string; end_date?: string; model_version?: string; source?: string; min_odds?: number; max_odds?: number }) =>
+  api.get("/market-flow/predictions/parlay-d", { params }).then((r) => r.data as MarketFlowParlayResponse);
+
+// 方案生成就绪度：说明当日各方案能否生成、缺什么数据（只读）
+export interface MarketFlowPlanReadiness {
+  date: string;
+  matches: number;
+  hafu_available: number;
+  ttg_signal: number;
+  sm_signal: number;
+  goals_signal: number;
+  pools: { favorite: number; ambiguous: number; upset: number };
+  plans: {
+    plan_a: { ok: boolean; reason: string | null };
+    plan_d: { ok: boolean; reason: string | null };
+    plan_c: { ok: boolean; reason: string | null };
+  };
+}
+export const getPlanReadiness = (params: { date: string }) =>
+  api.get("/market-flow/predictions/plan-readiness", { params }).then((r) => r.data as MarketFlowPlanReadiness);
+
 export interface MarketFlowPoolStat {
   key: "favorite" | "ambiguous" | "upset" | "unpooled";
   label: string;

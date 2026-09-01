@@ -1,0 +1,32 @@
+base排序|三级降级组合: 出串=21天 已结算=21 命中=5 p_hit=0.2381 均赔=5.90 ROI=+0.4042 | fallback=1 loose=4 strict=16
+base排序|无约束组合: 出串=21天 已结算=21 命中=4 p_hit=0.1905 均赔=5.46 ROI=+0.0391 | default=21
+gate排序|三级降级组合: 出串=21天 已结算=21 命中=4 p_hit=0.1905 均赔=5.97 ROI=+0.1372 | fallback=1 loose=4 strict=16
+gate排序|无约束组合: 出串=21天 已结算=21 命中=4 p_hit=0.1905 均赔=5.32 ROI=+0.0132 | default=21
+
+===== 进球腿候选 gate 分布 =====
+判大候选: strict=90 standard=28
+
+===== 选中判大腿 gate 分布 + 逐日命中对照 =====
+  2026-08-01: base=未中 gate=未中
+  2026-08-02: base=未中 gate=未中
+  2026-08-03: base=未中 gate=未中
+  2026-08-07: base=未中 gate=未中
+  2026-08-08: base=未中 gate=未中
+  2026-08-09: base=未中 gate=未中
+  2026-08-11: base=未中 gate=未中
+  2026-08-14: base=中 gate=中
+  2026-08-15: base=未中 gate=未中
+  2026-08-16: base=中 gate=中
+  2026-08-21: base=未中 gate=未中
+  2026-08-22: base=未中 gate=未中
+  2026-08-23: base=未中 gate=未中
+  2026-08-24: base=未中 gate=未中
+  2026-08-25: base=未中 gate=未中
+  2026-08-26: base=中 gate=中
+  2026-08-27: base=未中 gate=未中
+  2026-08-28: base=中 gate=中
+  2026-08-29: base=中 gate=未中 ★差异(base=True, gate=False)
+  2026-08-30: base=未中 gate=未中
+  2026-08-31: base=未中 gate=未中
+选中判大腿[base]: strict=27 standard=15
+选中判大腿[gate]: strict=37 standard=5

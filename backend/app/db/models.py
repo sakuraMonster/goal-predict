@@ -109,6 +109,7 @@ class JczqPlayOddsSnapshot(Base):
     hhad_away = Column(Float)
     ttg_odds_json = Column(_JSON_VARIANT)
     crs_odds_json = Column(_JSON_VARIANT)
+    hafu_odds_json = Column(_JSON_VARIANT, comment="半全场收盘赔率 {hh/hd/ha/dh/dd/da/ah/ad/aa: odds}")
 
 class TeamSeasonStats(Base):
     __tablename__ = "team_season_stats"

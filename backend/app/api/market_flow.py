@@ -10,7 +10,7 @@ from sqlalchemy.orm import aliased
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.database import get_db
-from app.db.models import JczqPlayOddsSnapshot, League, MarketFlowPrediction, Match, OddsSnapshot, Prediction, Team
+from app.db.models import JczqPlayOddsSnapshot, League, MarketFlowPrediction, Match, OddsSnapshot, ParlayEConfirm, ParlayFinalConfirm, Prediction, Team
 from app.db.redis_client import (
     acquire_lock,
     cache_bump_version,
@@ -27,6 +27,7 @@ from app.predictor.models.ou_market import (
     ou_market_from_rows,
 )
 from app.predictor.snap import snap_top2
+from app.halfdraw_rules import select_for_day, is_r1, is_r2, RULE_TOP, RULE_FALLBACK
 
 router = APIRouter(prefix="/api/market-flow", tags=["market_flow"])
 
@@ -36,11 +37,14 @@ def _err(msg: str, code: int):
 
 
 def _stake_amount(legs) -> int:
-    """下注注数 = Π(进球腿选数个数)；无进球腿 → 1 注（等额 1 元/注口径）。"""
+    """下注注数 = Π(各腿投注选项数)（等额 1 元/注口径）：
+    进球腿按 top3 选数（3）；其余腿按 picks 复式选项数（同场双选=2 / halfdraw R1 半平双选=2），单选腿=1。"""
     stake = 1
     for lg in legs:
         if lg.get("kind") == "goals":
             stake *= max(1, len(lg.get("top3") or []))
+        else:
+            stake *= max(1, len(lg.get("picks") or []))
     return stake
 
 
@@ -3383,3 +3387,2050 @@ async def market_flow_model_versions(db: AsyncSession = Depends(get_db)):
             "note": "fused: direction/score = V2 baseline, TTG Top2 merged from ModelC Poisson",
         })
     return {"data": out}
+
+
+# ============================================================================
+# 方案E（MarketFlow V2 串关推荐新增）：每日进球双选建议 + 人工确认 + 与方案D方向腿组 2串1
+# 说明：不修改方案A/D/C 的组合逻辑；方向腿为对方案D当日输出(dir 腿)的“引用快照”，
+#       由前端在确认时随方案D数据一并提交，后端落库。
+# 规则（与回测口径一致）：
+#   - 23 腿候选排除联赛：葡超、法乙
+#   - 34 腿候选额外排除：美职联、芬超、瑞典超（无 34 候选时降级为另一场 23）
+# ============================================================================
+_E_EX23 = {"葡超", "法乙"}
+_E_EX34 = {"美职联", "芬超", "瑞典超"}
+
+
+def _parlay_e_parse_ttg(raw):
+    if raw is None:
+        return {}
+    data = raw
+    if isinstance(data, str):
+        try:
+            data = json.loads(data)
+        except (ValueError, TypeError):
+            return {}
+    if not isinstance(data, dict):
+        return {}
+    out = {}
+    for k, v in data.items():
+        try:
+            o = float(v)
+        except (TypeError, ValueError):
+            continue
+        if o > 0:
+            out[int(k)] = o
+    return out
+
+
+def _parlay_e_pick_odds(ttg_odds, nums):
+    return {str(k): ttg_odds[k] for k in nums if k in ttg_odds}
+
+
+def _parlay_e_implied(ttg_odds):
+    inv = {k: 1.0 / v for k, v in ttg_odds.items() if v and v > 1.01}
+    if not inv:
+        return None
+    tot = sum(inv.values())
+    return {k: v / tot for k, v in inv.items()}
+
+
+def _parlay_e_match_entry(it, t, ip):
+    """把单个 market-flow item 变成方案E 场次条目（含 23/34 市场信息）"""
+    nums = {2, 3, 4}
+    pick23 = _parlay_e_pick_odds(t, [2, 3])
+    pick34 = _parlay_e_pick_odds(t, [3, 4])
+    p23 = (ip.get(2, 0) + ip.get(3, 0)) if ip else 0.0
+    p34 = (ip.get(3, 0) + ip.get(4, 0)) if ip else 0.0
+    return {
+        "match_id": it.get("match_id"),
+        "match_num": it.get("match_num"),
+        "league_name": it.get("league_name"),
+        "home_team": it.get("home_team"),
+        "away_team": it.get("away_team"),
+        "kickoff_time": it.get("kickoff_time"),
+        "p23": round(p23, 4),
+        "p34": round(p34, 4),
+        "pick_odds23": pick23,          # 有货才有 23 复式
+        "pick_odds34": pick34,          # 有货才有 34 复式
+        "excl23": it.get("league_name") in _E_EX23,
+        "excl34": it.get("league_name") in _E_EX34,
+    }
+
+
+def _parlay_e_suggestion(m, leg_type, downgraded=False):
+    base = {k: m[k] for k in ("match_id", "match_num", "league_name", "home_team",
+                              "away_team", "kickoff_time", "p23", "p34")}
+    base["leg_type"] = leg_type
+    base["downgraded"] = bool(downgraded)
+    if leg_type == "23":
+        base["pick_odds"] = m.get("pick_odds23")
+        base["p_hat"] = m.get("p23")
+        base["pick_nums"] = [2, 3]
+    else:
+        base["pick_odds"] = m.get("pick_odds34")
+        base["p_hat"] = m.get("p34")
+        base["pick_nums"] = [3, 4]
+    return base
+
+
+def _parlay_e_confirm_dict(row):
+    if row is None:
+        return None
+    return {
+        "pick_date": row.pick_date.isoformat(),
+        "match_id": row.match_id,
+        "match_num": row.match_num,
+        "league_name": row.league_name,
+        "home_team": row.home_team,
+        "away_team": row.away_team,
+        "kickoff_time": row.kickoff_time.isoformat() if row.kickoff_time else None,
+        "leg_type": row.leg_type,
+        "goal_pick_odds": row.goal_pick_odds,
+        "goal_p_hat": row.goal_p_hat,
+        "has_dir": row.dir_match_id is not None,
+        "dir": None if row.dir_match_id is None else {
+            "match_id": row.dir_match_id,
+            "match_num": row.dir_match_num,
+            "league_name": row.dir_league_name,
+            "home_team": row.dir_home_team,
+            "away_team": row.dir_away_team,
+            "kickoff_time": row.dir_kickoff_time.isoformat() if row.dir_kickoff_time else None,
+            "pick": row.dir_pick,
+            "odds": row.dir_odds,
+            "p_hat": row.dir_p_hat,
+            "source": row.dir_source,
+        },
+        "parlay_odds_max": row.parlay_odds_max,
+        "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+    }
+
+
+def _parlay_e_dir_snap(it: dict, opt: dict) -> dict:
+    """把 parlay-final 方向腿候选档转成方案E 方向腿快照（match_id 由后端权威解析，前端传 0）"""
+    return {
+        "match_id": 0,
+        "match_num": it.get("match_num"),
+        "league_name": it.get("league_name"),
+        "home_team": it.get("home_team"),
+        "away_team": it.get("away_team"),
+        "kickoff_time": it.get("kickoff_time"),
+        "pick": opt.get("pick") or opt.get("key") or "",
+        "odds": opt.get("odds"),
+        "p_hat": opt.get("p_hat"),
+        "source": opt.get("source"),
+    }
+
+
+def _parlay_e_dir_options(items: list, date: str) -> list:
+    """当日可作「方案D方向腿」人工指定候选的场次列表（玩法池与方案D一致：
+    模糊池 HAD fav≥1.8（ambiguous_had）/ 正路池半全场胜胜·负负≥1.8（favorite_hafu））。
+    每场只给该场系统默认档，按 p_hat 高置信降序；由前端按当前方向腿 source 过滤并排除与进球腿同场。"""
+    out = []
+    for it in items:
+        md = _matchday_date(it.get("kickoff_time"), match_num=it.get("match_num"))
+        if md != date:
+            continue
+        for _b in (_final_dir_ambig_pair, _final_dir_favhafu_pair):
+            pr, _dk = _b(it)
+            if pr:
+                out.append(_parlay_e_dir_snap(it, pr[0]))
+                break
+    return sorted(out, key=lambda o: o.get("p_hat") or 0.0, reverse=True)
+
+
+@router.get("/predictions/parlay-e")
+async def market_flow_parlay_e_suggest(
+    date: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """方案E：指定比赛日的进球双选建议（23腿 / 34腿，34 缺货降级为另一场 23）+ 当日场次列表 + 已确认快照（只读）。
+
+    进球注=竞彩总进球复式：23 = 买 {2,3}；34 = 买 {3,4}。
+    """
+    try:
+        d0 = datetime.fromisoformat(date)
+    except ValueError:
+        return _err("date must be ISO date string", 400)
+    start = d0.replace(hour=12, minute=0, second=0, microsecond=0)
+    end = start + timedelta(days=1)
+
+    items, _os, _osm = await _market_flow_query(
+        db, start=start, end=end, ou_tier="standard", ou_sm_tier="standard"
+    )
+
+    entries = []
+    for it in items:
+        md = _matchday_date(it.get("kickoff_time"), match_num=it.get("match_num"))
+        if md != date:
+            continue
+        t = _parlay_e_parse_ttg(it.get("ttg_odds"))
+        if not t or len(_parlay_e_pick_odds(t, [2, 3])) < 2:
+            continue  # 无完整 23 复式赔率，不可作为候选
+        ip = _parlay_e_implied(t)
+        if not ip:
+            continue
+        entries.append(_parlay_e_match_entry(it, t, ip))
+
+    entries.sort(key=lambda m: (m["kickoff_time"] or ""))
+    # —— 建议1：23腿（当日 P23 最高，排除葡超/法乙） ——
+    pool23 = [m for m in entries if not m["excl23"]]
+    s23 = max(pool23, key=lambda m: m["p23"]) if pool23 else None
+    # —— 建议2：34腿（排除葡超/法乙 + 美职联/芬超/瑞典超，且与建议1不同场）；缺货降级为第二 23 ——
+    s34 = None
+    reason2 = None
+    if s23 is not None:
+        pool34 = [m for m in entries if not m["excl23"] and not m["excl34"]
+                  and m["match_id"] != s23["match_id"]]
+        if pool34:
+            s34 = max(pool34, key=lambda m: m["p34"])
+            s34 = _parlay_e_suggestion(s34, "34")
+        else:
+            pool23b = [m for m in entries if not m["excl23"] and m["match_id"] != s23["match_id"]]
+            if pool23b:
+                s34 = max(pool23b, key=lambda m: m["p23"])
+                s34 = _parlay_e_suggestion(s34, "23", downgraded=True)
+            else:
+                reason2 = "当日无合格的第二场候选（排除规则后不足 2 场）"
+    else:
+        reason2 = "当日无可用的 23 球候选场次（排除葡超/法乙后为 0，或赔率缺失）"
+
+    suggestions = []
+    if s23 is not None:
+        suggestions.append(_parlay_e_suggestion(s23, "23"))
+    if s34 is not None:
+        suggestions.append(s34)
+
+    # —— 已确认快照 ——
+    row = (await db.execute(
+        select(ParlayEConfirm).where(ParlayEConfirm.pick_date == d0.date())
+    )).scalar_one_or_none()
+
+    return {
+        "date": date,
+        "suggestions": suggestions,
+        "suggestion_reason": None if len(suggestions) >= 2 else (reason2 or "当日场次不足"),
+        "day_matches": entries,
+        "dir_options": _parlay_e_dir_options(items, date),
+        "confirm": _parlay_e_confirm_dict(row),
+    }
+
+
+@router.post("/predictions/parlay-e/confirm")
+async def market_flow_parlay_e_confirm(
+    payload: dict = Body(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """方案E 人工确认并落库（每日 1 条）：确认一个进球场（23/34 复式）+ 当日方案D方向腿（前端随方案D输出提交）。
+
+    payload: {date, match_id, leg_type('23'|'34'), dir?: {match_id, match_num, league_name,
+              home_team, away_team, kickoff_time, pick, odds, p_hat, source}}
+    """
+    date = payload.get("date")
+    match_id = payload.get("match_id")
+    leg_type = payload.get("leg_type")
+    if not date or not match_id or leg_type not in ("23", "34"):
+        return _err("date/match_id/leg_type(23|34) required", 400)
+    try:
+        d0 = datetime.fromisoformat(date)
+    except ValueError:
+        return _err("date must be ISO date string", 400)
+
+    # 1) 进球场元数据 + 最新 TTG 收盘赔率
+    from sqlalchemy.orm import aliased
+    HT = aliased(Team)
+    AT = aliased(Team)
+    res = (await db.execute(
+        select(Match, League.name_zh.label("lg"), HT.name_zh.label("h"), AT.name_zh.label("a"))
+        .join(League, League.id == Match.league_id)
+        .join(HT, HT.id == Match.home_team_id)
+        .join(AT, AT.id == Match.away_team_id)
+        .where(Match.id == int(match_id))
+    )).first()
+    if res is None:
+        return _err("match not found", 404)
+    mrow = res[0]
+    lg_name, h_name, a_name = res[1], res[2], res[3]
+
+    snap = (await db.execute(
+        select(JczqPlayOddsSnapshot.ttg_odds_json)
+        .where(JczqPlayOddsSnapshot.match_id == int(match_id),
+               JczqPlayOddsSnapshot.ttg_odds_json.isnot(None))
+        .order_by(JczqPlayOddsSnapshot.snapshot_time.desc()).limit(1)
+    )).scalar_one_or_none()
+    t = _parlay_e_parse_ttg(snap)
+    nums = [2, 3] if leg_type == "23" else [3, 4]
+    po = _parlay_e_pick_odds(t, nums)
+    if len(po) < 2:
+        return _err(f"该场缺少 {leg_type} 复式所需赔率（{'+'.join(str(n) for n in nums)} 两档），无法确认", 400)
+    ip = _parlay_e_implied(t)
+    p_hat = round(sum(ip.get(k, 0) for k in nums), 4) if ip else 0.0
+
+    # 2) 方向腿快照（可选；来自方案D当日 dir 腿）
+    dr = payload.get("dir") or {}
+    dir_odds = dr.get("odds")
+
+    # 3) upsert（按比赛日唯一）
+    row = (await db.execute(
+        select(ParlayEConfirm).where(ParlayEConfirm.pick_date == d0.date())
+    )).scalar_one_or_none()
+    if row is None:
+        row = ParlayEConfirm(pick_date=d0.date())
+        db.add(row)
+    row.match_id = int(match_id)
+    row.match_num = getattr(mrow, "match_num", None)
+    row.league_name = lg_name
+    row.home_team = h_name
+    row.away_team = a_name
+    row.kickoff_time = mrow.kickoff_time
+    row.leg_type = leg_type
+    row.goal_pick_odds = po
+    row.goal_p_hat = p_hat
+    # —— 方向腿 match_id：服务端权威解析（前端提交的 dir.match_id 不可信，曾因同开球时间误配）——
+    resolved_dir_id = None
+    if dr.get("home_team") and dr.get("away_team"):
+        wstart = d0.replace(hour=12, minute=0, second=0, microsecond=0)
+        wend = wstart + timedelta(days=1)
+        q = (select(Match.id)
+             .join(League, League.id == Match.league_id)
+             .join(HT, HT.id == Match.home_team_id)
+             .join(AT, AT.id == Match.away_team_id)
+             .where(Match.kickoff_time >= wstart, Match.kickoff_time < wend,
+                    League.name_zh == dr.get("league_name"),
+                    HT.name_zh == dr.get("home_team"), AT.name_zh == dr.get("away_team")))
+        cand = (await db.execute(q)).scalars().all()
+        if len(cand) == 1:
+            resolved_dir_id = cand[0]
+        elif len(cand) > 1 and dr.get("match_num"):
+            cand2 = (await db.execute(q.where(Match.match_num == dr["match_num"]))).scalars().all()
+            if len(cand2) == 1:
+                resolved_dir_id = cand2[0]
+    row.dir_match_id = resolved_dir_id
+    parlay_odds_max = None
+    if resolved_dir_id and dir_odds:
+        high_goal_odd = max(float(po[str(n)]) for n in nums)
+        parlay_odds_max = round(high_goal_odd * float(dir_odds), 4)
+    row.dir_match_num = dr.get("match_num")
+    row.dir_league_name = dr.get("league_name")
+    row.dir_home_team = dr.get("home_team")
+    row.dir_away_team = dr.get("away_team")
+    dk = dr.get("kickoff_time")
+    row.dir_kickoff_time = datetime.fromisoformat(dk) if isinstance(dk, str) else dk
+    row.dir_pick = dr.get("pick")
+    row.dir_odds = float(dir_odds) if dir_odds else None
+    row.dir_p_hat = float(dr["p_hat"]) if dr.get("p_hat") is not None else None
+    row.dir_source = dr.get("source")
+    row.parlay_odds_max = parlay_odds_max
+    await db.commit()
+    await db.refresh(row)
+    return {"success": True, "message": f"方案E已确认：{h_name} vs {a_name} 打{leg_type}球",
+            "confirm": _parlay_e_confirm_dict(row)}
+
+
+def _parlay_e_outcome(m):
+    if m is None or m.home_score is None or m.away_score is None:
+        return None
+    return "home" if m.home_score > m.away_score else "away" if m.home_score < m.away_score else "draw"
+
+
+def _parlay_e_half_dir(m):
+    if m is None or not isinstance(m.half_home_score, int) or not isinstance(m.half_away_score, int):
+        return None
+    if m.half_home_score > m.half_away_score:
+        return "home"
+    if m.half_home_score < m.half_away_score:
+        return "away"
+    return "draw"
+
+
+@router.get("/predictions/parlay-e/history")
+async def market_flow_parlay_e_history(db: AsyncSession = Depends(get_db)):
+    """方案E 已确认记录结算统计（只读）：进球腿(23/34复式) / 方案D方向腿 / 2串1 分项命中与 ROI。
+
+    口径：进球腿命中 = 实际总进球 ∈ 所选两档；方向腿 = 主/客/平按全场，胜胜/负负按半场+全场同向；
+    2串1 复式注数=2（进球两档各 1 注 × 方向单注）；返奖 = 命中档赔率 × 方向腿赔率。
+    """
+    rows = (await db.execute(
+        select(ParlayEConfirm).order_by(ParlayEConfirm.pick_date.desc())
+    )).scalars().all()
+    ids = set()
+    for r in rows:
+        if r.match_id:
+            ids.add(r.match_id)
+        if r.dir_match_id:
+            ids.add(r.dir_match_id)
+    matches = {}
+    if ids:
+        mq = await db.execute(select(Match).where(Match.id.in_(ids)))
+        matches = {m.id: m for m in mq.scalars()}
+
+    _ZH_OUT = {"主": "home", "客": "away", "平": "draw"}
+    out_rows = []
+    n_goal_settled = n_goal_hit = 0
+    n_dir_verified = n_dir_hit = 0
+    n_combo = n_combo_hit = 0
+    total_stake = 0.0
+    total_payout = 0.0
+    for r in rows:
+        g = matches.get(r.match_id)
+        dgm = matches.get(r.dir_match_id) if r.dir_match_id else None
+        nums = [2, 3] if r.leg_type == "23" else [3, 4]
+        # 进球腿
+        goal_act = None
+        goal_settled = g is not None and g.home_score is not None and g.away_score is not None
+        if goal_settled:
+            goal_act = g.home_score + g.away_score
+        goal_hit = bool(goal_settled and goal_act in nums)
+        # 方向腿（主/客/平 全场；胜胜/负负 半场+全场同向）
+        dir_hit = None
+        dir_verified = False
+        if r.dir_pick and dgm is not None:
+            fo = _parlay_e_outcome(dgm)
+            if r.dir_pick in _ZH_OUT:
+                dir_verified = fo is not None
+                if dir_verified:
+                    dir_hit = (fo == _ZH_OUT[r.dir_pick])
+            elif r.dir_pick in ("胜胜", "负负"):
+                ho = _parlay_e_half_dir(dgm)
+                want = "home" if r.dir_pick == "胜胜" else "away"
+                dir_verified = (fo is not None and ho is not None)
+                if dir_verified:
+                    dir_hit = (ho == want and fo == want)
+        combo_hit = None
+        payout = None
+        if goal_settled and dir_verified:
+            combo_hit = bool(goal_hit and dir_hit)
+        if goal_settled:
+            n_goal_settled += 1
+            n_goal_hit += 1 if goal_hit else 0
+        if dir_verified:
+            n_dir_verified += 1
+            n_dir_hit += 1 if dir_hit else 0
+        if goal_settled and dir_verified:
+            n_combo += 1
+            stake = 2.0  # 进球两档复式
+            total_stake += stake
+            if goal_hit and dir_hit:
+                n_combo_hit += 1
+                po = r.goal_pick_odds or {}
+                odd_k = po.get(str(goal_act))
+                if odd_k and r.dir_odds:
+                    payout = float(odd_k) * float(r.dir_odds)
+                    total_payout += payout
+        out_rows.append({
+            "pick_date": r.pick_date.isoformat(),
+            "leg_type": r.leg_type,
+            "goal": {
+                "match_id": r.match_id, "match_num": r.match_num, "league_name": r.league_name,
+                "home_team": r.home_team, "away_team": r.away_team,
+                "pick_odds": r.goal_pick_odds, "nums": nums,
+                "settled": goal_settled, "act": goal_act,
+                "hit": goal_hit if goal_settled else None,
+            },
+            "dir": None if not r.dir_pick else {
+                "match_id": r.dir_match_id, "match_num": r.dir_match_num,
+                "league_name": r.dir_league_name, "home_team": r.dir_home_team,
+                "away_team": r.dir_away_team, "pick": r.dir_pick, "odds": r.dir_odds,
+                "source": r.dir_source,
+                "verified": dir_verified, "hit": dir_hit,
+            },
+            "combo_hit": combo_hit,
+            "parlay_odds_max": r.parlay_odds_max,
+            "stake": 2.0 if (goal_settled and dir_verified) else None,
+            "payout": payout,
+        })
+    stats = {
+        "confirm_n": len(rows),
+        "goal_settled_n": n_goal_settled, "goal_hit_n": n_goal_hit,
+        "goal_p_hit": round(n_goal_hit / n_goal_settled, 4) if n_goal_settled else None,
+        "dir_verified_n": n_dir_verified, "dir_hit_n": n_dir_hit,
+        "dir_p_hit": round(n_dir_hit / n_dir_verified, 4) if n_dir_verified else None,
+        "combo_n": n_combo, "combo_hit_n": n_combo_hit,
+        "combo_p_hit": round(n_combo_hit / n_combo, 4) if n_combo else None,
+        "total_stake": round(total_stake, 1),
+        "total_payout": round(total_payout, 2),
+        "roi": round(total_payout / total_stake, 4) if total_stake else None,
+    }
+    return {"rows": out_rows, "stats": stats}
+
+
+# =====================================================================
+# 方案终稿：弱腿候选 + 人工确认（2026-09-03）
+# 机制：方案 A/D/C 的"低命中单选腿"（判大进球3选 / 半全场腿 / 冷门方向腿）
+#       自动给 2 个选项（系统默认 + 备选），人工确认后与其余默认腿组成终稿组合；
+#       命中统计分两组：系统默认（现有 picks 自动结算） vs 人工终稿。
+# 弱腿基线 = 8 月已结算腿级命中（_dir_legs_aug / 串关腿级 ledger）。
+# =====================================================================
+_FINAL_HAFU_ZH = {"hh": "胜胜", "hd": "胜平", "ha": "胜负", "dh": "平胜", "dd": "平平",
+                  "da": "平负", "ah": "负胜", "ad": "负平", "aa": "负负"}
+_FINAL_WEAK_BASELINE: dict[tuple, float] = {
+    ("A", "goals", "over"): 0.559,      # 方案A 判大进球 3选
+    ("D", "hafu"): 0.500,               # 方案D 半全场腿
+    ("C", "hafu"): 0.400,               # 方案C 半全场腿
+    ("C", "dir", "had_upset"): 0.286,   # 方案C 强冷门方向腿
+    ("C", "dir", "cold"): 0.167,        # 方案C 冷门信号兜底方向腿
+}
+_FINAL_WEAK_THRESHOLD = 0.60
+_FINAL_ODDS_RANGE: dict[str, tuple[float, float] | None] = {
+    "A": None,
+    "D": (5.0, 15.0),
+    "C": (4.0, 10.0),
+    "G": None,  # 方案G 2串1：候选已被 halfdraw 规则池收窄，不再额外限定串关赔率
+}
+_FINAL_PLAN_FN = {
+    "A": "market_flow_parlay_recommend",
+    "D": "market_flow_parlay_d_recommend",
+    "C": "market_flow_parlay_dir_recommend",
+    "G": "market_flow_parlay_f_recommend",
+}
+# 手工新增方案（系统当日无组合时）：各腿槽位允许的候选玩法（同一槽位内取并集）
+_FINAL_MANUAL_SLOTS: dict[str, list[list[str]]] = {
+    "A": [["goals_over", "goals_under"], ["goals_over", "goals_under"], ["dir_ambig", "dir_favhafu"]],
+    "D": [["goals_over"], ["hafu"], ["dir_ambig", "dir_favhafu"]],
+    "C": [["hafu"], ["dir_c", "dir_had_any"]],
+    "G": [["halfdraw_any"], ["dir_ambig", "dir_favhafu"]],
+}
+_FINAL_MANUAL_KIND = {
+    "goals_over": "goals", "goals_under": "goals", "hafu": "hafu",
+    "halfdraw_r1": "halfdraw", "halfdraw_r2": "halfdraw", "halfdraw_any": "halfdraw",
+    "dir_ambig": "dir", "dir_favhafu": "dir", "dir_c": "dir", "dir_had_any": "dir",
+}
+
+
+def _final_json_odds(raw):
+    """把 JSON 列（字符串键）转成 {key: float}，兼容 {'0':13} / {'hh':1.9}"""
+    if raw is None:
+        return {}
+    data = raw
+    if isinstance(data, str):
+        try:
+            data = json.loads(data)
+        except (ValueError, TypeError):
+            return {}
+    if not isinstance(data, dict):
+        return {}
+    out = {}
+    for k, v in data.items():
+        try:
+            o = float(v)
+        except (TypeError, ValueError):
+            continue
+        if o > 0:
+            out[str(k)] = o
+    return out
+
+
+def _final_implied(odds: dict) -> dict | None:
+    inv = {k: 1.0 / v for k, v in odds.items() if v and v > 1.01}
+    if not inv:
+        return None
+    tot = sum(inv.values())
+    return {k: v / tot for k, v in inv.items()}
+
+
+def _final_combo_odds(top3_nums, ttg):
+    """进球 3选复式合成赔率 = 1/Σ(1/单项)"""
+    s = sum(1.0 / ttg[str(n)] for n in top3_nums if str(n) in ttg)
+    return round(1.0 / s, 4) if s else None
+
+
+def _final_item_for(leg, items):
+    """leg → 当日 market-flow item（同场判定：match_num 优先，其次 kickoff）"""
+    mn = leg.get("match_num")
+    kt = leg.get("kickoff_time")
+    for it in items:
+        i_mn = it.get("match_num")
+        if mn and i_mn and mn == i_mn:
+            return it
+    if kt:
+        for it in items:
+            if it.get("kickoff_time") == kt:
+                return it
+    return None
+
+
+def _final_leg_family(leg: dict) -> str | None:
+    """归一化腿家族：C 的半全场腿以 kind=dir/source=hafu 存储，也归为 hafu"""
+    kind = leg.get("kind")
+    if kind == "goals":
+        return "goals"
+    if kind == "hafu":
+        return "hafu"
+    if kind == "halfdraw":
+        return "halfdraw"
+    if kind == "dir" and leg.get("source") == "hafu":
+        return "hafu"
+    if kind == "dir":
+        return "dir"
+    return None
+
+
+def _final_leg_weak_meta(plan: str, leg: dict):
+    """返回 (是否弱腿, 基线命中, 阈值)。无基线数据 → 不强腿。"""
+    fam = _final_leg_family(leg)
+    base = None
+    if fam == "goals":
+        base = _FINAL_WEAK_BASELINE.get((plan, "goals", leg.get("dir")))
+    elif fam == "hafu":
+        base = _FINAL_WEAK_BASELINE.get((plan, "hafu"))
+    elif fam == "dir":
+        if leg.get("source") == "had_upset":
+            base = _FINAL_WEAK_BASELINE.get((plan, "dir", "had_upset"))
+        elif leg.get("fallback"):
+            base = _FINAL_WEAK_BASELINE.get((plan, "dir", "cold"))
+    if base is None:
+        return False, None
+    return base < _FINAL_WEAK_THRESHOLD, base
+
+
+DIR_ZH_FINAL = {"home": "主", "draw": "平", "away": "客"}
+_DIR_ZH_REV = {"主": "home", "平": "draw", "客": "away"}
+
+
+def _final_goals_dirn(leg: dict) -> str:
+    """进球腿方向：优先 leg.dir；缺省（方案D 不存 dir 且恒判大）按 top3 推断（under 恒 ≤2，over 含 ≥3）"""
+    d = leg.get("dir")
+    if d in ("over", "under"):
+        return d
+    return "over" if any(int(n) >= 3 for n in (leg.get("top3") or [])) else "under"
+
+
+def _final_exp_total(it: dict, team_avg: dict) -> float | None:
+    h = it.get("home_team_id")
+    a = it.get("away_team_id")
+    if not h or not a:
+        return None
+    hv = team_avg.get(int(h))
+    av = team_avg.get(int(a))
+    if not hv or not av:
+        return None
+    return (hv[0] + av[1]) / 2 + (av[0] + hv[1]) / 2
+
+
+def _final_over_dirn(it: dict) -> str | None:
+    """TTG ± SM 大小球方向（双信号矛盾→None）。与 parlay 逻辑一致。"""
+    ttg_all = it.get("ou_all") or {}
+    ttg_strict = (ttg_all.get("strict") or {}).get("direction")
+    ttg_dir = ttg_strict if ttg_strict in ("over", "under") else (ttg_all.get("standard") or {}).get("direction")
+    sm_tiers = ((it.get("ou_sm") or {}).get("tiers")) or {}
+    sm_dir = sm_tiers.get("strict")
+    if sm_dir not in ("over", "under"):
+        sm_dir = sm_tiers.get("standard")
+    ttg_valid = ttg_dir if ttg_dir in ("over", "under") else None
+    sm_valid = sm_dir if sm_dir in ("over", "under") else None
+    if ttg_valid and sm_valid and ttg_valid != sm_valid:
+        return None
+    return ttg_valid or sm_valid
+
+
+def _final_goals_pair(plan: str, it: dict, team_avg: dict, dirn: str):
+    """进球腿在目标场 X 的系统默认档位（无 over/under 信号门槛，仅需 TTG 可构造 3 选）。
+
+    over：方案A=温和分层（exp≥3.6→456，否则345）；方案D=盘口3.5分层（P(≥4)≥0.45→456，缺线回退 exp 567/456/345）。
+    under：市场 Top3（≤2 球，通常 0/1/2）。
+    返回 ([opt], default_key)；该场不可构造 3 选 → ([], None)。
+    """
+    ttg = _final_json_odds(it.get("ttg_odds"))
+    if not ttg:
+        return [], None
+    ip = _final_implied(ttg) or {}
+    if not ip:
+        return [], None
+    if dirn == "under":
+        cand = [k for k in ip if k.isdigit() and int(k) <= 2]
+        if len(cand) < 3:
+            return [], None
+        nums = [int(k) for k in sorted(cand, key=lambda k: ip[k], reverse=True)[:3]]
+    else:
+        if plan == "D":
+            _p35 = None
+            _l35 = ((it.get("ou_sm") or {}).get("lines") or {}).get("3.5")
+            if _l35:
+                _p35 = _l35.get("p_big")
+            if _p35 is not None:
+                chosen = [4, 5, 6] if _p35 >= 0.45 else [3, 4, 5]
+            else:
+                exp = _final_exp_total(it, team_avg)
+                chosen = [5, 6, 7] if (exp is not None and exp >= 3.6) else [4, 5, 6] if (exp is not None and exp >= 3.0) else [3, 4, 5]
+        else:  # 方案A 温和分层
+            exp = _final_exp_total(it, team_avg)
+            chosen = [4, 5, 6] if (exp is not None and exp >= 3.6) else [3, 4, 5]
+        if not all(str(n) in ttg for n in chosen):
+            return [], None
+        nums = list(chosen)
+
+    def _mk(ns):
+        return {
+            "key": "/".join(str(n) for n in ns),
+            "pick": "/".join(str(n) for n in ns),
+            "odds": _final_combo_odds(ns, ttg),
+            "p_hat": round(sum(ip.get(str(n), 0.0) for n in ns), 4),
+            "nums": list(ns),
+            "pick_odds": {str(n): ttg[str(n)] for n in ns},
+        }
+
+    d = _mk(nums)
+    return [d], d["key"]
+
+
+def _final_over_extreme(it: dict) -> bool:
+    """极端大市场：TTG 隐含 P(总进球>=3)>=0.90（长尾场，3/4/5 覆盖不住，不作为推荐②候选）"""
+    ttg = _final_json_odds(it.get("ttg_odds"))
+    if not ttg:
+        return False
+    ip = _final_implied(ttg) or {}
+    return sum(v for k, v in ip.items() if k.isdigit() and int(k) >= 3) >= 0.90
+
+
+def _final_hafu_pair(it: dict, with_alt: bool = False):
+    """半全场腿：默认=该场隐含最高且赔率>=2.0 的选项；
+    with_alt=True（方案D/C）时补第二个候选=隐含次高(>=2.0)。"""
+    hafu = _final_json_odds(it.get("hafu_odds"))
+    if not hafu:
+        return [], None
+    ip = _final_implied(hafu) or {}
+    pool = [k for k, v in hafu.items() if float(v) >= 2.0]
+    if not pool:
+        return [], None
+    ranked = sorted(pool, key=lambda k: ip.get(k, 0.0), reverse=True)
+
+    def _mk(k):
+        return {"key": k, "pick": _FINAL_HAFU_ZH.get(k, k),
+                "odds": round(float(hafu[k]), 4), "p_hat": round(ip.get(k, 0.0), 4)}
+
+    d = _mk(ranked[0])
+    out = [d]
+    if with_alt and len(ranked) >= 2:
+        out.append(_mk(ranked[1]))
+    return out, d["key"]
+
+
+def _final_halfdraw_homew(it: dict) -> float | None:
+    """HAD 主胜隐含 / (主胜隐含+客胜隐含)，与 halfdraw_rules.home_w 同口径。"""
+    had = it.get("had_odds") or {}
+    h = had.get("home")
+    a = had.get("away")
+    if not h or not a:
+        return None
+    try:
+        h, a = float(h), float(a)
+    except (TypeError, ValueError):
+        return None
+    if h <= 1.0 or a <= 1.0:
+        return None
+    ph, pa = 1.0 / h, 1.0 / a
+    return ph / (ph + pa)
+
+
+def _final_halfdraw_r1_pair(it: dict):
+    """方案G halfdraw 首选 R1 在目标场 X 的档位：联赛∈组A 且 home_w∈[0.53,0.63]
+    → 半平双选 {平胜dh, 平平dd}（2注复式，该腿本身即 2 个选项）。"""
+    from app.halfdraw_rules import is_r1
+    if not is_r1({"league": it.get("league_name"), "home_w": _final_halfdraw_homew(it)}):
+        return [], None
+    hafu = _final_json_odds(it.get("hafu_odds"))
+    if not hafu:
+        return [], None
+    dh, dd = hafu.get("dh"), hafu.get("dd")
+    if not dh or not dd:
+        return [], None
+    ip = _final_implied(hafu) or {}
+    picks = [{"key": "dh", "pick": _FINAL_HAFU_ZH["dh"], "odds": round(float(dh), 4)},
+             {"key": "dd", "pick": _FINAL_HAFU_ZH["dd"], "odds": round(float(dd), 4)}]
+    d = {"key": "dh+dd", "pick": "平胜/平平",
+         "odds": round(1.0 / (1.0 / float(dh) + 1.0 / float(dd)), 4),
+         "p_hat": round(ip.get("dh", 0.0) + ip.get("dd", 0.0), 4),
+         "picks": picks, "code": "R1", "fav": it.get("fav")}
+    return [d], d["key"]
+
+
+def _final_halfdraw_r2_pair(it: dict):
+    """方案G halfdraw 次选 R2 在目标场 X 的档位：fav_ip>=0.60 → fav侧单选 胜胜hh/负负aa（1注）。"""
+    from app.halfdraw_rules import is_r2
+    fav = it.get("fav")
+    if not is_r2({"fav": fav, "fav_ip": it.get("fav_ip")}):
+        return [], None
+    hafu = _final_json_odds(it.get("hafu_odds"))
+    if not hafu:
+        return [], None
+    key = "hh" if fav == "home" else "aa"
+    od = hafu.get(key)
+    if not od:
+        return [], None
+    ip = _final_implied(hafu) or {}
+    picks = [{"key": key, "pick": _FINAL_HAFU_ZH[key], "odds": round(float(od), 4)}]
+    d = {"key": key, "pick": _FINAL_HAFU_ZH[key], "odds": round(float(od), 4),
+         "p_hat": round(ip.get(key, 0.0), 4), "picks": picks, "code": "R2", "fav": fav}
+    return [d], d["key"]
+
+
+def _final_dir_ambig_pair(it: dict):
+    """模糊池方向腿（ambiguous_had）在目标场 X 的默认档：模糊池 & HAD fav >=1.8 的单选项"""
+    if it.get("pool") != "ambiguous":
+        return [], None
+    had = {k: v for k, v in (it.get("had_odds") or {}).items() if v}
+    fav = it.get("fav")
+    if not had or not fav or fav not in had or not had.get(fav) or float(had[fav]) < 1.8:
+        return [], None
+    if not isinstance(it.get("fav_ip"), (int, float)):
+        return [], None
+    d = {"key": fav, "pick": DIR_ZH_FINAL.get(fav, fav), "pref": fav,
+         "odds": round(float(had[fav]), 4), "p_hat": round(float(it["fav_ip"]), 4),
+         "source": "ambiguous_had"}
+    return [d], fav
+
+
+def _final_dir_favhafu_pair(it: dict):
+    """正路池半全场方向腿（favorite_hafu：胜胜/负负）在目标场 X 的默认档：正路池 & hh/aa >=1.8"""
+    if it.get("pool") != "favorite":
+        return [], None
+    fav = it.get("fav")
+    if fav not in ("home", "away"):
+        return [], None
+    hafu = _final_json_odds(it.get("hafu_odds"))
+    if not hafu:
+        return [], None
+    key = "hh" if fav == "home" else "aa"
+    odd = hafu.get(key)
+    if not odd or float(odd) < 1.8:
+        return [], None
+    ip = _final_implied(hafu) or {}
+    d = {"key": key, "pick": _FINAL_HAFU_ZH.get(key, key), "hafu_key": key,
+         "pref": "home" if key == "hh" else "away",
+         "odds": round(float(odd), 4), "p_hat": round(ip.get(key, 0.0), 4),
+         "source": "favorite_hafu"}
+    return [d], key
+
+
+def _final_dir_c_pair(it: dict):
+    """C 冷门方向腿目标场 X 的默认档：ambiguous/upset 池 allowed∩HAD>=1.8 隐含最高者 + 次高备选"""
+    had = {k: v for k, v in ((it.get("had_odds") or {})).items() if v}
+    if not had:
+        return [], None
+    allowed = it.get("allowed_outcomes") or []
+    pool = it.get("pool")
+    if pool not in ("ambiguous", "upset"):
+        return [], None
+    cands = [d for d in allowed if d in had and float(had[d]) >= 1.8]
+    if not cands:
+        return [], None
+    ip = _final_implied(had) or {}
+    ranked = sorted(cands, key=lambda dd: ip.get(dd, 0.0), reverse=True)
+
+    def _mk(dirn):
+        src = "ambiguous_had" if (dirn == it.get("fav") and dirn in had) else "had_upset"
+        return {"key": dirn, "pick": DIR_ZH_FINAL.get(dirn, dirn), "pref": dirn,
+                "odds": round(float(had[dirn]), 4), "p_hat": round(ip.get(dirn, 0.0), 4),
+                "source": src}
+
+    out = [_mk(ranked[0])]
+    if len(ranked) >= 2:
+        out.append(_mk(ranked[1]))
+    return out, ranked[0]
+
+
+def _final_halfdraw_any_pair(it: dict):
+    """手工新增方案：任意有半全场赔率的场次都可作 halfdraw 腿
+    → 给两种预设：半平双选 {平胜dh, 平平dd}、fav侧 胜胜hh/负负aa 单选。"""
+    hafu = _final_json_odds(it.get("hafu_odds"))
+    if not hafu:
+        return [], None
+    ip = _final_implied(hafu) or {}
+    out = []
+    dh, dd = hafu.get("dh"), hafu.get("dd")
+    if dh and dd:
+        picks = [{"key": "dh", "pick": _FINAL_HAFU_ZH["dh"], "odds": round(float(dh), 4)},
+                 {"key": "dd", "pick": _FINAL_HAFU_ZH["dd"], "odds": round(float(dd), 4)}]
+        out.append({"key": "dh+dd", "pick": "平胜/平平",
+                    "odds": round(1.0 / (1.0 / float(dh) + 1.0 / float(dd)), 4),
+                    "p_hat": round(ip.get("dh", 0.0) + ip.get("dd", 0.0), 4),
+                    "picks": picks, "code": "R1", "fav": it.get("fav")})
+    fav = it.get("fav")
+    if fav in ("home", "away"):
+        key = "hh" if fav == "home" else "aa"
+        od = hafu.get(key)
+        if od:
+            out.append({"key": key, "pick": _FINAL_HAFU_ZH[key], "odds": round(float(od), 4),
+                        "p_hat": round(ip.get(key, 0.0), 4),
+                        "picks": [{"key": key, "pick": _FINAL_HAFU_ZH[key], "odds": round(float(od), 4)}],
+                        "code": "R2", "fav": fav})
+    if not out:
+        return [], None
+    return out, out[0]["key"]
+
+
+def _final_dir_had_any_pair(it: dict):
+    """手工新增方案：任意场次，取 HAD 三向中赔率 >=1.8 的选项（隐含最高在前，最多 2 个）。"""
+    had = {k: v for k, v in (it.get("had_odds") or {}).items() if v}
+    if not had:
+        return [], None
+    ip = _final_implied(had) or {}
+    cands = [k for k in ("home", "draw", "away") if k in had and float(had[k]) >= 1.8]
+    if not cands:
+        return [], None
+    ranked = sorted(cands, key=lambda k: ip.get(k, 0.0), reverse=True)[:2]
+
+    def _mk(k):
+        src = "ambiguous_had" if k == it.get("fav") else ("had_upset" if k != "draw" else "ambiguous_had")
+        return {"key": k, "pick": DIR_ZH_FINAL.get(k, k), "pref": k,
+                "odds": round(float(had[k]), 4), "p_hat": round(ip.get(k, 0.0), 4), "source": src}
+
+    out = [_mk(ranked[0])]
+    if len(ranked) >= 2:
+        out.append(_mk(ranked[1]))
+    return out, ranked[0]
+
+
+def _final_swap_type(plan: str, leg: dict) -> str | None:
+    """腿的人工指定候选玩法类型。
+    大小球进球腿（大/小）→ goals_over / goals_under（人工指定池去掉信号门槛、全量列 TTG 场）；
+    其余腿按各自玩法合格池收窄：hafu→半全场合格场；dir→按其 source（模糊池 HAD / 正路池半全场 / 冷门方向）。
+    """
+    fam = _final_leg_family(leg)
+    if fam == "goals":
+        return "goals_over" if _final_goals_dirn(leg) == "over" else "goals_under"
+    if fam == "hafu":
+        return "hafu"
+    if fam == "halfdraw":
+        return "halfdraw_r2" if str(leg.get("code") or "").upper().startswith("R2") else "halfdraw_r1"
+    if fam == "dir":
+        src = leg.get("source")
+        if src == "ambiguous_had":
+            return "dir_ambig"
+        if src == "favorite_hafu":
+            return "dir_favhafu"
+        if src == "had_upset" or leg.get("fallback"):
+            return "dir_c"
+    return None
+
+
+def _final_family_choices(plan: str, family: str, it: dict, team_avg: dict):
+    if family == "goals_over":
+        return _final_goals_pair(plan, it, team_avg, "over")
+    if family == "goals_under":
+        return _final_goals_pair(plan, it, team_avg, "under")
+    if family == "hafu":
+        return _final_hafu_pair(it, with_alt=(plan in ("D", "C")))
+    if family == "halfdraw_r1":
+        return _final_halfdraw_r1_pair(it)
+    if family == "halfdraw_r2":
+        return _final_halfdraw_r2_pair(it)
+    if family == "halfdraw_any":
+        return _final_halfdraw_any_pair(it)
+    if family == "dir_had_any":
+        return _final_dir_had_any_pair(it)
+    if family == "dir_ambig":
+        return _final_dir_ambig_pair(it)
+    if family == "dir_favhafu":
+        return _final_dir_favhafu_pair(it)
+    if family == "dir_c":
+        return _final_dir_c_pair(it)
+    return [], None
+
+
+def _final_wrap_opt(it: dict | None, choice: dict, is_default: bool, mid, is_other: bool) -> dict:
+    opt = dict(choice)
+    opt["opt_id"] = _final_opt_id(mid, choice["key"])
+    opt["match_id"] = mid
+    opt["is_other"] = bool(is_other)
+    opt["is_default"] = bool(is_default)
+    if it is not None:
+        for fld in ("match_num", "league_name", "home_team", "away_team", "kickoff_time"):
+            opt[fld] = it.get(fld)
+    return opt
+
+
+def _final_opt_id(mid, key):
+    return f"{mid}|{key}"
+
+
+def _final_opt_match_key(o: dict):
+    if o.get("match_id"):
+        return ("id", o["match_id"])
+    if o.get("match_num"):
+        return ("num", o["match_num"])
+    if o.get("kickoff_time"):
+        return ("kt", o.get("kickoff_time"))
+    return ("o", o.get("opt_id"))
+
+
+def _final_norm_dir(leg: dict) -> dict:
+    """补齐方向腿的结算字段（终稿展示/结算共用，不改变 pick/odds）：
+    ambiguous_had 需 pref；favorite_hafu/胜胜负负 需 hafu_key（D 方案方向腿未写 hafu_key，结算会恒 miss）。"""
+    if not leg or leg.get("kind") != "dir":
+        return leg
+    pick = leg.get("pick")
+    src = leg.get("source")
+    if src == "ambiguous_had" and not leg.get("pref") and pick in _DIR_ZH_REV:
+        leg["pref"] = _DIR_ZH_REV[pick]
+    if src == "favorite_hafu" or leg.get("hafu_key") in ("hh", "aa") or pick in ("胜胜", "负负"):
+        if not leg.get("hafu_key"):
+            leg["hafu_key"] = "hh" if pick == "胜胜" else "aa"
+    if not leg.get("pref") and leg.get("hafu_key") in ("hh", "aa"):
+        leg["pref"] = "home" if leg["hafu_key"] == "hh" else "away"
+    return leg
+
+
+def _final_apply_option(leg: dict, opt: dict) -> dict:
+    """按（场次 + 档位）选项重建一条终稿腿"""
+    out = dict(leg)
+    for k in ("idx", "weak", "weak_hit", "weak_threshold", "choices", "options",
+              "default_key", "default_opt_id", "hit", "actual", "actual_key", "payout"):
+        out.pop(k, None)
+    fam = _final_leg_family(leg)
+    if fam == "goals":
+        nums = list(opt["nums"])
+        out["top3"] = nums
+        out["pick"] = "/".join(str(n) for n in nums)
+        out["pick_odds"] = opt.get("pick_odds")
+        out["odds"] = opt.get("odds")
+        out["p_hat"] = opt.get("p_hat")
+        if opt.get("dir") in ("over", "under"):
+            out["dir"] = opt["dir"]  # 手工新增时同一槽位可含判大/判小两种玩法
+    elif fam == "hafu":
+        out["hafu_key"] = opt["key"]
+        out["pick"] = opt.get("pick")
+        out["odds"] = opt.get("odds")
+        out["p_hat"] = opt.get("p_hat")
+    elif fam == "halfdraw":
+        picks = [dict(p) for p in (opt.get("picks") or [])]
+        out["code"] = opt.get("code")
+        out["fav"] = opt.get("fav")
+        out["pick"] = opt.get("pick")
+        out["odds"] = opt.get("odds")
+        out["p_hat"] = opt.get("p_hat")
+        out["picks"] = picks
+        out["played"] = [{"key": p.get("key"), "zh": p.get("pick"), "odds": p.get("odds")} for p in picks]
+    elif fam == "dir":
+        out["pref"] = opt.get("pref") or opt["key"]
+        out["pick"] = opt.get("pick")
+        out["odds"] = opt.get("odds")
+        out["p_hat"] = opt.get("p_hat")
+        if opt.get("source"):
+            out["source"] = opt["source"]
+        if opt.get("hafu_key"):
+            out["hafu_key"] = opt["hafu_key"]
+    # 跨场：覆盖该腿场次身份
+    if opt.get("is_other"):
+        for fld in ("match_id", "match_num", "league_name", "home_team", "away_team", "kickoff_time"):
+            if opt.get(fld) is not None:
+                out[fld] = opt[fld]
+    return _final_norm_dir(out)
+
+
+def _final_apply_multi(leg: dict, opts: list) -> dict:
+    """同场双选：同一场比赛投 默认+备选 两个互斥结果（复式，注数×2）。"""
+    out = _final_apply_option(leg, opts[0])
+    out["picks"] = [
+        {"key": o.get("key"), "pick": o.get("pick") or _FINAL_HAFU_ZH.get(o.get("key"), o.get("key")),
+         "odds": o.get("odds"), "p_hat": o.get("p_hat")}
+        for o in opts
+    ]
+    return out
+
+
+def _final_leg_odds_opts(leg: dict) -> list:
+    picks = leg.get("picks")
+    if picks:
+        return [float(p.get("odds") or 1.0) for p in picks]
+    o = leg.get("odds")
+    return [float(o)] if o else [1.0]
+
+
+def _final_ticket_products(legs) -> list:
+    prods = [1.0]
+    for lg in legs:
+        prods = [c * o for c in prods for o in _final_leg_odds_opts(lg)]
+    return prods
+
+
+def _final_pl_odds(legs):
+    """展示/校验用串关赔率：取所有单注里的最高赔率（双选时按最优单注）"""
+    return round(max(_final_ticket_products(legs)), 4)
+
+
+def _final_leg_options(plan: str, leg: dict, it: dict | None, items: list,
+                        used_mids: set, team_avg: dict):
+    """腿的人工指定候选分桶，返回 (options, default_opt_id, manual_match_n)。
+
+    弱腿：rec1=当前默认场（同场默认/备选）· rec2=当日第二高置信场 · manual=其余场次；
+    非弱单选项腿：无 rec1/rec2，options 全部为 manual（仅人工指定列表）。
+    玩法候选池：大小球进球腿（goals_over/under）manual 去掉信号门槛、全量列 TTG 可构造场；
+    其余腿（hafu/方向）按各自玩法合格池收窄（_final_*_pair 内界定）。
+    rec2 对 A 判大弱腿维持冻结规则：仅 over 信号场且排除极端大市场。
+    """
+    stype = _final_swap_type(plan, leg)
+    if stype is None:
+        return [], None, 0
+    weak = bool(leg.get("weak"))
+    mid = it.get("match_id") if it else None
+    opts = []
+    def_opt_id = None
+    if weak and it is not None and mid is not None:
+        # rec1：当前默认场的默认(+备选)档
+        pr, dk = _final_family_choices(plan, stype, it, team_avg)
+        if pr:
+            def_opt_id = _final_opt_id(mid, dk)
+            for i, o in enumerate(pr):
+                opts.append(_final_wrap_opt(it, o, i == 0, mid, False))
+    cands = []  # (item, [choice,...])
+    for oit in items:
+        omid = oit.get("match_id")
+        if not omid or omid in used_mids or omid == mid:
+            continue
+        pr, _dk = _final_family_choices(plan, stype, oit, team_avg)
+        if not pr:
+            continue
+        cands.append((oit, pr))
+    # rec2：弱腿中 p_hat 最高的“推荐②”场（goals_over 维持冻结门槛）
+    rec2_mid = None
+    if weak:
+        best_p = -1.0
+        for oit, pr in cands:
+            if stype == "goals_over" and (_final_over_dirn(oit) != "over" or _final_over_extreme(oit)):
+                continue
+            p = pr[0].get("p_hat") or 0.0
+            if p > best_p:
+                best_p = p
+                rec2_mid = oit.get("match_id")
+    # 人工指定（manual）场次按该场默认档 p_hat 高置信降序排列
+    cands_sorted = sorted(cands, key=lambda x: x[1][0].get("p_hat") or 0.0, reverse=True)
+    for oit, pr in cands_sorted:
+        omid = oit.get("match_id")
+        for i, o in enumerate(pr):
+            opts.append(_final_wrap_opt(oit, o, i == 0, omid, True))
+    for o in opts:
+        if not o.get("is_other"):
+            o["bucket"] = "rec1"
+        elif o.get("match_id") == rec2_mid:
+            o["bucket"] = "rec2"
+        else:
+            o["bucket"] = "manual"
+    manual_n = len({o.get("match_id") for o in opts if o.get("bucket") == "manual"})
+    return opts, def_opt_id, manual_n
+
+
+def _final_manual_slot_options(plan: str, stypes: list, items: list, team_avg: dict) -> list:
+    """手工新增方案：某腿槽位的候选池 = 该槽位允许的各玩法 stype 的并集（全部 manual，可跨场选）。"""
+    opts: list = []
+    seen: set = set()
+    for st in stypes:
+        for it in items:
+            mid = it.get("match_id")
+            if not mid:
+                continue
+            pr, _dk = _final_family_choices(plan, st, it, team_avg)
+            for o in pr:
+                c = dict(o)
+                if st == "goals_over":
+                    c["dir"] = "over"
+                elif st == "goals_under":
+                    c["dir"] = "under"
+                oid = _final_opt_id(mid, c.get("key"))
+                if oid in seen:
+                    continue
+                seen.add(oid)
+                oo = _final_wrap_opt(it, c, True, mid, True)
+                oo["bucket"] = "manual"
+                opts.append(oo)
+    opts.sort(key=lambda x: (x.get("p_hat") or 0.0), reverse=True)
+    return opts
+
+
+async def _final_day_plans(db, date: str) -> dict:
+    """单日 三方案 + 各腿候选视图（day 与 confirm 共用）。
+
+    弱腿：rec1/rec2/manual 分桶；非弱单选项腿：仅 manual（人工指定其他场次）。
+    """
+    d0 = datetime.fromisoformat(date)
+    start = d0.replace(hour=12, minute=0, second=0, microsecond=0)
+    end = start + timedelta(days=1)
+    items, _os, _osm = await _market_flow_query(
+        db, start=start, end=end, ou_tier=DEFAULT_TIER, ou_sm_tier=OU_M_DEFAULT
+    )
+    # 球队赛季场均（进球档位分层用），与 parlay 同口径
+    from app.db.models import TeamSeasonStats
+    team_avg: dict[int, tuple] = {}
+    _tids: set[int] = set()
+    for it in items:
+        for _k in ("home_team_id", "away_team_id"):
+            _v = it.get(_k)
+            if _v:
+                _tids.add(int(_v))
+    if _tids:
+        _tss = (await db.execute(
+            select(TeamSeasonStats.team_id, TeamSeasonStats.goals_for,
+                   TeamSeasonStats.goals_against, TeamSeasonStats.played)
+            .where(TeamSeasonStats.team_id.in_(_tids), TeamSeasonStats.played > 0)
+        )).all()
+        _best: dict[int, tuple] = {}
+        for _tid, _gf, _ga, _played in _tss:
+            _tid = int(_tid)
+            if _tid not in _best or _played > _best[_tid][2]:
+                _best[_tid] = (_gf, _ga, _played)
+        for _tid, (_gf, _ga, _played) in _best.items():
+            team_avg[_tid] = (_gf / _played, _ga / _played)
+
+    plans = {}
+    for plan, fn_name in _FINAL_PLAN_FN.items():
+        fn = globals().get(fn_name)
+        view = {"plan": plan, "pick": None, "legs": [], "exists": False}
+        if fn is None:
+            plans[plan] = view
+            continue
+        try:
+            r = await fn(date=date, db=db)
+        except Exception as e:
+            view["error"] = f"{type(e).__name__}: {e}"
+            plans[plan] = view
+            continue
+        picks = [p for p in (r.get("picks") or []) if p.get("matchday") == date]
+        if not picks:
+            # 系统当日无组合 → 提供「手工新增方案」骨架：按方案结构给出各腿槽位与候选池
+            slots = _FINAL_MANUAL_SLOTS.get(plan)
+            if slots:
+                mlegs = []
+                for i, stypes in enumerate(slots):
+                    vleg = {"idx": i, "kind": _FINAL_MANUAL_KIND.get(stypes[0], "dir")}
+                    o = _final_manual_slot_options(plan, stypes, items, team_avg)
+                    if o:
+                        vleg["options"] = o
+                        vleg["other_match_n"] = len({x.get("match_id") for x in o})
+                    mlegs.append(vleg)
+                if any(lg.get("options") for lg in mlegs):
+                    view["exists"] = True
+                    view["manual"] = True
+                    view["legs"] = mlegs
+                    view["range"] = _FINAL_ODDS_RANGE.get(plan)
+            plans[plan] = view
+            continue
+        pick = picks[0]
+        view["pick"] = pick
+        view["exists"] = True
+        view["combo_level"] = pick.get("combo_level")
+        view["parlay_odds"] = pick.get("parlay_odds")
+        view["parlay_p_hat"] = pick.get("parlay_p_hat")
+        view["stake"] = pick.get("stake")
+        view["settled"] = pick.get("settled")
+        view["range"] = _FINAL_ODDS_RANGE.get(plan)
+        base_legs = pick.get("legs") or []
+        used_mids = set()
+        for _lg in base_legs:
+            _lit = _final_item_for(_lg, items)
+            if _lit is not None and _lit.get("match_id"):
+                used_mids.add(_lit["match_id"])
+        legs = []
+        for leg in base_legs:
+            it = _final_item_for(leg, items)
+            weak, base_hit = _final_leg_weak_meta(plan, leg)
+            entry = _final_norm_dir({"idx": len(legs), **leg})
+            if entry.get("kind") == "goals" and entry.get("dir") not in ("over", "under"):
+                entry["dir"] = _final_goals_dirn(entry)  # 方案D 进球腿未存 dir，按 top3 推断供展示/候选
+            if it is not None and it.get("match_id") is not None:
+                entry["match_id"] = it["match_id"]
+            if weak:
+                entry["weak"] = True
+                entry["weak_hit"] = round(base_hit, 3) if base_hit is not None else None
+                entry["weak_threshold"] = _FINAL_WEAK_THRESHOLD
+            # 全部腿：能构造目标场候选即附 options（弱腿=rec1/rec2/manual；非弱单选项腿=仅 manual 人工指定）
+            opts, def_opt_id, other_n = _final_leg_options(plan, entry, it, items, used_mids, team_avg)
+            if opts:
+                entry["options"] = opts
+                entry["default_opt_id"] = def_opt_id
+                entry["other_match_n"] = other_n
+            legs.append(entry)
+        view["legs"] = legs
+        plans[plan] = view
+
+    rows = (await db.execute(
+        select(ParlayFinalConfirm).where(ParlayFinalConfirm.pick_date == d0.date())
+    )).scalars().all()
+    confirm_map = {r.plan: r for r in rows}
+    for plan, view in plans.items():
+        view["confirm"] = _final_confirm_dict(confirm_map.get(plan))
+    return plans
+
+
+def _final_confirm_dict(row):
+    if row is None:
+        return None
+    meta = row.meta or {}
+    return {
+        "pick_date": row.pick_date.isoformat(),
+        "plan": row.plan,
+        "system_legs": row.system_legs,
+        "final_legs": row.final_legs,
+        "meta": meta,
+        "combo_level": meta.get("combo_level"),
+        "parlay_odds": row.parlay_odds,
+        "stake": row.stake,
+        "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+    }
+
+
+@router.get("/predictions/parlay-final/day")
+async def market_flow_parlay_final_day(
+    date: str,
+    db: AsyncSession = Depends(get_db),
+):
+    """方案终稿·单日视图：A/D/C 当日组合 + 每条弱腿的候选（默认/备选）+ 已确认快照（只读）"""
+    try:
+        datetime.fromisoformat(date)
+    except ValueError:
+        return _err("date must be ISO date string", 400)
+    plans = await _final_day_plans(db, date)
+    return {"date": date, "plans": plans}
+
+
+@router.post("/predictions/parlay-final/confirm")
+async def market_flow_parlay_final_confirm(
+    payload: dict = Body(...),
+    db: AsyncSession = Depends(get_db),
+):
+    """方案终稿·人工确认并落库（每方案每日 1 条，可覆盖重提）。
+
+    payload: {date, plan: 'A'|'D'|'C', choices?: {leg_idx: choice_key | [choice_key, choice_key]}}
+      choices 缺省的腿保持系统默认；choices 的 key 必须是该腿候选里的 key。
+      弱腿候选含 rec1/rec2/manual；非弱单选项腿仅 manual（可人工指定其他场次）。
+    """
+    date = payload.get("date")
+    plan = payload.get("plan")
+    choices_raw = payload.get("choices") or {}
+    if not date or plan not in _FINAL_PLAN_FN:
+        return _err("date/plan(A|D|C|G) required", 400)
+    if not isinstance(choices_raw, dict):
+        return _err("choices must be object", 400)
+    try:
+        d0 = datetime.fromisoformat(date).date()
+    except ValueError:
+        return _err("date must be ISO date string", 400)
+
+    plans = await _final_day_plans(db, date)
+    view = plans.get(plan)
+    if view is None or not view.get("exists"):
+        return _err(f"当日 {plan} 无组合可确认", 400)
+    base_legs = view["legs"]
+    if not base_legs:
+        return _err(f"当日 {plan} 组合无腿", 400)
+
+    is_manual = bool(view.get("manual"))
+    if is_manual:
+        # 手工新增：每条腿都必须人工选定（否则该腿没有比赛，无法结算）
+        missing = [str(e.get("idx")) for e in base_legs
+                   if not (e.get("options") or []) or str(e.get("idx")) not in choices_raw]
+        if missing:
+            return _err(f"手工新增方案：请为每条腿各选一场比赛（缺 腿{'、'.join(missing)}）", 400)
+
+    def _plain(entry):
+        fl = dict(entry)
+        for k in ("idx", "weak", "weak_hit", "weak_threshold", "choices", "options",
+                  "default_key", "default_opt_id", "hit", "actual", "actual_key"):
+            fl.pop(k, None)
+        return fl
+
+    final_legs = []
+    changed = []
+    used_choices: dict[int, object] = {}
+    for entry in base_legs:
+        idx = int(entry["idx"])
+        opts = entry.get("options") or []
+        if opts:
+            opt_ids = [o["opt_id"] for o in opts]
+            d_opt = entry.get("default_opt_id")  # 弱腿有默认；非弱单选项腿=None（保持默认 = 不改）
+            if d_opt is None and str(idx) not in choices_raw:
+                final_legs.append(_plain(entry))
+                continue
+            raw = choices_raw.get(str(idx), d_opt)
+            if isinstance(raw, list):
+                sel = [str(x) for x in raw]
+            else:
+                sel = [str(raw)]
+            if not sel or len(sel) > 2 or len(set(sel)) != len(sel):
+                return _err(f"腿{idx} 选项格式无效（同场双选最多 2 个不同选项）", 400)
+            bad = [s for s in sel if s not in opt_ids]
+            if bad:
+                return _err(f"腿{idx} 选项无效: {bad}", 400)
+            chosen_opts = [next(o for o in opts if o["opt_id"] == s) for s in sel]
+            if len(sel) == 2:
+                if d_opt is None:
+                    return _err(f"腿{idx} 非弱单选项腿不支持同场双选", 400)
+                fam = _final_leg_family(entry)
+                if plan not in ("D", "C") or fam == "goals":
+                    return _err(f"腿{idx}（{fam}）不支持同场双选（仅方案D/C 半全场/方向弱腿可双选）", 400)
+                if _final_opt_match_key(chosen_opts[0]) != _final_opt_match_key(chosen_opts[1]):
+                    return _err(f"腿{idx} 双选的两个选项必须来自同一场比赛", 400)
+                changed.append(idx)
+                used_choices[idx] = sel
+                final_legs.append(_final_apply_multi(entry, chosen_opts))
+            else:
+                opt = chosen_opts[0]
+                if sel[0] != d_opt:
+                    changed.append(idx)
+                    used_choices[idx] = sel[0]
+                final_legs.append(_final_apply_option(entry, opt))
+        else:
+            # 无可改选选项的腿（含候选为空的弱腿）不接受改选
+            if str(idx) in choices_raw:
+                return _err(f"腿{idx} 无可改选选项，不支持改选", 400)
+            final_legs.append(_plain(entry))
+
+    # 必保异场：跨场选项不能与其余腿同场
+    seen_keys = []
+
+    def _leg_same_key(lg):
+        if lg.get("match_id"):
+            return ("id", lg["match_id"])
+        if lg.get("match_num"):
+            return ("num", lg["match_num"])
+        return ("kt", lg.get("kickoff_time"))
+
+    for fl in final_legs:
+        k = _leg_same_key(fl)
+        if k in seen_keys:
+            return _err(f"组合出现同场腿（{fl.get('match_num')} {fl.get('home_team')} vs {fl.get('away_team')}）：换场后必须与其余腿不同场", 400)
+        seen_keys.append(k)
+
+    if is_manual and any(not lg.get("match_id") for lg in final_legs):
+        return _err("手工新增方案：存在未选定比赛的腿", 400)
+
+    odds = _final_pl_odds(final_legs)
+    rng = _FINAL_ODDS_RANGE.get(plan)
+    if rng and not is_manual:
+        tickets = _final_ticket_products(final_legs)
+        if not any(rng[0] <= t <= rng[1] for t in tickets):
+            return _err(f"终稿串关赔率全部超出 {plan} 区间 [{rng[0]}, {rng[1]}]（单注 {min(tickets):.2f}~{max(tickets):.2f}），请改选", 400)
+
+    combo_level = "fallback"
+    leagues = {lg.get("league_name") for lg in final_legs}
+    n = len(final_legs)
+    if n >= 2:
+        combo_level = "strict" if len(leagues) == n else ("loose" if len(leagues) >= 2 else "fallback")
+
+    system_legs_save = [] if is_manual else [_plain(e) for e in base_legs]
+
+    row = (await db.execute(
+        select(ParlayFinalConfirm).where(
+            ParlayFinalConfirm.pick_date == d0,
+            ParlayFinalConfirm.plan == plan,
+        )
+    )).scalar_one_or_none()
+    now_utc = datetime.utcnow()
+    meta = {"changed_legs": changed, "choices": used_choices, "combo_level": combo_level, "manual": is_manual}
+    if row:
+        row.system_legs = system_legs_save
+        row.final_legs = final_legs
+        row.meta = meta
+        row.parlay_odds = odds
+        row.stake = _stake_amount(final_legs)
+        row.updated_at = now_utc
+    else:
+        row = ParlayFinalConfirm(
+            pick_date=d0, plan=plan,
+            system_legs=system_legs_save, final_legs=final_legs,
+            meta=meta, parlay_odds=odds, stake=_stake_amount(final_legs),
+            created_at=now_utc, updated_at=now_utc,
+        )
+        db.add(row)
+    await db.commit()
+    await cache_bump_version()
+    return {"status": "ok", "confirm": _final_confirm_dict(row)}
+
+
+# ---------- 终稿结算与统计 ----------
+def _final_match_outcome(h, a):
+    return "home" if h > a else "away" if h < a else "draw"
+
+
+def _final_settle_leg(leg: dict, m) -> dict:
+    """按比赛实际结算单腿，返回 (hit, actual描述, actual_key)。m=None 无法验证。
+    支持同场双选：picks 里任一命中即该腿命中（actual_key 供按命中档取赔率）。"""
+    out = {"hit": None, "actual": None, "actual_key": None}
+    if m is None or not isinstance(getattr(m, "home_score", None), int) or not isinstance(getattr(m, "away_score", None), int):
+        return out
+    h, a = m.home_score, m.away_score
+    fam = _final_leg_family(leg)
+    if fam == "goals":
+        total = h + a
+        out["actual"] = str(total)
+        out["actual_key"] = str(total)
+        out["hit"] = total in (leg.get("top3") or [])
+    elif fam in ("hafu", "halfdraw"):
+        hh = getattr(m, "half_home_score", None)
+        ha = getattr(m, "half_away_score", None)
+        if not isinstance(hh, int) or not isinstance(ha, int):
+            return out
+        hd = _final_match_outcome(hh, ha)
+        fo = _final_match_outcome(h, a)
+        key = {"home": "h", "draw": "d", "away": "a"}[hd] + {"home": "h", "draw": "d", "away": "a"}[fo]
+        out["actual"] = f"半{hh}-{ha} 全{h}-{a} ({_FINAL_HAFU_ZH.get(key, key)})"
+        out["actual_key"] = key
+        picks = leg.get("picks") or []
+        keys = [p["key"] for p in picks] or ([leg["hafu_key"]] if leg.get("hafu_key") else [])
+        out["hit"] = key in keys
+    elif fam == "dir":
+        fo = _final_match_outcome(h, a)
+        out["actual_key"] = fo
+        pref = leg.get("pref")
+        if leg.get("hafu_key") in ("hh", "aa") or (leg.get("source") == "favorite_hafu"):
+            # 正路池 胜胜/负负：半场与全场同向
+            hh = getattr(m, "half_home_score", None)
+            ha = getattr(m, "half_away_score", None)
+            if not isinstance(hh, int) or not isinstance(ha, int):
+                return out
+            hd = _final_match_outcome(hh, ha)
+            side = "home" if leg.get("hafu_key") == "hh" else "away"
+            out["actual"] = f"半{hh}-{ha} 全{h}-{a}"
+            out["hit"] = (hd == side and fo == side)
+        else:
+            out["actual"] = DIR_ZH_FINAL.get(fo, fo)
+            picks = leg.get("picks") or []
+            keys = [p["key"] for p in picks] or ([pref] if pref is not None else [])
+            out["hit"] = fo in keys
+    return out
+
+
+async def _final_resolve_matches(db, legs) -> dict:
+    """leg → Match（按 match_num + kickoff ±36h）"""
+    out: dict[int, object] = {}
+    for i, leg in enumerate(legs):
+        kt = leg.get("kickoff_time")
+        if not kt:
+            continue
+        try:
+            ktd = datetime.fromisoformat(str(kt).replace("Z", "+00:00").replace("+00:00", ""))
+        except ValueError:
+            continue
+        if ktd.tzinfo is not None:
+            ktd = ktd.astimezone(timezone.utc).replace(tzinfo=None)
+        q = select(Match).where(
+            Match.kickoff_time >= ktd - timedelta(hours=36),
+            Match.kickoff_time <= ktd + timedelta(hours=36),
+        )
+        mn = leg.get("match_num")
+        if mn:
+            q = q.where(Match.match_num == mn)
+        q = q.order_by(Match.kickoff_time.asc(), Match.id.asc())
+        m = (await db.execute(q)).scalars().first()
+        out[i] = m
+    return out
+
+
+def _final_combo_result(legs_with_hit: list[dict]) -> dict:
+    stake = _stake_amount(legs_with_hit)
+    if any(lg.get("hit") is None for lg in legs_with_hit):
+        return {"settled": False, "hit": None, "payout": None, "stake": None}
+    all_hit = all(lg.get("hit") for lg in legs_with_hit)
+    if not all_hit:
+        return {"settled": True, "hit": False, "payout": 0.0, "stake": stake}
+    p = 1.0
+    for lg in legs_with_hit:
+        if lg.get("kind") == "goals":
+            po = (lg.get("pick_odds") or {}).get(str(lg.get("actual")))
+            p *= float(po) if po else float(lg.get("odds") or 1.0)
+        else:
+            picks = lg.get("picks") or []
+            ak = lg.get("actual_key")
+            if picks and ak is not None:
+                mp = next((x for x in picks if x.get("key") == ak), None)
+                p *= float(mp["odds"]) if mp else float(lg.get("odds") or 1.0)
+            else:
+                p *= float(lg.get("odds") or 1.0)
+    return {"settled": True, "hit": True, "payout": round(p, 4), "stake": stake}
+
+
+@router.get("/predictions/parlay-final/history")
+async def market_flow_parlay_final_history(db: AsyncSession = Depends(get_db)):
+    """方案终稿统计（只读）：逐日默认组合 vs 人工终稿（腿级 + 串关级），分两组统计。"""
+    rows = (await db.execute(
+        select(ParlayFinalConfirm).order_by(ParlayFinalConfirm.pick_date.asc())
+    )).scalars().all()
+    out_rows = []
+    by_plan: dict[str, dict] = {}
+    leg_changed_agg = {"n": 0, "default_settled": 0, "default_hit": 0, "final_settled": 0, "final_hit": 0}
+
+    for r in rows:
+        date = r.pick_date.isoformat()
+        plan = r.plan
+        fn = globals().get(_FINAL_PLAN_FN.get(plan))
+        default_view = {"pick": None, "hit": None, "settled": False, "payout": None, "stake": None}
+        try:
+            if fn is not None:
+                dr = await fn(date=date, db=db)
+                dpicks = [p for p in (dr.get("picks") or []) if p.get("matchday") == date]
+                if dpicks:
+                    dp = dpicks[0]
+                    default_view = {
+                        "pick": dp, "hit": dp.get("hit"),
+                        "settled": bool(dp.get("settled")),
+                        "payout": dp.get("payout"), "stake": dp.get("stake"),
+                    }
+        except Exception:
+            pass
+
+        final_legs = [dict(lg) for lg in (r.final_legs or [])]
+        mrow_map = await _final_resolve_matches(db, final_legs)
+        for i, lg in enumerate(final_legs):
+            st = _final_settle_leg(lg, mrow_map.get(i))
+            lg["hit"] = st["hit"]
+            lg["actual"] = st["actual"]
+            lg["actual_key"] = st["actual_key"]
+        final_res = _final_combo_result(final_legs)
+
+        changed_legs = []
+        meta = r.meta or {}
+        changed_idx = meta.get("changed_legs") or []
+        sys_legs = r.system_legs or []
+        # 系统默认腿按各自的场次结算（跨场改选时默认腿应对应原场次，而非终稿目标场）
+        sys_map = await _final_resolve_matches(db, sys_legs)
+        for i in changed_idx:
+            if i >= len(sys_legs):
+                continue
+            dl = dict(sys_legs[i])
+            fl = final_legs[i] if i < len(final_legs) else {}
+            d_hit = None
+            if sys_map.get(i) is not None:
+                d_st = _final_settle_leg(dl, sys_map.get(i))
+                d_hit = d_st["hit"]
+            f_hit = fl.get("hit")
+            leg_changed_agg["n"] += 1
+            if d_hit is not None:
+                leg_changed_agg["default_settled"] += 1
+                leg_changed_agg["default_hit"] += 1 if d_hit else 0
+            if f_hit is not None:
+                leg_changed_agg["final_settled"] += 1
+                leg_changed_agg["final_hit"] += 1 if f_hit else 0
+            changed_legs.append({
+                "idx": i,
+                "kind": dl.get("kind"),
+                "match_num": dl.get("match_num"),
+                "league_name": dl.get("league_name"),
+                "home_team": dl.get("home_team"),
+                "away_team": dl.get("away_team"),
+                "default_pick": _final_leg_pick_label(dl),
+                "final_pick": _final_leg_pick_label(fl),
+                "default_hit": d_hit,
+                "final_hit": f_hit,
+            })
+
+        dpick = default_view.get("pick")
+        default_legs = [dict(lg) for lg in (dpick.get("legs") or [])] if dpick else []
+        default_view["exists"] = bool(default_legs)
+        is_manual_row = not (r.system_legs or [])
+
+        out_rows.append({
+            "pick_date": date,
+            "plan": plan,
+            "manual": is_manual_row,
+            "changed_legs": changed_legs,
+            "default_legs": default_legs,
+            "final_legs": final_legs,
+            "default": default_view,
+            "final": {
+                "hit": final_res["hit"], "settled": final_res["settled"],
+                "payout": final_res["payout"], "stake": final_res["stake"],
+                "parlay_odds": r.parlay_odds,
+            },
+        })
+        agg = by_plan.setdefault(plan, {"confirm_n": 0, "settled_n": 0, "default_hit_n": 0, "final_hit_n": 0,
+                                        "same_n": 0, "improved_n": 0, "worsened_n": 0,
+                                        "manual_n": 0, "manual_settled_n": 0, "manual_hit_n": 0,
+                                        "stake_default": 0.0, "payout_default": 0.0,
+                                        "stake_final": 0.0, "payout_final": 0.0})
+        agg["confirm_n"] += 1
+        if is_manual_row:
+            agg["manual_n"] += 1
+            if final_res["settled"]:
+                agg["manual_settled_n"] += 1
+                agg["manual_hit_n"] += 1 if final_res["hit"] else 0
+        if default_view["settled"] and final_res["settled"]:
+            agg["settled_n"] += 1
+            agg["default_hit_n"] += 1 if default_view["hit"] else 0
+            agg["final_hit_n"] += 1 if final_res["hit"] else 0
+            if bool(default_view["hit"]) == bool(final_res["hit"]):
+                agg["same_n"] += 1
+            elif final_res["hit"]:
+                agg["improved_n"] += 1
+            else:
+                agg["worsened_n"] += 1
+        agg["stake_default"] += float(default_view["stake"] or 0.0)
+        agg["payout_default"] += float(default_view["payout"] or 0.0)
+        agg["stake_final"] += float(final_res["stake"] or 0.0)
+        agg["payout_final"] += float(final_res["payout"] or 0.0)
+
+    plan_stats = {}
+    for plan, a in by_plan.items():
+        plan_stats[plan] = {
+            "confirm_n": a["confirm_n"],
+            "settled_n": a["settled_n"],
+            "default_p_hit": round(a["default_hit_n"] / a["settled_n"], 4) if a["settled_n"] else None,
+            "final_p_hit": round(a["final_hit_n"] / a["settled_n"], 4) if a["settled_n"] else None,
+            "same_n": a["same_n"], "improved_n": a["improved_n"], "worsened_n": a["worsened_n"],
+            "manual_n": a["manual_n"],
+            "manual_settled_n": a["manual_settled_n"],
+            "manual_p_hit": round(a["manual_hit_n"] / a["manual_settled_n"], 4) if a["manual_settled_n"] else None,
+            "default_roi": round(a["payout_default"] / a["stake_default"], 4) if a["stake_default"] else None,
+            "final_roi": round(a["payout_final"] / a["stake_final"], 4) if a["stake_final"] else None,
+        }
+    stats = {
+        "confirm_n": len(rows),
+        "by_plan": plan_stats,
+        "changed_legs": {
+            "n": leg_changed_agg["n"],
+            "default_p_hit": round(leg_changed_agg["default_hit"] / leg_changed_agg["default_settled"], 4) if leg_changed_agg["default_settled"] else None,
+            "final_p_hit": round(leg_changed_agg["final_hit"] / leg_changed_agg["final_settled"], 4) if leg_changed_agg["final_settled"] else None,
+        },
+    }
+    return {"rows": out_rows, "stats": stats}
+
+
+def _final_leg_pick_label(leg: dict) -> str:
+    if not leg:
+        return ""
+    picks = leg.get("picks")
+    if picks:
+        return "/".join(str(p.get("pick") or p.get("key") or "") for p in picks)
+    fam = _final_leg_family(leg)
+    if fam == "goals":
+        return "/".join(str(x) for x in (leg.get("top3") or []))
+    if fam == "hafu":
+        return _FINAL_HAFU_ZH.get(leg.get("hafu_key"), leg.get("hafu_key") or "")
+    if fam == "dir":
+        return leg.get("pick") or DIR_ZH_FINAL.get(leg.get("pref"), leg.get("pref") or "")
+    return leg.get("pick") or ""
+
+
+# =====================================================================
+# 方案G（曾称方案F）：halfdraw(R1半平/R2 fav侧单选) × 方案D方向腿，每日1串
+# =====================================================================
+_G_HAFU_ZH = {"hh": "胜胜", "hd": "胜平", "ha": "胜负", "dh": "平胜", "dd": "平平",
+              "da": "平负", "ah": "负胜", "ad": "负平", "aa": "负负"}
+_G_DIR_ZH = {"home": "主", "draw": "平", "away": "客"}
+_G_CN2KEY = {"胜胜": "hh", "平胜": "dh", "负胜": "ah", "胜平": "hd", "平平": "dd",
+             "负平": "ad", "胜负": "ha", "平负": "da", "负负": "aa"}
+
+
+def _g_ldjson(v):
+    if isinstance(v, str):
+        try:
+            return json.loads(v)
+        except (ValueError, TypeError):
+            return None
+    return v
+
+
+def _g_hafu_odds(snap, key: str):
+    js = _g_ldjson(getattr(snap, "hafu_odds_json", None))
+    if not isinstance(js, dict):
+        return None
+    for k in (key.lower(), key):
+        if k in js:
+            try:
+                return float(js[k])
+            except (TypeError, ValueError):
+                return None
+    return None
+
+
+def _g_sign(h, a):
+    return "h" if h > a else ("a" if h < a else "d")
+
+
+def _g_daykey(kickoff, match_num):
+    return _matchday_date(kickoff.isoformat(), match_num)
+
+
+def _g_dir_hit_of(opt_cn: str, half: tuple | None, full: tuple):
+    """按 D 方向腿选项中文判定命中（支持 HAD 主/平/客 与 hafu 胜胜/负负等）。"""
+    fo = _g_sign(*full)
+    if opt_cn in ("主", "平", "客"):
+        return fo == {"主": "h", "平": "d", "客": "a"}[opt_cn], fo
+    key = _G_CN2KEY.get(opt_cn)
+    if key is None or half is None or half[0] is None or half[1] is None:
+        return None, fo
+    k = _g_sign(*half) + fo
+    return (k == key), k
+
+
+@router.get("/predictions/parlay-f")
+async def market_flow_parlay_f_recommend(
+    date: str | None = None,
+    start_date: str | None = None,
+    end_date: str | None = None,
+    db: AsyncSession = Depends(get_db),
+):
+    """方案G（原方案F 落码）：halfdraw 腿 × 方案D 方向腿 2串1，每日 1 串。
+
+    腿1 = halfdraw_rules.select_for_day 整日候选：
+      code R1（半平首选）→ 打 半平双选 {平胜dh, 平平dd}（2注）；
+      code R2（fav侧次选）→ 打 fav侧 胜胜hh/负负aa 单选（1注）。
+    腿2 = 当日方案D 方向腿（复用 parlay-d 引擎输出，同口径）。
+    规则B（同场降级）：code=R1 但当日 R1 候选全部与方向腿同场 → 改用当日 R2 候选兜底。
+
+    注数：R1 日 2注/串，R2 日 1注/串；命中返奖 = 命中选项赔率 × dir赔率；ROI=返奖/注数。
+    """
+    if date:
+        try:
+            d0 = datetime.fromisoformat(date)
+        except ValueError:
+            return _err("date must be ISO date string", 400)
+        start = d0.replace(hour=12, minute=0, second=0, microsecond=0)
+        end = start + timedelta(days=1)
+    elif start_date or end_date:
+        try:
+            s0 = datetime.fromisoformat(start_date) if start_date else None
+            e0 = datetime.fromisoformat(end_date) if end_date else None
+        except ValueError:
+            return _err("start_date/end_date must be ISO date string", 400)
+        start = s0.replace(hour=12, minute=0, second=0, microsecond=0) if s0 else None
+        end = (e0.replace(hour=11, minute=59, second=59, microsecond=0) + timedelta(days=1)) if e0 else None
+    else:
+        end = datetime.now().replace(hour=12, minute=0, second=0, microsecond=0)
+        start = end - timedelta(days=28)
+
+    # ---- 方案D 方向腿（引擎，同口径） ----
+    if date:
+        d_res = await market_flow_parlay_d_recommend(date=date, db=db)
+    else:
+        d_res = await market_flow_parlay_d_recommend(start_date=start_date, end_date=end_date, db=db)
+    d_dir_by_day: dict[str, dict] = {}
+    for p in (d_res.get("picks") or []):
+        leg = next((l for l in (p.get("legs") or []) if l.get("kind") == "dir"), None)
+        if leg:
+            d_dir_by_day.setdefault(p.get("matchday"), leg)
+
+    # ---- 窗口比赛与最新快照 ----
+    q = select(Match)
+    if start:
+        q = q.where(Match.kickoff_time >= start)
+    if end:
+        q = q.where(Match.kickoff_time < end)
+    q = q.order_by(Match.kickoff_time.asc())
+    mrows = (await db.execute(q)).scalars().all()
+    if not mrows:
+        return {"picks": [], "stats": {"n": 0, "hit": 0, "p_hit": None, "total_stake": 0,
+                                        "total_payout": 0.0, "roi": None}}
+    ids = [m.id for m in mrows]
+    srows = (await db.execute(
+        select(JczqPlayOddsSnapshot).where(JczqPlayOddsSnapshot.match_id.in_(ids))
+        .order_by(JczqPlayOddsSnapshot.match_id, JczqPlayOddsSnapshot.snapshot_time.desc())
+    )).scalars().all()
+    snap_best: dict[int, object] = {}
+    for s in srows:
+        cur = snap_best.get(s.match_id)
+        if cur is None:
+            snap_best[s.match_id] = s
+        elif cur.hafu_odds_json is None and s.hafu_odds_json is not None:
+            snap_best[s.match_id] = s  # 优先有半全场赔率的快照
+    # 联赛名显式查询（避免 ORM 懒加载在异步会话中的不确定性）
+    lg_rows = (await db.execute(
+        select(Match.id, League.name_zh)
+        .outerjoin(League, League.id == Match.league_id)
+        .where(Match.id.in_(ids))
+    )).all()
+    lg_map = {row[0]: row[1] for row in lg_rows}
+    day_matches: dict[str, list] = {}
+    for m in mrows:
+        dk = _g_daykey(m.kickoff_time, m.match_num)
+        day_matches.setdefault(dk, []).append(m)
+
+    # ---- 半场判定用比分 ----
+    def half_full(m):
+        half = (m.half_home_score, m.half_away_score) if m.half_home_score is not None else None
+        full = (m.home_score, m.away_score) if m.home_score is not None else None
+        return half, full
+
+    # ---- 逐日 halfdraw 候选（按玩法可投注过滤） ----
+    day_cands: dict[str, tuple] = {}   # day -> (code, r1_cands, r2_cands)
+    for dk, ms in day_matches.items():
+        feats = []
+        for m in ms:
+            sp = snap_best.get(m.id)
+            league = lg_map.get(m.id)
+            home_w = fav = fip = None
+            if sp is not None:
+                try:
+                    h = float(sp.had_home); a = float(sp.had_away)
+                    if h and a:
+                        ph, pa = 1.0 / h, 1.0 / a
+                        home_w = ph / (ph + pa)
+                except (TypeError, ValueError):
+                    pass
+                line = sp.hhad_line
+                try:
+                    line = float(line)
+                except (TypeError, ValueError):
+                    line = None
+                if line is not None and line != 0:
+                    fav = "home" if line < 0 else "away"
+                if fav is not None and sp.had_home and sp.had_draw and sp.had_away:
+                    try:
+                        ph = 1.0 / float(sp.had_home)
+                        pd = 1.0 / float(sp.had_draw)
+                        pa = 1.0 / float(sp.had_away)
+                        fip = (ph if fav == "home" else pa) / (ph + pd + pa)
+                    except (TypeError, ValueError):
+                        pass
+            feats.append({"m": m, "league": league, "home_w": home_w,
+                          "fav": fav, "fav_ip": fip, "sp": sp})
+
+        def _hafu_ip(sp):
+            allod = {}
+            for k in _G_HAFU_ZH:
+                v = _g_hafu_odds(sp, k)
+                if v:
+                    allod[k] = v
+            return _final_implied(allod) or {}
+
+        def _cand_of(code, x):
+            m, sp, fav = x["m"], x["sp"], x["fav"]
+            if sp is None:
+                return None
+            ip = _hafu_ip(sp)
+            if code == RULE_TOP:
+                need = {"dh": "平胜", "dd": "平平", "da": "平负"}
+                ods = {k: _g_hafu_odds(sp, k) for k in need}
+                if any(v is None for v in ods.values()):
+                    return None
+                picks = [{"key": "dh", "pick": "平胜", "odds": ods["dh"]},
+                         {"key": "dd", "pick": "平平", "odds": ods["dd"]}]
+                played = [{"key": p["key"], "zh": p["pick"], "odds": p["odds"]} for p in picks]
+                return {"match_num": m.match_num, "code": code, "fav": fav,
+                        "home_team": m.home_team_name, "away_team": m.away_team_name,
+                        "league_name": x["league"], "kickoff_time": m.kickoff_time.isoformat(),
+                        "played": played, "picks": picks, "pick": "平胜/平平",
+                        "odds": round(1.0 / (1.0 / ods["dh"] + 1.0 / ods["dd"]), 4),
+                        "p_hat": round(ip.get("dh", 0.0) + ip.get("dd", 0.0), 4),
+                        "da_odds": ods["da"], "stake": 2}
+            # R2 fav侧单选
+            key = "hh" if fav == "home" else "aa"
+            od = _g_hafu_odds(sp, key)
+            if od is None:
+                return None
+            picks = [{"key": key, "pick": _G_HAFU_ZH[key], "odds": od}]
+            return {"match_num": m.match_num, "code": code, "fav": fav,
+                    "home_team": m.home_team_name, "away_team": m.away_team_name,
+                    "league_name": x["league"], "kickoff_time": m.kickoff_time.isoformat(),
+                    "played": [{"key": key, "zh": _G_HAFU_ZH[key], "odds": od}], "picks": picks,
+                    "pick": _G_HAFU_ZH[key], "odds": od, "p_hat": round(ip.get(key, 0.0), 4),
+                    "da_odds": None, "stake": 1}
+
+        pool = [{"league": x["league"], "home_w": x["home_w"], "fav": x["fav"],
+                 "fav_ip": x["fav_ip"]} for x in feats]
+        code, _picks = select_for_day(pool)
+        r1 = []
+        r2 = []
+        for x in feats:
+            if is_r1({"league": x["league"], "home_w": x["home_w"]}):
+                c = _cand_of(RULE_TOP, x)
+                if c:
+                    r1.append(c)
+            if is_r2({"league": x["league"], "home_w": x["home_w"],
+                      "fav": x["fav"], "fav_ip": x["fav_ip"]}):
+                c = _cand_of(RULE_FALLBACK, x)
+                if c:
+                    r2.append(c)
+        day_cands[dk] = (code, r1, r2)
+
+    def _score(c):
+        if c["code"] == RULE_TOP:
+            p = 0.0
+            for pl in c["played"]:
+                p += 1.0 / pl["odds"]
+            p += 1.0 / c["da_odds"] if c.get("da_odds") else 0.0
+            return p
+        return 1.0 / c["played"][0]["odds"]
+
+    def _settle(dk, cand, dleg):
+        num_map = {mm.match_num: mm for mm in day_matches.get(dk, [])}
+        cm = num_map.get(cand["match_num"])
+        dm = num_map.get(dleg.get("match_num"))
+        c_hit = c_act = None
+        d_hit = d_act = None
+        if cm is not None:
+            half, full = half_full(cm)
+            if full is not None and half is not None:
+                key = _g_sign(*half) + _g_sign(*full)
+                c_act = _G_HAFU_ZH.get(key, key)
+                if cand["code"] == RULE_TOP:
+                    c_hit = key in ("dh", "dd")
+                else:
+                    want = "hh" if cand["fav"] == "home" else "aa"
+                    c_hit = key == want
+        if dm is not None:
+            half, full = half_full(dm)
+            if full is not None:
+                d_hit, d_act = _g_dir_hit_of(dleg.get("pick"), half, full)
+        return c_hit, c_act, d_hit, d_act
+
+    picks_out = []
+    for dk in sorted(day_matches):
+        dleg = d_dir_by_day.get(dk)
+        if dleg is None:
+            continue  # 当日 D 无方向腿输出
+        code, r1, r2 = day_cands[dk]
+        cand = None
+        combo = None
+        if code == RULE_TOP and r1:
+            usable = [c for c in r1 if c["match_num"] != dleg.get("match_num")]
+            if usable:
+                cand, combo = max(usable, key=_score), "R1"
+            elif r2:  # 规则B：R1 与方向腿全同场 → R2 兜底
+                u2 = [c for c in r2 if c["match_num"] != dleg.get("match_num")]
+                if u2:
+                    cand, combo = max(u2, key=_score), "R2_fallback"
+        elif code == RULE_FALLBACK and r2:
+            usable = [c for c in r2 if c["match_num"] != dleg.get("match_num")]
+            if usable:
+                cand, combo = max(usable, key=_score), "R2"
+        if cand is None:
+            continue
+        c_hit, c_act, d_hit, d_act = _settle(dk, cand, dleg)
+        d_odds = float(dleg.get("odds") or 0.0)
+        leg1 = {
+            "kind": "halfdraw", "code": cand["code"], "fav": cand["fav"],
+            "match_num": cand["match_num"], "home_team": cand["home_team"],
+            "away_team": cand["away_team"], "league_name": cand["league_name"],
+            "kickoff_time": cand["kickoff_time"], "played": cand["played"],
+            "picks": cand.get("picks"), "pick": cand.get("pick"),
+            "odds": cand.get("odds"), "p_hat": cand.get("p_hat"),
+            "stake": cand["stake"], "hit": c_hit, "actual": c_act,
+        }
+        leg2 = {"kind": "dir", "match_num": dleg.get("match_num"),
+                "home_team": dleg.get("home_team"), "away_team": dleg.get("away_team"),
+                "league_name": dleg.get("league_name"), "kickoff_time": dleg.get("kickoff_time"),
+                "pick": dleg.get("pick"), "odds": d_odds, "source": dleg.get("source"),
+                "hit": d_hit, "actual": d_act}
+        if c_hit is None or d_hit is None:
+            settled, hit, payout = False, None, None
+        else:
+            settled = True
+            hit = bool(c_hit and d_hit)
+            if hit:
+                paid = next((p for p in cand["played"] if p["key"] == (c_act and _G_CN2KEY.get(c_act))), None)
+                leg1_od = paid["odds"] if paid else cand["played"][0]["odds"]
+                payout = round(leg1_od * d_odds, 4)
+            else:
+                payout = 0.0
+        stake = cand["stake"]
+        picks_out.append({
+            "matchday": dk, "combo_level": combo, "settled": settled,
+            "in_range": True, "parlay_odds": payout if settled and hit else None,
+            "stake": stake, "payout": payout, "roi": round(payout / stake, 4) if settled else None,
+            "hit": hit, "legs": [leg1, leg2],
+        })
+
+    # stats
+    settled_picks = [p for p in picks_out if p["settled"]]
+    hits = sum(1 for p in settled_picks if p["hit"])
+    stake_all = sum(p["stake"] for p in settled_picks)
+    payout_all = sum(p["payout"] for p in settled_picks)
+    stats = {
+        "n": len(settled_picks), "hit": hits,
+        "p_hit": round(hits / len(settled_picks), 4) if settled_picks else None,
+        "total_stake": stake_all, "total_payout": round(payout_all, 4),
+        "roi": round(payout_all / stake_all, 4) if stake_all else None,
+        "window_start": start.isoformat() if start else None,
+        "window_end": end.isoformat() if end else None,
+    }
+    return {"picks": picks_out, "stats": stats}
+

@@ -143,16 +143,24 @@ def parse_snapshot(value: dict):
     crs_list = oh.get("crsList") or []
     hafu_list = oh.get("hafuList") or []
 
-    if not (had_list and hhad_list and ttg_list and crs_list):
+    # 进球链路只需 TTG/CRS 完整即可；HAD/HHAD 允许缺失（竞彩对强弱悬殊场次不售胜平负盘）
+    if not (ttg_list and crs_list):
         return None
-
-    had = parse_had(had_list[-1])
-    hhad = parse_hhad(hhad_list[-1])
     ttg = parse_ttg(ttg_list[-1])
     crs = parse_crs(crs_list[-1])
-    hafu = parse_hafu(hafu_list[-1]) if hafu_list else None
+    if not (ttg and crs):
+        return None
 
-    if not (had and hhad and ttg and crs):
+    had = parse_had(had_list[-1]) if had_list else None
+    hhad = parse_hhad(hhad_list[-1]) if hhad_list else None
+    hafu = parse_hafu(hafu_list[-1]) if hafu_list else None
+    # 收盘时间取最早开售池的最后一笔更新时间
+    snapshot_time = None
+    for lst in (had_list, hhad_list, ttg_list, crs_list):
+        if lst:
+            snapshot_time = _update_time(lst[-1])
+            break
+    if snapshot_time is None:
         return None
 
     return {
@@ -161,19 +169,43 @@ def parse_snapshot(value: dict):
         "ttg": ttg,
         "crs": crs,
         "hafu": hafu,
-        "snapshot_time": _update_time(had_list[-1]),
+        "snapshot_time": snapshot_time,
     }
 
 
+def _has_direction_data(snap) -> bool:
+    """快照是否携带可用方向定价（HAD 三向完整 或 HHAD 有盘口线）"""
+    return bool(snap.had_home and snap.had_draw and snap.had_away) or snap.hhad_line is not None
+
+
+def _can_insert(existing, had, hhad) -> bool:
+    """防降级：新快照缺某方向盘但历史已有 → 视为该盘未开售/抓取遗漏，禁止用缺盘快照覆盖。"""
+    if not had and any(s.had_home and s.had_draw and s.had_away for s in existing):
+        return False
+    if not hhad and any(s.hhad_line is not None for s in existing):
+        return False
+    return True
+
+
 def _snap_equal(snap, had, hhad, ttg, crs):
+    """内容相等判定。had/hhad 允许 None：某列两边都缺视为一致；都有值时精确比较。"""
+
+    def _seg(cur, new):
+        if new is None:
+            return all(v is None for v in cur)
+        return all(
+            (c is None and n is None)
+            or (c is not None and n is not None and abs(float(c) - float(n)) < 1e-6)
+            for c, n in zip(cur, new)
+        )
+
+    had_cur = (snap.had_home, snap.had_draw, snap.had_away)
+    had_new = tuple(had[k] for k in ("home", "draw", "away")) if had else None
+    hh_cur = (snap.hhad_line, snap.hhad_home, snap.hhad_draw, snap.hhad_away)
+    hh_new = tuple(hhad[k] for k in ("line", "home", "draw", "away")) if hhad else None
     return (
-        snap.had_home == had["home"]
-        and snap.had_draw == had["draw"]
-        and snap.had_away == had["away"]
-        and snap.hhad_line == hhad["line"]
-        and snap.hhad_home == hhad["home"]
-        and snap.hhad_draw == hhad["draw"]
-        and snap.hhad_away == hhad["away"]
+        _seg(had_cur, had_new)
+        and _seg(hh_cur, hh_new)
         and snap.ttg_odds_json == ttg
         and snap.crs_odds_json == crs
     )
@@ -260,17 +292,23 @@ async def main():
                 print(f"  [dup] {label} 已存在相同快照")
                 continue
 
+            # 防降级：新快照方向盘缺失但历史快照已有（盘未开售/抓取遗漏）→ 不写入
+            if not _can_insert(existing, had, hhad):
+                skipped_dup += 1
+                print(f"  [no-downgrade] {label} 方向盘数据缺失，跳过缺盘快照")
+                continue
+
             snap = JczqPlayOddsSnapshot(
                 match_id=m.id,
                 snapshot_time=snapshot_time,
                 source=args.source,
-                had_home=had["home"],
-                had_draw=had["draw"],
-                had_away=had["away"],
-                hhad_line=hhad["line"],
-                hhad_home=hhad["home"],
-                hhad_draw=hhad["draw"],
-                hhad_away=hhad["away"],
+                had_home=(had or {}).get("home"),
+                had_draw=(had or {}).get("draw"),
+                had_away=(had or {}).get("away"),
+                hhad_line=(hhad or {}).get("line"),
+                hhad_home=(hhad or {}).get("home"),
+                hhad_draw=(hhad or {}).get("draw"),
+                hhad_away=(hhad or {}).get("away"),
                 ttg_odds_json=ttg,
                 crs_odds_json=crs,
                 hafu_odds_json=hafu,

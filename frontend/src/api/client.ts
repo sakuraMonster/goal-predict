@@ -592,6 +592,325 @@ export const getMarketFlowParlayDir = (params?: { date?: string; start_date?: st
 export const getMarketFlowParlayD = (params?: { date?: string; start_date?: string; end_date?: string; model_version?: string; source?: string; min_odds?: number; max_odds?: number }) =>
   api.get("/market-flow/predictions/parlay-d", { params }).then((r) => r.data as MarketFlowParlayResponse);
 
+// ---- 方案G：halfdraw(R1半平/R2 fav侧) × 方案D方向腿，每日1串 ----
+export interface ParlayFLegPlayed {
+  key: string;
+  zh: string;
+  odds: number;
+}
+export interface ParlayFLeg {
+  kind: "halfdraw" | "dir";
+  code?: string;          // halfdraw 腿: R1 / R2
+  fav?: string;
+  match_num?: string;
+  home_team?: string;
+  away_team?: string;
+  league_name?: string | null;
+  kickoff_time?: string;
+  played?: ParlayFLegPlayed[]; // halfdraw 腿选项(1或2格)
+  stake?: number;
+  pick?: string;          // dir 腿
+  odds?: number;
+  source?: string;
+  hit?: boolean | null;
+  actual?: string | null;
+}
+export interface ParlayFPick {
+  matchday?: string;
+  combo_level?: string;   // R1 / R2 / R2_fallback
+  settled: boolean;
+  in_range?: boolean;
+  stake?: number;
+  payout?: number | null;
+  roi?: number | null;
+  hit?: boolean | null;
+  parlay_odds?: number | null;
+  legs: ParlayFLeg[];
+}
+export interface ParlayFResponse {
+  picks: ParlayFPick[];
+  stats: MarketFlowParlayStats;
+}
+export const getMarketFlowParlayF = (params?: { date?: string; start_date?: string; end_date?: string }) =>
+  api.get("/market-flow/predictions/parlay-f", { params }).then((r) => r.data as ParlayFResponse);
+
+// ===== 方案E：每日进球双选建议 + 人工确认（与方案D方向腿组 2串1） =====
+export interface ParlayEMatch {
+  match_id: number;
+  match_num?: string | null;
+  league_name?: string | null;
+  home_team?: string | null;
+  away_team?: string | null;
+  kickoff_time?: string | null;
+  p23: number;                       // 市场隐含 P(2∪3)
+  p34: number;                       // 市场隐含 P(3∪4)
+  pick_odds23?: Record<string, number>;  // 买 {2,3} 两档赔率
+  pick_odds34?: Record<string, number>;  // 买 {3,4} 两档赔率
+  excl23?: boolean;                  // 联赛被 23 规则排除（葡超/法乙）
+  excl34?: boolean;                  // 联赛被 34 规则排除（美职联/芬超/瑞典超）
+}
+export interface ParlayESuggestion extends ParlayEMatch {
+  leg_type: "23" | "34";
+  downgraded?: boolean;              // 34 缺货降级为第二场 23
+  pick_odds?: Record<string, number>;
+  p_hat: number;
+  pick_nums: number[];
+}
+export interface ParlayEDirSnapshot {
+  match_id: number;
+  match_num?: string | null;
+  league_name?: string | null;
+  home_team?: string | null;
+  away_team?: string | null;
+  kickoff_time?: string | null;
+  pick: string;
+  odds: number;
+  p_hat?: number | null;
+  source?: string | null;
+}
+export interface ParlayEConfirm {
+  pick_date: string;
+  match_id: number;
+  match_num?: string | null;
+  league_name?: string | null;
+  home_team?: string | null;
+  away_team?: string | null;
+  kickoff_time?: string | null;
+  leg_type: "23" | "34";
+  goal_pick_odds?: Record<string, number>;
+  goal_p_hat?: number | null;
+  has_dir: boolean;
+  dir?: ParlayEDirSnapshot | null;
+  parlay_odds_max?: number | null;
+  updated_at?: string | null;
+}
+export interface ParlayEResponse {
+  date: string;
+  suggestions: ParlayESuggestion[];
+  suggestion_reason?: string | null;
+  day_matches: ParlayEMatch[];
+  dir_options?: ParlayEDirSnapshot[];  // 当日可人工指定的方向腿候选（玩法池同方案D，排除/按 source 由前端过滤）
+  confirm?: ParlayEConfirm | null;
+}
+export const getMarketFlowParlayE = (params: { date: string }) =>
+  api.get("/market-flow/predictions/parlay-e", { params }).then((r) => r.data as ParlayEResponse);
+
+export const confirmMarketFlowParlayE = (payload: {
+  date: string;
+  match_id: number;
+  leg_type: "23" | "34";
+  dir?: ParlayEDirSnapshot | null;
+}) =>
+  api.post("/market-flow/predictions/parlay-e/confirm", payload).then((r) => r.data as { success: boolean; message?: string; confirm?: ParlayEConfirm | null });
+
+export interface ParlayEHistoryStats {
+  confirm_n: number;
+  goal_settled_n: number;
+  goal_hit_n: number;
+  goal_p_hit: number | null;
+  dir_verified_n: number;
+  dir_hit_n: number;
+  dir_p_hit: number | null;
+  combo_n: number;
+  combo_hit_n: number;
+  combo_p_hit: number | null;
+  total_stake: number;
+  total_payout: number;
+  roi: number | null;
+}
+export interface ParlayEHistoryRow {
+  pick_date: string;
+  leg_type: "23" | "34";
+  goal: {
+    match_id: number;
+    match_num?: string | null;
+    league_name?: string | null;
+    home_team?: string | null;
+    away_team?: string | null;
+    pick_odds?: Record<string, number>;
+    nums: number[];
+    settled: boolean;
+    act?: number | null;
+    hit: boolean | null;
+  };
+  dir?: {
+    match_id?: number;
+    match_num?: string | null;
+    league_name?: string | null;
+    home_team?: string | null;
+    away_team?: string | null;
+    pick: string;
+    odds?: number | null;
+    source?: string | null;
+    verified: boolean;
+    hit: boolean | null;
+  } | null;
+  combo_hit: boolean | null;
+  parlay_odds_max?: number | null;
+  stake?: number | null;
+  payout?: number | null;
+}
+export interface ParlayEHistory {
+  rows: ParlayEHistoryRow[];
+  stats: ParlayEHistoryStats;
+}
+export const getMarketFlowParlayEHistory = () =>
+  api.get("/market-flow/predictions/parlay-e/history").then((r) => r.data as ParlayEHistory);
+
+
+// ===== 方案终稿：弱腿候选 + 人工确认（方案 A/D/C） =====
+/** 终稿单腿选择：单选=opt_id；同场双选（方案C/D 半全场/方向弱腿）= 同一场两个 opt_id 数组 */
+export type FinalChoiceSel = string | string[];
+export interface FinalChoice {
+  key: string;
+  pick: string;
+  odds: number;
+  p_hat: number;
+  nums?: number[];
+  pick_odds?: Record<string, number>;
+}
+export interface FinalOption {
+  opt_id: string;
+  key: string;
+  pick: string;
+  odds: number;
+  p_hat: number;
+  nums?: number[];
+  pick_odds?: Record<string, number>;
+  dir?: string;                  // 进球腿：over/under（手工新增时同一槽位可含两种）
+  match_id?: number | null;
+  match_num?: string | null;
+  league_name?: string | null;
+  home_team?: string | null;
+  away_team?: string | null;
+  kickoff_time?: string | null;
+  is_other: boolean;      // true = 换到其他比赛
+  is_default: boolean;    // 该场系统默认档位
+  bucket?: "rec1" | "rec2" | "manual";  // rec1=当前默认场 rec2=第二高置信场 manual=人工指定
+}
+export interface FinalLeg {
+  idx: number;
+  kind: "goals" | "hafu" | "dir" | "halfdraw" | string;
+  source?: string;
+  code?: string;                 // halfdraw 腿：R1 半平首选 / R2 半全场次选
+  picks?: Array<{ key: string; pick?: string; odds?: number }>;
+  match_id?: number | null;
+  match_num?: string | null;
+  league_name?: string | null;
+  home_team?: string | null;
+  away_team?: string | null;
+  kickoff_time?: string | null;
+  pick?: string | null;
+  p_hat?: number | null;
+  odds?: number | null;
+  dir?: string;
+  top3?: number[];
+  weak?: boolean;
+  weak_hit?: number | null;
+  weak_threshold?: number | null;
+  options?: FinalOption[];
+  default_opt_id?: string | null;
+  other_match_n?: number;
+  hit?: boolean | null;
+  actual?: string | null;
+}
+export interface ParlayFinalConfirm {
+  pick_date: string;
+  plan: string;
+  system_legs: Array<Record<string, unknown>>;
+  final_legs: Array<Record<string, unknown>>;
+  meta?: { changed_legs?: number[]; choices?: Record<string, FinalChoiceSel>; manual?: boolean } | null;
+  combo_level?: string | null;
+  parlay_odds?: number | null;
+  stake?: number | null;
+  updated_at?: string | null;
+}
+export interface ParlayFinalPlanView {
+  plan: string;
+  exists: boolean;
+  manual?: boolean;              // 系统当日无组合 → 由人工逐腿选定
+  combo_level?: string | null;
+  parlay_odds?: number | null;
+  parlay_p_hat?: number | null;
+  stake?: number | null;
+  legs: FinalLeg[];
+  confirm?: ParlayFinalConfirm | null;
+  error?: string | null;
+}
+export interface ParlayFinalDayResponse {
+  date: string;
+  plans: Record<string, ParlayFinalPlanView>;
+}
+export const getMarketFlowParlayFinalDay = (params: { date: string }) =>
+  api.get("/market-flow/predictions/parlay-final/day", { params }).then((r) => r.data as ParlayFinalDayResponse);
+
+export const confirmMarketFlowParlayFinal = (payload: {
+  date: string;
+  plan: string;
+  choices?: Record<string, FinalChoiceSel>;
+}) =>
+  api.post("/market-flow/predictions/parlay-final/confirm", payload).then(
+    (r) => r.data as { status?: string; error?: string; confirm?: ParlayFinalConfirm | null }
+  );
+
+export interface ParlayFinalPlanStats {
+  confirm_n: number;
+  settled_n: number;
+  default_p_hit: number | null;
+  final_p_hit: number | null;
+  same_n: number;
+  improved_n: number;
+  worsened_n: number;
+  manual_n?: number;
+  manual_settled_n?: number;
+  manual_p_hit?: number | null;
+  default_roi: number | null;
+  final_roi: number | null;
+}
+export interface ParlayFinalHistoryStats {
+  confirm_n: number;
+  by_plan?: Record<string, ParlayFinalPlanStats>;
+  changed_legs?: { n: number; default_p_hit: number | null; final_p_hit: number | null };
+}
+/** 终稿历史中逐日的腿（系统默认 / 终稿，均带逐腿命中）——供方案列表里与原方案分开展示 */
+export interface ParlayFinalHistLeg {
+  kind?: string;
+  source?: string;
+  match_id?: number | null;
+  match_num?: string | null;
+  league_name?: string | null;
+  home_team?: string | null;
+  away_team?: string | null;
+  kickoff_time?: string | null;
+  pick?: string | null;
+  odds?: number | null;
+  p_hat?: number | null;
+  dir?: string;
+  top3?: number[];
+  hafu_key?: string;
+  pref?: string;
+  picks?: Array<{ key: string; pick?: string; odds?: number }>;
+  hit?: boolean | null;
+  actual?: string | null;
+}
+export interface ParlayFinalHistoryRow {
+  pick_date: string;
+  plan: string;
+  manual?: boolean;              // 该系统当日无组合，由人工逐腿选定
+  changed_legs: Array<Record<string, unknown>>;
+  default_legs?: ParlayFinalHistLeg[];
+  final_legs?: ParlayFinalHistLeg[];
+  default: { hit: boolean | null; settled: boolean; exists?: boolean; payout?: number | null; stake?: number | null };
+  final: { hit: boolean | null; settled: boolean; payout?: number | null; stake?: number | null; parlay_odds?: number | null };
+}
+export interface ParlayFinalHistory {
+  rows: ParlayFinalHistoryRow[];
+  stats: ParlayFinalHistoryStats;
+}
+export const getMarketFlowParlayFinalHistory = () =>
+  api.get("/market-flow/predictions/parlay-final/history").then((r) => r.data as ParlayFinalHistory);
+
+
 // 方案生成就绪度：说明当日各方案能否生成、缺什么数据（只读）
 export interface MarketFlowPlanReadiness {
   date: string;

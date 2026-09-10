@@ -141,15 +141,40 @@ def fetch_live(pool_code: str = "had,hhad,ttg,crs,hafu") -> list[dict]:
     return out
 
 
+def _has_direction_data(snap) -> bool:
+    """快照是否携带可用方向定价（HAD 三向完整 或 HHAD 有盘口线）"""
+    return bool(snap.had_home and snap.had_draw and snap.had_away) or snap.hhad_line is not None
+
+
+def _can_insert(existing, had, hhad) -> bool:
+    """防降级：新快照缺某方向盘但历史已有 → 视为该盘已收盘/抓取遗漏，禁止用缺盘快照覆盖。"""
+    if not had and any(s.had_home and s.had_draw and s.had_away for s in existing):
+        return False
+    if not hhad and any(s.hhad_line is not None for s in existing):
+        return False
+    return True
+
+
 def _snap_equal(snap: JczqPlayOddsSnapshot, had, hhad, ttg, crs):
+    """内容相等判定。had/hhad 允许 None（强弱悬殊场次不售胜平负盘）：
+    某列两边都缺视为一致；都有值时精确比较；单边缺失视为不一致（会触发新写入）。"""
+
+    def _seg(cur, new):
+        if new is None:
+            return all(v is None for v in cur)
+        return all(
+            (c is None and n is None)
+            or (c is not None and n is not None and abs(float(c) - float(n)) < 1e-6)
+            for c, n in zip(cur, new)
+        )
+
+    had_cur = (snap.had_home, snap.had_draw, snap.had_away)
+    had_new = tuple(had[k] for k in ("home", "draw", "away")) if had else None
+    hh_cur = (snap.hhad_line, snap.hhad_home, snap.hhad_draw, snap.hhad_away)
+    hh_new = tuple(hhad[k] for k in ("line", "home", "draw", "away")) if hhad else None
     return (
-        snap.had_home == had["home"]
-        and snap.had_draw == had["draw"]
-        and snap.had_away == had["away"]
-        and abs(snap.hhad_line - hhad["line"]) < 1e-6
-        and snap.hhad_home == hhad["home"]
-        and snap.hhad_draw == hhad["draw"]
-        and snap.hhad_away == hhad["away"]
+        _seg(had_cur, had_new)
+        and _seg(hh_cur, hh_new)
         and snap.ttg_odds_json == ttg
         and snap.crs_odds_json == crs
     )
@@ -160,7 +185,8 @@ def _parse_match(raw: dict) -> dict | None:
     hhad = parse_hhad(raw.get("hhad"))
     ttg = parse_ttg(raw.get("ttg"))
     crs = parse_crs(raw.get("crs"))
-    if not (had and hhad and ttg and crs):
+    # 进球链路只需 TTG/CRS 完整即可；HAD/HHAD 允许缺失（竞彩对强弱悬殊场次不售胜平负盘）
+    if not (ttg and crs):
         return None
     hafu = parse_hafu(raw.get("hafu"))
     times = [_update_time(x) for x in [raw.get("had") or {}, raw.get("hhad") or {}, raw.get("ttg") or {}, raw.get("crs") or {}]]
@@ -220,7 +246,7 @@ async def main() -> int:
         if not (p["kickoff"] and start_dt <= p["kickoff"] <= end_dt):
             continue
         parsed.append(p)
-    print(f"过滤后窗口内 {len(parsed)} 场（HAD/HHAD/TTG/CRS 齐全）")
+    print(f"过滤后窗口内 {len(parsed)} 场（TTG/CRS 齐全，HAD/HHAD 允许缺失）")
 
     async with async_session() as db:
         # 匹配本地 Match：优先 jc_match_id，其次 match_num + kickoff ± 12h
@@ -272,17 +298,23 @@ async def main() -> int:
                 print(f"  [dup]       {p['match_num']:<10}{str(p['kickoff']):<22}{p['home_team']} vs {p['away_team']}")
                 continue
 
+            # 防降级：新快照方向盘缺失但历史快照已有（盘已收盘）→ 不写入
+            if not _can_insert(existing, p["had"], p["hhad"]):
+                skipped_dup += 1
+                print(f"  [no-downgrade] {p['match_num']:<10}{str(p['kickoff']):<22}{p['home_team']} vs {p['away_team']}  方向盘已收盘，跳过缺盘快照")
+                continue
+
             snap = JczqPlayOddsSnapshot(
                 match_id=matched.id,
                 snapshot_time=p["snapshot_time"],
                 source=args.source,
-                had_home=p["had"]["home"],
-                had_draw=p["had"]["draw"],
-                had_away=p["had"]["away"],
-                hhad_line=p["hhad"]["line"],
-                hhad_home=p["hhad"]["home"],
-                hhad_draw=p["hhad"]["draw"],
-                hhad_away=p["hhad"]["away"],
+                had_home=(p["had"] or {}).get("home"),
+                had_draw=(p["had"] or {}).get("draw"),
+                had_away=(p["had"] or {}).get("away"),
+                hhad_line=(p["hhad"] or {}).get("line"),
+                hhad_home=(p["hhad"] or {}).get("home"),
+                hhad_draw=(p["hhad"] or {}).get("draw"),
+                hhad_away=(p["hhad"] or {}).get("away"),
                 ttg_odds_json=p["ttg"],
                 crs_odds_json=p["crs"],
                 hafu_odds_json=p["hafu"],

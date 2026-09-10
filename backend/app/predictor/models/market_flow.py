@@ -1420,6 +1420,24 @@ class MarketFlowEngineV2:
         priorities = _style_priority(matchup_style)
 
         allowed_outcomes, outcome_evidence, outcome_votes, outcome_enforce_raw = _build_outcome_constraint_v2(had, hhad, base_odds, cfg, crs=crs, ttg=ttg)
+        no_had_mode = not bool(had)  # 竞彩不售胜平负（强弱悬殊场次）→ 进球盘口主导
+        if no_had_mode:
+            # 无 HAD 时方向无锚点：按方向锚点做强制剔除会把 CRS 热门池（强队大胜比分）整侧滤掉，
+            # 导致所选总进球档候选比分为空 → best_score/second_score 空 → 整场预测失败（004/003/009/012 类）。
+            # 放开 allowed，比分完全交给 TTG/CRS 进球链路：先由进球盘口定总进球，再在对应总进球档内按 CRS 隐含选分。
+            allowed_outcomes = {"home", "draw", "away"}
+            outcome_evidence = [{
+                "target_outcome": None,
+                "metric": "no_had_goals_driven",
+                "lhs": "had",
+                "rhs": "missing",
+                "value": None,
+                "threshold": None,
+                "pass": True,
+                "kind": "override",
+            }]
+            outcome_votes = {"home": 0, "draw": 0, "away": 0}
+            outcome_enforce_raw = []
         anchor_detail_ex: dict[str, Any] = {}
         outcome_enforce: list[dict[str, Any]] = []
         for it in (outcome_enforce_raw or []):
@@ -1702,6 +1720,7 @@ class MarketFlowEngineV2:
                 "goal_priority": priorities,
             },
             "stage_b": {
+                "no_had_mode": bool(no_had_mode),
                 "had_pref": _had_preference(had) if had else None,
                 "allowed_outcomes": sorted(list(allowed_outcomes)),
                 "excluded_outcomes": sorted([x for x in ["home", "draw", "away"] if x not in allowed_outcomes]),

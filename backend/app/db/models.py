@@ -320,3 +320,63 @@ class ColdPickRecord(Base):
     score = Column(Float, comment="把握度评分（rank_gap 为主）")
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class ParlayEConfirm(Base):
+    """方案E 人工确认快照（每日 1 条：确认的进球场 + 当日方案D方向腿 → 2串1）
+
+    进球注为竞彩总进球复式（23 = 买 {2,3} 两档；34 = 买 {3,4} 两档）。
+    方向腿快照来自方案D当日输出（parlay-d 的 dir 腿），只做引用不改方案D逻辑。
+    """
+    __tablename__ = "parlay_e_confirms"
+    __table_args__ = (UniqueConstraint("pick_date", name="uq_parlay_e_pick_date"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    pick_date = Column(Date, nullable=False, index=True, comment="比赛日（竞彩 12:00 口径）")
+    # —— 确认的进球场（方案E 进球腿） ——
+    match_id = Column(Integer, ForeignKey("matches.id"), nullable=False, index=True)
+    match_num = Column(String(50))
+    league_name = Column(String(100))
+    home_team = Column(String(100))
+    away_team = Column(String(100))
+    kickoff_time = Column(DateTime)
+    leg_type = Column(String(10), nullable=False, comment="23=总进球2∪3复式, 34=3∪4复式")
+    goal_pick_odds = Column(JSON, comment="{档位: 赔率}，如 {2:3.9, 3:3.6}")
+    goal_p_hat = Column(Float, comment="所选两档隐含概率和")
+    # —— 当日方案D方向腿（快照引用） ——
+    dir_match_id = Column(Integer)
+    dir_match_num = Column(String(50))
+    dir_league_name = Column(String(100))
+    dir_home_team = Column(String(100))
+    dir_away_team = Column(String(100))
+    dir_kickoff_time = Column(DateTime)
+    dir_pick = Column(String(20), comment="主/客/平 或 胜胜/负负")
+    dir_odds = Column(Float)
+    dir_p_hat = Column(Float)
+    dir_source = Column(String(30), comment="favorite_hafu / ambiguous_had")
+    parlay_odds_max = Column(Float, comment="2串1最高单注赔率快照（两档中高者×方向腿赔率）")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class ParlayFinalConfirm(Base):
+    """方案终稿人工确认快照（每方案每日 1 条：弱腿候选确认后的最终组合）
+
+    机制（2026-09-03）：方案 A/D/C 的低命中"单选腿"（判大进球3选 / 半全场腿 /
+    冷门方向腿）自动给出 2 个选项（默认 + 备选），人工确认其中一条后与其余
+    系统默认腿组成"终稿"组合。system_legs=系统默认组合快照；final_legs=确认后组合；
+    meta.changed_legs 记录被人工改选的腿下标，用于"默认 vs 终稿"分开统计。
+    """
+    __tablename__ = "parlay_final_confirms"
+    __table_args__ = (UniqueConstraint("pick_date", "plan", name="uq_parlay_final_date_plan"),)
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    pick_date = Column(Date, nullable=False, index=True, comment="比赛日（竞彩 12:00 口径）")
+    plan = Column(String(4), nullable=False, comment="A / D / C")
+    system_legs = Column(JSON, comment="系统默认组合腿快照（与方案输出同构）")
+    final_legs = Column(JSON, comment="人工确认后终稿组合腿快照")
+    meta = Column(JSON, comment="{changed_legs:[idx], choices:{idx:key}}")
+    parlay_odds = Column(Float, comment="终稿串关赔率")
+    stake = Column(Integer, comment="终稿注数（进球3选复式计3注/腿）")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

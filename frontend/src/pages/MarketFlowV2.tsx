@@ -6,6 +6,8 @@ import {
   getMarketFlowParlay,
   getMarketFlowParlayD,
   getMarketFlowParlayDir,
+  getMarketFlowParlayF,
+  getMarketFlowParlayFinalHistory,
   getMarketFlowPools,
   getPlanReadiness,
   predictMarketFlow,
@@ -18,13 +20,20 @@ import {
   type MarketFlowOuMatch,
   type MarketFlowParlayResponse,
   type MarketFlowParlayLeg,
+  type ParlayFResponse,
   type MarketFlowPlanReadiness,
   type MarketFlowPoolsResponse,
+  type ParlayFinalHistLeg,
+  type ParlayFinalHistory,
+  type ParlayFinalHistoryRow,
 } from "../api/client";
 import SkeletonCard from "../components/Skeleton";
 import EmptyState from "../components/EmptyState";
 import ErrorState from "../components/ErrorState";
 import { useToast } from "../components/Toast";
+import ParlayEView from "./ParlayEView";
+import ParlayFinalView from "./ParlayFinalView";
+import ParlayFView from "./ParlayFView";
 
 type TabKey = "live" | "history" | "ou_history" | "pools" | "parlay";
 type HistoryView = "by_league" | "by_date";
@@ -1419,7 +1428,7 @@ function OuHistoryView() {
 function ParlayView() {
   const today = () => { const d = new Date(); return d.toISOString().slice(0, 10); };
   const [mode, setMode] = useState<"day" | "range">("range");
-  const [subTab, setSubTab] = useState<"all" | "d" | "dir">("all");  // 方案：全方向 / 进球+半全场+方向 / 方向二串一
+  const [subTab, setSubTab] = useState<"all" | "d" | "dir" | "e" | "f" | "g">("all");  // 方案：全方向 / 进球+半全场+方向 / 方向二串一 / 进球人工确认 / 终稿·弱腿人工确认 / 方案G(半平×D方向)
   const [date, setDate] = useState<string>(today);
   const [start, setStart] = useState<string>(() => { const d = new Date(); d.setDate(d.getDate() - 6); return d.toISOString().slice(0, 10); });
   const [end, setEnd] = useState<string>(today);
@@ -1427,8 +1436,78 @@ function ParlayView() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   // 生成方案：同步当日赔率 → 执行预测 → 生成三方案；无方案时显示就绪度原因（不自动回退历史）
-  const [planBoard, setPlanBoard] = useState<{ date: string; a: MarketFlowParlayResponse; d: MarketFlowParlayResponse; c: MarketFlowParlayResponse; readiness?: MarketFlowPlanReadiness | null } | null>(null);
+  const [planBoard, setPlanBoard] = useState<{ date: string; a: MarketFlowParlayResponse; d: MarketFlowParlayResponse; c: MarketFlowParlayResponse; g: ParlayFResponse; readiness?: MarketFlowPlanReadiness | null } | null>(null);
   const [generating, setGenerating] = useState(false);
+
+  // 终稿（parlay-final 人工确认）历史：把已确认的方案 A/D/C 显示到对应方案列表，与原系统方案分开显示/统计
+  const [finalHist, setFinalHist] = useState<ParlayFinalHistory | null>(null);
+  const [finalHistLoading, setFinalHistLoading] = useState(false);
+  const [finalCollapsed, setFinalCollapsed] = useState(false); // 人工终稿对比板块收缩
+  const backFromConfirmTab = useRef(false); // 从「终稿·人工确认」切回时强制刷新终稿列表
+  const loadFinalHist = useCallback(async () => {
+    setFinalHistLoading(true);
+    try {
+      setFinalHist(await getMarketFlowParlayFinalHistory());
+    } catch {
+      setFinalHist(null);
+    } finally {
+      setFinalHistLoading(false);
+    }
+  }, []);
+  useEffect(() => {
+    if (subTab === "e" || subTab === "f") {
+      backFromConfirmTab.current = true;
+      return;
+    }
+    if (!finalHist || backFromConfirmTab.current) loadFinalHist();
+    backFromConfirmTab.current = false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [subTab]);
+
+  // 当前 subTab 对应的方案代号（终稿历史按 A/D/C 存）
+  const planCode = subTab === "all" ? "A" : subTab === "d" ? "D" : "C";
+  const planLabel = subTab === "all" ? "方案A · 全方向" : subTab === "d" ? "方案D · 进球半全场" : "方案C · 方向二串一";
+  const inWindowDate = (d: string) => (mode === "day" ? d === date : d >= start && d <= end);
+  // 窗口内该方案已确认终稿的行（按日期倒序）
+  const finalRows = useMemo<ParlayFinalHistoryRow[]>(() => {
+    if (!finalHist || subTab === "e" || subTab === "f") return [];
+    return (finalHist.rows || [])
+      .filter((r) => r.plan === planCode && inWindowDate(r.pick_date))
+      .sort((a, b) => b.pick_date.localeCompare(a.pick_date));
+  }, [finalHist, subTab, planCode, mode, date, start, end]);
+  const finalByDate = useMemo(() => {
+    const m = new Map<string, ParlayFinalHistoryRow>();
+    for (const r of finalRows) m.set(r.pick_date, r);
+    return m;
+  }, [finalRows]);
+  // 全量（不限于窗口）：用于「生成方案」卡片标记当日是否已出终稿
+  const finalByPlanDate = useMemo(() => {
+    const m = new Map<string, ParlayFinalHistoryRow>();
+    for (const r of finalHist?.rows || []) m.set(`${r.plan}:${r.pick_date}`, r);
+    return m;
+  }, [finalHist]);
+  // 统计：已确认日里 系统默认 vs 终稿 分开统计（口径与「终稿」页一致）
+  const finalStats = useMemo(() => {
+    const n = finalRows.length;
+    const settled = finalRows.filter((r) => r.default.settled && r.final.settled);
+    const defHit = settled.filter((r) => r.default.hit === true).length;
+    const finHit = settled.filter((r) => r.final.hit === true).length;
+    const sum = (xs: Array<number | null | undefined>) => xs.reduce<number>((a, b) => a + (Number(b) || 0), 0);
+    const defStake = sum(finalRows.map((r) => r.default.stake));
+    const finStake = sum(finalRows.map((r) => r.final.stake));
+    return {
+      n,
+      settled_n: settled.length,
+      def_p_hit: settled.length ? defHit / settled.length : null,
+      fin_p_hit: settled.length ? finHit / settled.length : null,
+      def_roi: defStake ? sum(finalRows.map((r) => r.default.payout)) / defStake : null,
+      fin_roi: finStake ? sum(finalRows.map((r) => r.final.payout)) / finStake : null,
+      def_hit_n: defHit,
+      fin_hit_n: finHit,
+      improved_n: settled.filter((r) => r.default.hit !== true && r.final.hit === true).length,
+      worsened_n: settled.filter((r) => r.default.hit === true && r.final.hit !== true).length,
+    };
+  }, [finalRows]);
 
   // 方案切换缓存：按「方案 + 窗口」缓存，切 tab 命中缓存不重新查询，仅「刷新」强制重查
   const cacheRef = useRef<Map<string, MarketFlowParlayResponse>>(new Map());
@@ -1438,6 +1517,8 @@ function ParlayView() {
   }, [mode, subTab, date, start, end]);
 
   const fetchData = useCallback((force = false) => {
+    if (subTab === "e") return; // 方案E 使用独立组件（ParlayEView），不走通用串关管线
+    if (subTab === "g") return; // 方案G 使用独立组件（ParlayFView），不走通用串关管线
     if (!force) {
       const cached = cacheRef.current.get(cacheKey);
       if (cached) {
@@ -1478,13 +1559,14 @@ function ParlayView() {
       await syncMarketFlowSmOdds({ date: d });
       // 2) 执行 MarketFlow 批量预测（覆盖式）
       await predictMarketFlow({ date: d, overwrite: true });
-      // 3) 拉取三方案
-      const [a, dRes, c] = await Promise.all([
+      // 3) 拉取四方案（A/D/C/G）
+      const [a, dRes, c, g] = await Promise.all([
         getMarketFlowParlay({ date: d }),
         getMarketFlowParlayD({ date: d }),
         getMarketFlowParlayDir({ date: d }),
+        getMarketFlowParlayF({ date: d }),
       ]);
-      // 4) 任一方案为空 → 获取就绪度原因展示
+      // 4) A/D/C 任一为空 → 获取就绪度原因展示（G 无就绪度接口，卡片内直接说明）
       let readiness: MarketFlowPlanReadiness | null = null;
       if (a.picks.length === 0 || dRes.picks.length === 0 || c.picks.length === 0) {
         try {
@@ -1493,7 +1575,7 @@ function ParlayView() {
           readiness = null;
         }
       }
-      setPlanBoard({ date: d, a, d: dRes, c, readiness });
+      setPlanBoard({ date: d, a, d: dRes, c, g, readiness });
     } catch {
       setError("生成方案失败");
     } finally {
@@ -1501,11 +1583,37 @@ function ParlayView() {
     }
   }, [mode, date]);
 
+  if (subTab === "e") {
+    return (
+      <ParlayEView initialDate={mode === "day" ? date : today()} onNavigate={(k) => setSubTab(k)} />
+    );
+  }
+
+  if (subTab === "f") {
+    return (
+      <ParlayFinalView initialDate={mode === "day" ? date : today()} onNavigate={(k) => setSubTab(k)} />
+    );
+  }
+
+  if (subTab === "g") {
+    return (
+      <ParlayFView
+        initialDate={mode === "day" ? date : today()}
+        onNavigate={(k) => setSubTab(k as "all" | "d" | "dir" | "e" | "f" | "g")}
+      />
+    );
+  }
+
   if (loading) return <div className="h-64 bg-parchment-light rounded animate-pulse" />;
   if (error) return <ErrorState message={error} onRetry={fetchData} />;
   if (!data) return <EmptyState icon="🧩" message="暂无串关推荐数据" />;
 
   const st = data.stats;
+  const planTitle = subTab === "dir"
+    ? "串关推荐 · 方向优选二串一（2串1，串关赔率 4~10 倍）"
+    : subTab === "d"
+      ? "串关推荐 · 3串1（1场进球数3选 + 1场半全场 + 1场方向优选）· 方案D，串关赔率 5~15 倍"
+      : "串关推荐 · 3串1（2场进球数3选 + 1场高置信方向优选）· 方案A：进球腿大小球均可";
 
   const legCard = (lg: MarketFlowParlayLeg) => (
     <div className="flex-1 min-w-[220px] bg-parchment-light/50 rounded-md border border-highlight p-3">
@@ -1542,48 +1650,47 @@ function ParlayView() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-3 px-4 py-3 bg-parchment-dark rounded-lg border border-border-dark flex-wrap">
-        <span className="flex items-center gap-2 text-xs text-moss font-semibold">
-          <span className="w-2 h-2 rounded-full bg-moss" />
-          {subTab === "dir"
-            ? "串关推荐 · 方向优选二串一（2串1，串关赔率 4~10 倍）"
-            : subTab === "d"
-              ? "串关推荐 · 3串1（1场进球数3选 + 1场半全场 + 1场方向优选）· 方案D，串关赔率 5~15 倍"
-              : "串关推荐 · 3串1（2场进球数3选 + 1场高置信方向优选）· 方案A：进球腿大小球均可"}
-        </span>
-        <span className="text-xs text-ink-muted">窗口 {data.window_start?.slice(0, 10) || "-"} ~ {data.window_end?.slice(0, 10) || "-"}</span>
-        <button onClick={genPlans} disabled={generating}
-          className="px-3 py-1.5 text-xs bg-amber text-white rounded hover:bg-amber/90 transition-colors disabled:opacity-50 font-semibold"
-          title="同步当日赔率（TTG/HAFU + SM O/U）→ 执行 MarketFlow 预测 → 生成方案A/D/C推荐">
-          {generating ? "同步赔率生成中..." : "生成方案"}
-        </button>
-        <div className="ml-auto flex items-center gap-2 flex-wrap">
-          <div className="flex gap-0.5 bg-white rounded p-0.5 border border-border text-[11px]">
-            {([["all", "方案A·全方向"], ["d", "方案D·进球半全场"], ["dir", "方案C·方向二串一"]] as const).map(([k, label]) => (
-              <span key={k} className={`px-2 py-0.5 rounded cursor-pointer ${subTab === k ? "bg-amber text-white font-semibold" : "text-ink-muted"}`}
-                onClick={() => setSubTab(k)}>{label}</span>
-            ))}
-          </div>
-          <div className="flex gap-0.5 bg-white rounded p-0.5 border border-border text-[11px]">
-            {(["range", "day"] as const).map((m) => (
-              <span key={m} className={`px-2 py-0.5 rounded cursor-pointer ${mode === m ? "bg-moss text-white" : "text-ink-muted"}`}
-                onClick={() => setMode(m)}>{m === "range" ? "区间回测" : "单日推荐"}</span>
-            ))}
-          </div>
-          {mode === "day" ? (
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
-              className="font-mono text-xs text-ink bg-white border border-border rounded-md px-2 py-1 outline-none [color-scheme:light]" />
-          ) : (
-            <>
-              <input type="date" value={start} max={end} onChange={(e) => setStart(e.target.value)}
+      <div className="px-4 py-3 bg-parchment-dark rounded-lg border border-border-dark space-y-2">
+        <div className="flex items-center gap-3 min-h-8">
+          <span className="flex items-center gap-2 min-w-0 flex-1 text-xs text-moss font-semibold" title={planTitle}>
+            <span className="w-2 h-2 rounded-full bg-moss shrink-0" />
+            <span className="truncate">{planTitle}</span>
+          </span>
+          <span className="text-xs text-ink-muted shrink-0">窗口 {data.window_start?.slice(0, 10) || "-"} ~ {data.window_end?.slice(0, 10) || "-"}</span>
+          <button onClick={genPlans} disabled={generating}
+            className="px-3 py-1.5 text-xs bg-amber text-white rounded hover:bg-amber/90 transition-colors disabled:opacity-50 font-semibold shrink-0"
+            title="同步当日赔率（TTG/HAFU + SM O/U）→ 执行 MarketFlow 预测 → 生成方案A/D/C/G推荐">
+            {generating ? "同步赔率生成中..." : "生成方案"}
+          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <div className="flex gap-0.5 bg-white rounded p-0.5 border border-border text-[11px]">
+              {(["range", "day"] as const).map((m) => (
+                <span key={m} className={`px-2 py-0.5 rounded cursor-pointer ${mode === m ? "bg-moss text-white" : "text-ink-muted"}`}
+                  onClick={() => setMode(m)}>{m === "range" ? "区间回测" : "单日推荐"}</span>
+              ))}
+            </div>
+            {mode === "day" ? (
+              <input type="date" value={date} onChange={(e) => setDate(e.target.value)}
                 className="font-mono text-xs text-ink bg-white border border-border rounded-md px-2 py-1 outline-none [color-scheme:light]" />
-              <span className="text-ink-muted text-xs">至</span>
-              <input type="date" value={end} onChange={(e) => setEnd(e.target.value)}
-                className="font-mono text-xs text-ink bg-white border border-border rounded-md px-2 py-1 outline-none [color-scheme:light]" />
-            </>
-          )}
-          <button onClick={() => fetchData(true)}
-            className="px-3 py-1.5 text-xs text-ink-muted border border-border rounded hover:border-moss transition-colors">刷新</button>
+            ) : (
+              <>
+                <input type="date" value={start} max={end} onChange={(e) => setStart(e.target.value)}
+                  className="font-mono text-xs text-ink bg-white border border-border rounded-md px-2 py-1 outline-none [color-scheme:light]" />
+                <span className="text-ink-muted text-xs">至</span>
+                <input type="date" value={end} onChange={(e) => setEnd(e.target.value)}
+                  className="font-mono text-xs text-ink bg-white border border-border rounded-md px-2 py-1 outline-none [color-scheme:light]" />
+              </>
+            )}
+            <button onClick={() => fetchData(true)}
+              className="px-3 py-1.5 text-xs text-ink-muted border border-border rounded hover:border-moss transition-colors">刷新</button>
+          </div>
+        </div>
+        {/* 方案切换 tab：固定第二行，各子方案视图位置一致 */}
+        <div className="flex gap-0.5 bg-white rounded p-0.5 border border-border text-[11px] w-fit flex-wrap">
+          {([["all", "方案A·全方向"], ["d", "方案D·进球半全场"], ["dir", "方案C·方向二串一"], ["e", "方案E·进球确认"], ["f", "终稿·人工确认"], ["g", "方案G·半平×方向"]] as const).map(([k, label]) => (
+            <span key={k} className={`px-2 py-0.5 rounded cursor-pointer ${subTab === k ? "bg-amber text-white font-semibold" : "text-ink-muted"}`}
+              onClick={() => setSubTab(k)}>{label}</span>
+          ))}
         </div>
       </div>
 
@@ -1598,14 +1705,109 @@ function ParlayView() {
           highlight={st.roi != null && st.roi > 1} />
       </div>
 
+      {/* 人工终稿 · 已确认（同一方案列表内、与原系统方案分开显示；命中/ROI 分开统计） */}
+      {!finalHistLoading && finalRows.length > 0 && (
+        <div className="bg-white rounded-md border border-amber/40 overflow-hidden">
+          <div className="px-4 py-3 border-b border-amber/30 bg-amber/5 flex items-center gap-3 flex-wrap cursor-pointer select-none"
+            onClick={() => setFinalCollapsed((v) => !v)} title="点击展开/收起对比">
+            <span className="text-[10px] text-amber font-bold">{finalCollapsed ? "▶" : "▼"}</span>
+            <span className="text-xs font-bold text-amber uppercase tracking-wide">人工终稿 · 已确认（{planLabel}，与原系统方案分开显示/统计）</span>
+            <span className="text-[10px] text-ink-light">
+              窗口中已确认 {finalStats.n} 天 · 已结算 {finalStats.settled_n} 天；系统默认与人工终稿仅在「已确认日」内分别统计
+            </span>
+            <span className="ml-auto text-[10px] text-ink-muted">{finalCollapsed ? "展开对比" : "收起对比"}</span>
+          </div>
+          {!finalCollapsed && (<>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-3">
+            <StatBox label="确认天数" value={String(finalStats.n)} sub={`已结算 ${finalStats.settled_n} 天`} />
+            <StatBox label="系统默认 p_hit（确认日）" value={finalStats.def_p_hit == null ? "-" : `${(finalStats.def_p_hit * 100).toFixed(0)}%`}
+              sub={`命中 ${finalStats.def_hit_n} / ${finalStats.settled_n}`} />
+            <StatBox label="人工终稿 p_hit" value={finalStats.fin_p_hit == null ? "-" : `${(finalStats.fin_p_hit * 100).toFixed(0)}%`}
+              sub={`命中 ${finalStats.fin_hit_n} / ${finalStats.settled_n} · 改好 ${finalStats.improved_n} / 改差 ${finalStats.worsened_n}`}
+              highlight={finalStats.fin_p_hit != null && finalStats.fin_p_hit >= 0.4} />
+            <div className="rounded-md border border-highlight bg-parchment-light/40 p-3">
+              <div className="text-[10px] text-ink-light mb-1">ROI（返奖/下注，确认日）</div>
+              <div className="text-[11px] text-ink-muted">系统默认{" "}
+                <span className="font-bold text-ink">{finalStats.def_roi == null ? "-" : `${(finalStats.def_roi * 100).toFixed(0)}%`}</span>
+              </div>
+              <div className="text-[11px] mt-1">人工终稿{" "}
+                <span className={`font-bold ${(finalStats.fin_roi ?? 0) > (finalStats.def_roi ?? 0) ? "text-moss" : (finalStats.fin_roi ?? 0) < (finalStats.def_roi ?? 0) ? "text-rust" : "text-ink"}`}>
+                  {finalStats.fin_roi == null ? "-" : `${(finalStats.fin_roi * 100).toFixed(0)}%`}
+                </span>
+              </div>
+            </div>
+          </div>
+          <div className="divide-y divide-highlight border-t border-highlight">
+            {finalRows.map((r) => {
+              const defLegs = r.default_legs || [];
+              const finLegs = r.final_legs || [];
+              const legBrief = (lg: ParlayFinalHistLeg) => {
+                const picks = (lg.picks?.length ? lg.picks.map((p) => p.pick ?? p.key).join("/") : lg.pick) ?? "";
+                const hitTxt = lg.hit == null ? "未结算" : lg.hit ? "✓命中" : "✗未中";
+                return `${lg.match_num ? `${lg.match_num} ` : ""}${lg.home_team ?? "?"} vs ${lg.away_team ?? "?"} ${picks}@${lg.odds?.toFixed(2) ?? "-"} ${hitTxt}${lg.hit === false && lg.actual ? `(${lg.actual})` : ""}`;
+              };
+              return (
+                <div key={r.pick_date} className="px-4 py-3">
+                  <div className="flex items-center gap-2 flex-wrap mb-2">
+                    <span className="font-mono text-xs text-ink font-semibold">{r.pick_date}</span>
+                    {(r.default_legs || []).length === 0 ? (
+                            <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber/15 text-amber font-semibold">系统 无方案（手工新增）</span>
+                          ) : r.default.settled ? (
+                            r.default.hit ? (
+                              <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-600 text-white font-bold">系统 ✓全中</span>
+                            ) : (
+                              <span className="text-[11px] px-1.5 py-0.5 rounded bg-rust/10 text-rust font-bold">系统 ✗未中</span>
+                            )
+                          ) : (
+                            <span className="text-[11px] px-1.5 py-0.5 rounded bg-parchment-dark text-ink-muted">系统 未结算</span>
+                          )}
+                    {r.final.settled ? (
+                      r.final.hit ? (
+                        <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-600 text-white font-bold">终稿 ✓全中</span>
+                      ) : (
+                        <span className="text-[11px] px-1.5 py-0.5 rounded bg-rust/10 text-rust font-bold">终稿 ✗未中</span>
+                      )
+                    ) : (
+                      <span className="text-[11px] px-1.5 py-0.5 rounded bg-parchment-dark text-ink-muted">终稿 未结算</span>
+                    )}
+                    {r.final.parlay_odds != null && <span className="text-xs text-ink">终稿串关 {r.final.parlay_odds.toFixed(2)}</span>}
+                    {r.final.settled && r.final.payout != null && (
+                      <span className="text-[11px] text-ink-muted">返奖 {r.final.payout.toFixed(2)} / {r.final.stake ?? 1}注</span>
+                    )}
+                    {r.changed_legs.length > 0 && (
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber/15 text-amber font-semibold">改选 {r.changed_legs.length} 腿</span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    <div className="rounded border border-highlight bg-parchment-light/30 px-2 py-1.5">
+                      <div className="text-[10px] text-ink-muted mb-1">系统默认（原方案）</div>
+                      <div className="space-y-0.5 text-[11px] text-ink-light">
+                        {defLegs.length ? defLegs.map((lg, i) => <div key={i} className="leading-relaxed">{legBrief(lg)}</div>) : <div>-</div>}
+                      </div>
+                    </div>
+                    <div className="rounded border border-amber/40 bg-amber/5 px-2 py-1.5">
+                      <div className="text-[10px] text-amber mb-1">人工终稿（已确认）</div>
+                      <div className="space-y-0.5 text-[11px] text-ink">
+                        {finLegs.length ? finLegs.map((lg, i) => <div key={i} className="leading-relaxed">{legBrief(lg)}</div>) : <div>-</div>}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          </>)}
+        </div>
+      )}
+
       {/* 今日三方案（生成方案按钮结果） */}
       {planBoard && (
         <div className="bg-white rounded-md border border-border overflow-hidden">
           <div className="px-4 py-3 border-b border-highlight bg-parchment-light/60 flex items-center gap-3 flex-wrap">
             <span className="text-xs font-bold text-ink-light uppercase tracking-wide">方案生成 · {planBoard.date}</span>
-            <span className="text-[10px] text-ink-light">流程：同步当日赔率 → 执行预测 → 生成三方案 · 每串按竞彩复式实际返奖口径（进球3选=3注）</span>
+            <span className="text-[10px] text-ink-light">流程：同步当日赔率 → 执行预测 → 生成四方案（A/D/C/G）· 每串按竞彩复式实际返奖口径（进球3选=3注）</span>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 p-3">
             {([
               ["A", planBoard.a, "方案A · 全方向", "2进球3选 + 1方向"],
               ["D", planBoard.d, "方案D · 进球半全场", "1进球3选 + 1半全场 + 1方向"],
@@ -1615,6 +1817,7 @@ function ParlayView() {
               const reason = planBoard.readiness
                 ? planBoard.readiness.plans[k === "A" ? "plan_a" : k === "D" ? "plan_d" : "plan_c"].reason
                 : null;
+              const confRow = finalByPlanDate.get(`${k}:${planBoard.date}`);
               return (
                 <div key={k} className="border border-highlight rounded-md p-3 bg-parchment-light/30">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -1622,6 +1825,13 @@ function ParlayView() {
                     <span className="text-[10px] text-ink-light">{s.hit}/{s.n} 命中</span>
                   </div>
                   <div className="text-[10px] text-ink-light mt-0.5">{sub}</div>
+                  {confRow && (
+                    <div className="mt-1.5 text-[10px] text-amber font-semibold">
+                      ✓ 已确认终稿：串关 {confRow.final.parlay_odds?.toFixed(2) ?? "-"} ·
+                      {confRow.final.hit == null ? " 未结算" : confRow.final.hit ? " 命中" : " 未中"}
+                      {confRow.changed_legs.length > 0 ? ` · 改选 ${confRow.changed_legs.length} 腿` : ""}
+                    </div>
+                  )}
                   {res.picks.length === 0 ? (
                     <div className="text-[11px] text-rust mt-2">{reason ?? "当日无推荐"}</div>
                   ) : (
@@ -1637,7 +1847,7 @@ function ParlayView() {
                             {p.roi != null && <span className="text-ink-light">单场ROI {p.roi.toFixed(2)}</span>}
                           </div>
                           <div className="text-[10px] text-ink-muted mt-1">
-                            {p.legs.map((lg) => `${lg.home_team ?? "?"}vs${lg.away_team ?? "?"} ${lg.pick}@${lg.odds.toFixed(2)}`).join(" × ")}
+                            {p.legs.map((lg) => `${lg.match_num ? `${lg.match_num} ` : ""}${lg.home_team ?? "?"}vs${lg.away_team ?? "?"} ${lg.pick}@${lg.odds.toFixed(2)}`).join(" × ")}
                           </div>
                         </div>
                       ))}
@@ -1646,6 +1856,52 @@ function ParlayView() {
                 </div>
               );
             })}
+            {/* 方案G · 半平×方向（halfdraw × 方案D方向腿 2串1） */}
+            {(() => {
+              const g = planBoard.g;
+              const gp = g.picks[0];
+              const confRow = finalByPlanDate.get(`G:${planBoard.date}`);
+              return (
+                <div className="border border-highlight rounded-md p-3 bg-parchment-light/30">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <span className="text-xs font-bold text-ink">方案G · 半平×方向</span>
+                    <span className="text-[10px] text-ink-light">{g.stats.hit}/{g.stats.n} 命中</span>
+                  </div>
+                  <div className="text-[10px] text-ink-light mt-0.5">halfdraw(R1半平/R2半全场) + 方案D方向腿（2串1）</div>
+                  {confRow && (
+                    <div className="mt-1.5 text-[10px] text-amber font-semibold">
+                      ✓ 已确认终稿：串关 {confRow.final.parlay_odds?.toFixed(2) ?? "-"} ·
+                      {confRow.final.hit == null ? " 未结算" : confRow.final.hit ? " 命中" : " 未中"}
+                      {confRow.changed_legs.length > 0 ? ` · 改选 ${confRow.changed_legs.length} 腿` : ""}
+                    </div>
+                  )}
+                  {!gp ? (
+                    <div className="text-[11px] text-rust mt-2">
+                      {!(planBoard.d?.picks?.length > 0 && planBoard.d.picks[0].legs.some((l) => l.kind === "dir"))
+                        ? "方案D 当日无方向腿，方案G 无法组合"
+                        : "当日无 halfdraw 候选：R1 需「组A联赛(韩K/西甲/意甲/日职联/美职联/欧冠/葡超/巴西杯)且主胜隐含占比 0.53~0.63」、R2 需「fav 方向隐含 ≥0.60」，本比赛日均不满足"}
+                    </div>
+                  ) : (
+                    <div className="mt-2 space-y-2">
+                      <div className="border-t border-highlight pt-2 first:border-t-0 first:pt-0">
+                        <div className="flex items-center gap-1.5 flex-wrap text-[11px]">
+                          <span className={`font-bold ${gp.hit === true ? "text-moss" : gp.hit === false ? "text-rust" : "text-ink-light"}`}>
+                            {gp.hit === true ? "✓ 命中" : gp.hit === false ? "✗ 未中" : "· 未结算"}
+                          </span>
+                          <span className="text-ink">串关 {gp.parlay_odds != null ? gp.parlay_odds.toFixed(2) : "待结算"}</span>
+                          <span className="text-ink-muted">{gp.stake} 注</span>
+                          {gp.roi != null && <span className="text-ink-light">单场ROI {gp.roi.toFixed(2)}</span>}
+                          {gp.combo_level && <span className="text-ink-muted">{gp.combo_level}</span>}
+                        </div>
+                        <div className="text-[10px] text-ink-muted mt-1">
+                          {gp.legs.map((lg) => `${lg.match_num ? `${lg.match_num} ` : ""}${lg.home_team ?? "?"}vs${lg.away_team ?? "?"} ${lg.pick ?? ""}@${lg.odds != null ? lg.odds.toFixed(2) : "-"}`).join(" × ")}
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         </div>
       )}
@@ -1695,6 +1951,9 @@ function ParlayView() {
                   )}
                   {subTab === "d" && p.in_range === false && (
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber/15 text-amber font-semibold">赔率偏离 {data.min_odds ?? 5}~{data.max_odds ?? 15}（退化）</span>
+                  )}
+                  {finalByDate.has(p.matchday) && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber/20 text-amber font-semibold" title="该日已人工确认终稿（见上方「人工终稿 · 已确认」区块，与原方案分开显示/统计）">该日已出终稿</span>
                   )}
                   <span className="text-xs text-ink-muted">预估 p_hat {(p.parlay_p_hat * 100).toFixed(1)}%</span>
                 </div>

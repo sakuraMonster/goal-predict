@@ -216,13 +216,17 @@ async def trigger_sync_market_flow_odds(
                     continue
                 skipped_dup += 1
                 continue
+            # 防降级：新快照方向盘缺失但历史快照已有（盘已收盘）→ 不写入
+            if not _live_mod._can_insert(existing, p["had"], p["hhad"]):
+                skipped_dup += 1
+                continue
             db.add(JczqPlayOddsSnapshot(
                 match_id=matched.id,
                 snapshot_time=p["snapshot_time"],
                 source="sporttery",
-                had_home=p["had"]["home"], had_draw=p["had"]["draw"], had_away=p["had"]["away"],
-                hhad_line=p["hhad"]["line"], hhad_home=p["hhad"]["home"],
-                hhad_draw=p["hhad"]["draw"], hhad_away=p["hhad"]["away"],
+                had_home=(p["had"] or {}).get("home"), had_draw=(p["had"] or {}).get("draw"), had_away=(p["had"] or {}).get("away"),
+                hhad_line=(p["hhad"] or {}).get("line"), hhad_home=(p["hhad"] or {}).get("home"),
+                hhad_draw=(p["hhad"] or {}).get("draw"), hhad_away=(p["hhad"] or {}).get("away"),
                 ttg_odds_json=p["ttg"], crs_odds_json=p["crs"],
                 hafu_odds_json=p["hafu"],
             ))
@@ -973,27 +977,32 @@ async def predict_market_flow_batch(
             if m.away_team and m.away_team.style_tag:
                 away_style_tag = m.away_team.style_tag
 
-            had = {"home": snap.had_home, "draw": snap.had_draw, "away": snap.had_away}
-            hhad = {
+            had_raw = {"home": snap.had_home, "draw": snap.had_draw, "away": snap.had_away}
+            had_ok = all(isinstance(v, (int, float)) and v > 0 for v in had_raw.values())
+            hhad_raw = {
                 "line": snap.hhad_line,
                 "home": snap.hhad_home,
                 "draw": snap.hhad_draw,
                 "away": snap.hhad_away,
             }
+            hhad_ok = hhad_raw["line"] is not None and all(
+                isinstance(v, (int, float)) and v > 0
+                for k, v in hhad_raw.items() if k != "line"
+            )
             ttg = snap.ttg_odds_json or {}
             crs = snap.crs_odds_json or {}
 
-            if not (had["home"] and had["draw"] and had["away"]):
-                skipped += 1
-                skipped_reasons["incomplete_had_odds"] = skipped_reasons.get("incomplete_had_odds", 0) + 1
-                continue
-            if not (hhad["home"] and hhad["draw"] and hhad["away"]):
-                skipped += 1
-                skipped_reasons["incomplete_hhad_odds"] = skipped_reasons.get("incomplete_hhad_odds", 0) + 1
-                continue
+            # 进球链路（TTG/CRS）完整即可生成 MFP；HAD 允许缺失（竞彩对强弱悬殊场次不售胜平负盘，
+            # 但 TTG 大小球方向仍可用于进球链路，如德国杯 010）。方向盘完全没有时才跳过。
             if not ttg or not crs:
                 skipped += 1
                 skipped_reasons["missing_ttg_or_crs"] = skipped_reasons.get("missing_ttg_or_crs", 0) + 1
+                continue
+            had = had_raw if had_ok else {}
+            hhad = hhad_raw if hhad_ok else {}
+            if not (had_ok or hhad_ok):
+                skipped += 1
+                skipped_reasons["incomplete_had_odds"] = skipped_reasons.get("incomplete_had_odds", 0) + 1
                 continue
 
             engine_result = engine.predict(

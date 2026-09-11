@@ -300,7 +300,8 @@ export const addAlias = (payload: { type: string; id: number; alias_name: string
   api.post("/mappings/add-alias", payload).then((r) => r.data);
 
 export const batchMatch = () =>
-  api.post("/mappings/batch-match").then((r) => r.data);
+  // 批量匹配需逐队查询 SportMonks（限速+赛程反查），耗时远超默认 30s，故单独放宽超时
+  api.post("/mappings/batch-match", null, { timeout: 600000 }).then((r) => r.data);
 
 export const predictModelC = () =>
   api.post("/admin/predict-model-c").then((r) => r.data);

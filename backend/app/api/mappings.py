@@ -24,6 +24,30 @@ def _extract_latin(name: str) -> str:
     return result if len(result) >= 2 else ""
 
 
+def _norm_key(s: str) -> str:
+    return "".join(ch for ch in (s or "").lower() if ch.isalnum())
+
+
+def _score_candidate(cand: dict, term: str) -> int:
+    """SportMonks 候选可信度打分（务必防止缩写子串误命中）。
+
+    100=缩写精确 | 95=名称精确 | 80=名称前缀；<80 视为不可信。
+    例：搜索 'DER' 时 SunDERland 只在词中出现 → 0 分被拒；Derby County 名称前缀命中 → 80 分。
+    """
+    t = _norm_key(term)
+    if not t:
+        return 0
+    short = _norm_key(cand.get("short_code") or "")
+    name = _norm_key(cand.get("name") or "")
+    if short and short == t:
+        return 100
+    if name and name == t:
+        return 95
+    if name.startswith(t):
+        return 80
+    return 0
+
+
 # 竞彩网中文名 → SportMonks 英文搜索词映射（SportMonks 不支持中文搜索）
 # batch-match 第4层命中时会自动扩充此表
 CN_TO_EN_SEARCH = {
@@ -269,12 +293,77 @@ async def batch_match_teams(db: AsyncSession = Depends(get_db)):
     sm = SportMonksClient()
     results, matched_count, api_errors = [], 0, 0
 
+    async def _reverse_lookup(_team):
+        """反向匹配：通过该队赛事中【已映射】的对手，在 SM 赛程里反查另一名参赛者。
+        同时覆盖已关联 team_id 的赛事与仅存原始队名的历史赛事。
+        返回 (sm_id, name, short_code, search_term) 或 None。"""
+        nonlocal api_errors
+        from datetime import timedelta
+        zh = _team.name_zh or ""
+        conds = [Match.home_team_id == _team.id, Match.away_team_id == _team.id]
+        if zh:
+            conds += [Match.home_team_name == zh, Match.away_team_name == zh]
+        rows = (await db.execute(
+            select(Match).where(Match.kickoff_time.isnot(None), or_(*conds))
+            .order_by(Match.kickoff_time.desc()).limit(5))).scalars().all()
+        for m in rows:
+            team_is_home = (m.home_team_id == _team.id) or (m.home_team_name == zh)
+            opp_name = m.away_team_name if team_is_home else m.home_team_name
+            opp_id = m.away_team_id if team_is_home else m.home_team_id
+            opp = None
+            if opp_id:
+                opp = (await db.execute(select(Team).where(Team.id == opp_id))).scalar_one_or_none()
+            if (not opp or not opp.sportmonks_id) and opp_name:
+                a = (await db.execute(select(TeamAlias).where(
+                    TeamAlias.alias_name == opp_name).limit(1))).scalar_one_or_none()
+                if a:
+                    opp = (await db.execute(select(Team).where(Team.id == a.team_id))).scalar_one_or_none()
+            if not opp or not opp.sportmonks_id:
+                continue
+            date_from = (m.kickoff_time - timedelta(days=2)).strftime("%Y-%m-%d")
+            date_to = (m.kickoff_time + timedelta(days=2)).strftime("%Y-%m-%d")
+            try:
+                fixtures = await sm.get_fixtures_between(date_from, date_to, includes="participants")
+            except Exception as e:
+                api_errors += 1
+                if api_errors <= 3:
+                    print(f"[batch-match] L5 error for '{zh}': {e}", flush=True)
+                continue
+            for fx in fixtures:
+                ps = fx.get("participants") or []
+                if len(ps) < 2:
+                    continue
+                ids = [p.get("id") for p in ps if isinstance(p, dict)]
+                if opp.sportmonks_id not in ids:
+                    continue
+                other = next((p for p in ps if isinstance(p, dict)
+                              and p.get("id") and p.get("id") != opp.sportmonks_id), None)
+                if not other:
+                    continue
+                return (other.get("id"), other.get("name", ""), other.get("short_code", ""),
+                        f"reverse:{opp.name_zh or opp.name_en}(sm{opp.sportmonks_id})")
+        return None
+
     for team in teams:
         tr = {"id": team.id, "name_zh": team.name_zh or "", "name_en": team.name_en or "",
               "status": "unmatched", "sm_id": None, "sm_name": None, "sm_short": None,
               "search_term": None, "layer": None}
 
         if team.sportmonks_id:  # Layer 1
+            continue
+
+        # Layer 5（优先执行）：反向匹配最可靠，避免缩写被 SportMonks 模糊命中错误球队
+        rev = await _reverse_lookup(team)
+        if rev:
+            sm_id, sm_name, sm_short, term = rev
+            dup = (await db.execute(select(Team).where(
+                Team.sportmonks_id == sm_id, Team.id != team.id))).scalar_one_or_none()
+            if dup:
+                await _do_merge_team(sm_id, sm_name, sm_short, term, "L5", dup)
+            else:
+                await _do_match_team(sm_id, sm_name, sm_short, term, "L5",
+                                     note=f"通过对手反向匹配: {term}")
+            results.append(tr)
             continue
 
         l1, l2, l3 = [], [], []
@@ -300,93 +389,48 @@ async def batch_match_teams(db: AsyncSession = Depends(get_db)):
 
         all_terms = l1 + l2 + l3
         found = False
+        candidates = []
 
         for term in all_terms[:6]:
             try:
                 sm_results = await sm.search_teams(term)
-                if sm_results:
-                    best = sm_results[0] if isinstance(sm_results[0], dict) else sm_results[0]
-                    sm_id = best.get("id")
-                    if sm_id:
-                        sm_name = best.get("name", "")
-                        sm_short = best.get("short_code", "")
-                        dup = await db.execute(select(Team).where(Team.sportmonks_id == sm_id, Team.id != team.id))
-                        existing = dup.scalar_one_or_none()
-                        if existing:
-                            layer = "L2" if term in l1 else ("L3" if term in l2 else "L4")
-                            await _do_merge_team(sm_id, sm_name, sm_short, term, layer, existing)
-                            break
-
-                        if term in l3 and team.name_zh:
-                            CN_TO_EN_SEARCH[team.name_zh] = term  # 自动扩充
-
-                        layer = "L2" if term in l1 else ("L3" if term in l2 else "L4")
-                        await _do_match_team(sm_id, sm_name, sm_short, term, layer)
-                        break
             except Exception as e:
                 api_errors += 1
                 if api_errors <= 3: print(f"[batch-match] SM error '{term}': {e}", flush=True)
                 continue
+            if not sm_results:
+                continue
+            scored = sorted(
+                ((_score_candidate(c, term), c) for c in sm_results if isinstance(c, dict)),
+                key=lambda p: -p[0])
+            for _, cand in scored[:3]:
+                if cand.get("name"):
+                    candidates.append(f"{cand.get('name')}[{cand.get('short_code') or ''}]")
+            score, best = scored[0] if scored else (0, None)
+            # 提取的拉丁片段可信度低，要求更强命中；其余也需 ≥80 分，杜绝子串误命中
+            min_score = 95 if term in l3 else 80
+            if not best or score < min_score:
+                continue
+            sm_id = best.get("id")
+            if not sm_id:
+                continue
+            sm_name = best.get("name", "")
+            sm_short = best.get("short_code", "")
+            dup = await db.execute(select(Team).where(Team.sportmonks_id == sm_id, Team.id != team.id))
+            existing = dup.scalar_one_or_none()
+            layer = "L2" if term in l1 else ("L3" if term in l2 else "L4")
+            if existing:
+                await _do_merge_team(sm_id, sm_name, sm_short, term, layer, existing)
+            else:
+                if term in l3 and team.name_zh:
+                    CN_TO_EN_SEARCH[team.name_zh] = term  # 自动扩充
+                await _do_match_team(sm_id, sm_name, sm_short, term, layer)
+            break
 
-        if not found and tr.get("status") == "unmatched":
-            # Layer 5: 反向匹配 —— 通过已匹配对手在 SM 赛事中反向查找
-            match_query = await db.execute(
-                select(Match).where(
-                    or_(Match.home_team_id == team.id, Match.away_team_id == team.id),
-                    Match.kickoff_time.isnot(None),
-                ).order_by(Match.kickoff_time.desc()).limit(5)
-            )
-            l5_matches = match_query.scalars().all()
-            for m in l5_matches:
-                opponent_id = m.away_team_id if m.home_team_id == team.id else m.home_team_id
-                opp_result = await db.execute(select(Team).where(Team.id == opponent_id))
-                opponent = opp_result.scalar_one_or_none()
-                if not opponent or not opponent.sportmonks_id:
-                    continue
-                try:
-                    from datetime import timedelta
-                    # 前后各2天窗口（应对时区差异），用 between 一次拉取
-                    date_from = (m.kickoff_time - timedelta(days=2)).strftime("%Y-%m-%d")
-                    date_to = (m.kickoff_time + timedelta(days=2)).strftime("%Y-%m-%d")
-                    fixtures = await sm.get_fixtures_between(date_from, date_to, includes="participants")
-                    for fx in fixtures:
-                        fx_participants = fx.get("participants", [])
-                        if len(fx_participants) < 2:
-                            continue
-                        for i, p in enumerate(fx_participants):
-                            pid = p.get("id") if isinstance(p, dict) else None
-                            if pid and pid == opponent.sportmonks_id:
-                                other = fx_participants[1 - i]
-                                other_id = other.get("id") if isinstance(other, dict) else None
-                                other_name = other.get("name", "") if isinstance(other, dict) else ""
-                                if not other_id:
-                                    continue
-                                dup = await db.execute(select(Team).where(
-                                    Team.sportmonks_id == other_id, Team.id != team.id))
-                                existing = dup.scalar_one_or_none()
-                                search_term = f"reverse:{opponent.name_zh or ''}(sm{opponent.sportmonks_id})"
-                                if existing:
-                                    await _do_merge_team(other_id, other_name,
-                                        other.get("short_code", "") if isinstance(other, dict) else "",
-                                        search_term, "L5", existing)
-                                else:
-                                    await _do_match_team(other_id, other_name,
-                                        other.get("short_code", "") if isinstance(other, dict) else "",
-                                        search_term, "L5",
-                                        note=f"通过对手 {opponent.name_zh or opponent.name_en} 反向匹配")
-                                break
-                        if found:
-                            break
-                except Exception as e:
-                    api_errors += 1
-                    if api_errors <= 3:
-                        print(f"[batch-match] L5 reverse error for '{team.name_zh}': {e}", flush=True)
-                    continue
-                if found:
-                    break
-
-            if not found:
-                tr.update(note=f"候选词均未匹配: {all_terms[:4]}", search_term=all_terms[0] if all_terms else None)
+        if not found:
+            uniq = list(dict.fromkeys(candidates))[:5]
+            tr.update(search_term=all_terms[0] if all_terms else None,
+                      note=f"未找到可信匹配；候选词 {all_terms[:3]}；SM 候选 {uniq}")
         results.append(tr)
 
     await db.commit()

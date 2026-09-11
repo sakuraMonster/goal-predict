@@ -1,8 +1,8 @@
-# 生产构建：Vite 构建静态产物 → Nginx 托管并反向代理 /api
+# 前端构建阶段：使用Vite + Nginx部署，反向代理/api到后端
 FROM node:20-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm config set registry https://registry.npmmirror.com && npm ci
 COPY . .
 RUN npm run build
 

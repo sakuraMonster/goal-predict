@@ -2840,6 +2840,7 @@ async def market_flow_parlay_d_recommend(
                         "pick": "/".join(str(x) for x in pick),
                         "top3": list(pick),
                         "pick_odds": {str(c): round(ttg_odds[c], 4) for c in pick if c in ttg_odds},
+                        "dir": "over",  # 方案D 进球腿仅判大（此前未写该字段，前端会误显示“判小”）
                         "gate": gate,
                         "tier": tier,
                         "p_hat": round(sum(mkt[c] for c in pick), 4),

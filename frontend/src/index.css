@@ -16,6 +16,9 @@
   --color-cold-bg: #fff3e0;
   --color-hot-bg: #e8f0e0;
   --color-highlight: #f4f0e3;
+  /* 语义色：命中 / 未中（替代散落的 red-* 硬编码，红不再表达“命中”） */
+  --color-win: #2d5a3b;
+  --color-lose: #9c3d24;
   --font-heading: 'Noto Serif SC', Georgia, serif;
   --font-body: 'Inter', system-ui, sans-serif;
 }

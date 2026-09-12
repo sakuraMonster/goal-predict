@@ -72,7 +72,7 @@ const OU_SM_TIERS: { key: string; label: string; desc: string }[] = [
 ];
 
 function outcomeColor(outcome: "home" | "draw" | "away" | string, hit?: boolean | null) {
-  if (hit === true) return "bg-red-500/10 text-red-600 border border-red-500/40";
+  if (hit === true) return "bg-win/10 text-win border border-win/40";
   if (hit === false) return "bg-parchment-dark text-ink-muted border border-parchment-dark/80";
   const base: Record<string, string> = {
     home: "bg-moss/10 text-moss border border-moss/30",
@@ -479,7 +479,7 @@ function PredictionCard({ row, onlyPreferred = false, onlyCold = false, ouActive
           const isPreferred = row.preferred_outcome === o;
           let cls;
           if (hit === true) {
-            cls = "px-2 py-1 text-[11px] font-extrabold rounded border bg-red-50 text-red-600 border-red-500/50 shadow-sm";
+            cls = "px-2 py-1 text-[11px] font-extrabold rounded border bg-win/10 text-win border-win/50 shadow-sm";
           } else if (isPreferred) {
             cls = "px-2.5 py-1 text-[11px] font-bold rounded-md bg-ink text-white shadow-md ring-1 ring-ink/30";
           } else {
@@ -525,11 +525,11 @@ function PredictionCard({ row, onlyPreferred = false, onlyCold = false, ouActive
                   i === 0
                     ? "w-9 h-9 rounded-md bg-moss text-white text-lg"
                     : "w-9 h-9 rounded-md border-2 border-moss text-moss text-lg"
-                } ${row.actual_total_goals != null && row.actual_total_goals === g ? "ring-1 ring-red-500/60" : ""}`}
+                } ${row.actual_total_goals != null && row.actual_total_goals === g ? "ring-1 ring-win/60" : ""}`}
               >{g >= 6 ? "6+" : g}</span>
             ))}
             {row.actual_total_goals != null && (
-              <span className="text-[11px] text-red-600 font-bold ml-2">实:{row.actual_total_goals}</span>
+              <span className="text-[11px] text-win font-bold ml-2">实:{row.actual_total_goals}</span>
             )}
           </div>
         </div>
@@ -665,11 +665,11 @@ function PredictionCard({ row, onlyPreferred = false, onlyCold = false, ouActive
                   : i === 1
                     ? "px-2.5 py-1 rounded-md border border-moss text-moss text-sm"
                     : "px-2.5 py-1 rounded-md bg-white border border-border-dark text-ink text-sm"
-              } ${row.actual_score === s ? "ring-1 ring-red-500/70" : ""}`}
+              } ${row.actual_score === s ? "ring-1 ring-win/70" : ""}`}
             >{s}</span>
           ))}
           {row.actual_score && (
-            <span className="text-[11px] text-red-600 font-bold ml-auto">实:{row.actual_score}</span>
+            <span className="text-[11px] text-win font-bold ml-auto">实:{row.actual_score}</span>
           )}
         </div>
       </div>
@@ -1119,7 +1119,7 @@ function HistoryView() {
                     const hit = settled && r.actual_outcome === o;
                     const isPref = r.preferred_outcome === o;
                     const cls = hit
-                      ? "px-1.5 py-0.5 text-[10px] rounded bg-red-50 text-red-600 border border-red-500/50 font-extrabold shadow-sm"
+                      ? "px-1.5 py-0.5 text-[10px] rounded bg-win/10 text-win border border-win/50 font-extrabold shadow-sm"
                       : isPref
                         ? "px-1.5 py-0.5 text-[10px] rounded bg-ink text-white shadow-sm font-bold"
                         : "px-1.5 py-0.5 text-[10px] rounded bg-moss/10 text-moss border border-moss/30 font-semibold";
@@ -1162,7 +1162,7 @@ function HistoryView() {
                 <span className="text-[10px] font-mono text-ink-muted">S2:{r.score_top2?.join("/")}</span>
                 <span className="text-[10px] font-mono text-ink-muted">S3:{r.score_top3?.join("/")}</span>
                 {settled && (
-                  <span className="text-[10px] font-bold text-red-600 shrink-0">实:{r.actual_score}</span>
+                  <span className="text-[10px] font-bold text-win shrink-0">实:{r.actual_score}</span>
                 )}
               </div>
             );
@@ -1576,12 +1576,15 @@ function ParlayView() {
         }
       }
       setPlanBoard({ date: d, a, d: dRes, c, g, readiness });
+      // 生成方案会重跑赔率/预测，清空串关缓存并刷新当前视图，避免继续展示旧缓存结果
+      cacheRef.current.clear();
+      fetchData(true);
     } catch {
       setError("生成方案失败");
     } finally {
       setGenerating(false);
     }
-  }, [mode, date]);
+  }, [mode, date, fetchData]);
 
   if (subTab === "e") {
     return (
@@ -1642,14 +1645,14 @@ function ParlayView() {
         ) : lg.hit ? (
           <span className="text-[10px] text-moss font-bold bg-moss/10 rounded px-1.5 py-0.5">命中 {lg.actual}</span>
         ) : (
-          <span className="text-[10px] text-rust font-bold bg-rust/10 rounded px-1.5 py-0.5">未中 {lg.actual}</span>
+          <span className="text-[10px] text-lose font-bold bg-lose/10 rounded px-1.5 py-0.5">未中 {lg.actual}</span>
         )}
       </div>
     </div>
   );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 tabular-nums">
       <div className="px-4 py-3 bg-parchment-dark rounded-lg border border-border-dark space-y-2">
         <div className="flex items-center gap-3 min-h-8">
           <span className="flex items-center gap-2 min-w-0 flex-1 text-xs text-moss font-semibold" title={planTitle}>
@@ -1698,9 +1701,10 @@ function ParlayView() {
       <div className="flex gap-3 flex-wrap">
         <StatBox label="已结算串关" value={String(st.n)} sub={`命中 ${st.hit}`} />
         <StatBox label="串关命中率 p_hit" value={st.p_hit == null ? "-" : `${(st.p_hit * 100).toFixed(1)}%`}
-          sub={`盈亏平衡 ${st.avg_odds ? `${(100 / st.avg_odds).toFixed(1)}%` : "-"}`} highlight={st.p_hit != null && st.p_hit >= 0.4} />
+          sub={`盈亏平衡 ${st.avg_odds ? `${(100 / st.avg_odds).toFixed(1)}%` : "-"}`}
+          highlight={st.p_hit != null && !!st.avg_odds && st.p_hit > 1 / st.avg_odds} />
         <StatBox label="平均赔率" value={st.avg_odds == null ? "-" : st.avg_odds.toFixed(2)} />
-        <StatBox label="ROI（返奖/下注）" value={st.roi == null ? "-" : `${(st.roi * 100).toFixed(1)}%`}
+        <StatBox label="ROI（返奖/下注，倍率）" value={st.roi == null ? "-" : `${st.roi.toFixed(2)}×`}
           sub={st.roi != null ? (st.roi > 1 ? "正收益" : st.roi < 1 ? "负收益" : "盈亏平衡") : undefined}
           highlight={st.roi != null && st.roi > 1} />
       </div>
@@ -1720,19 +1724,19 @@ function ParlayView() {
           {!finalCollapsed && (<>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-3">
             <StatBox label="确认天数" value={String(finalStats.n)} sub={`已结算 ${finalStats.settled_n} 天`} />
-            <StatBox label="系统默认 p_hit（确认日）" value={finalStats.def_p_hit == null ? "-" : `${(finalStats.def_p_hit * 100).toFixed(0)}%`}
+            <StatBox label="系统默认 p_hit（确认日）" value={finalStats.def_p_hit == null ? "-" : `${(finalStats.def_p_hit * 100).toFixed(1)}%`}
               sub={`命中 ${finalStats.def_hit_n} / ${finalStats.settled_n}`} />
-            <StatBox label="人工终稿 p_hit" value={finalStats.fin_p_hit == null ? "-" : `${(finalStats.fin_p_hit * 100).toFixed(0)}%`}
+            <StatBox label="人工终稿 p_hit" value={finalStats.fin_p_hit == null ? "-" : `${(finalStats.fin_p_hit * 100).toFixed(1)}%`}
               sub={`命中 ${finalStats.fin_hit_n} / ${finalStats.settled_n} · 改好 ${finalStats.improved_n} / 改差 ${finalStats.worsened_n}`}
               highlight={finalStats.fin_p_hit != null && finalStats.fin_p_hit >= 0.4} />
-            <div className="rounded-md border border-highlight bg-parchment-light/40 p-3">
-              <div className="text-[10px] text-ink-light mb-1">ROI（返奖/下注，确认日）</div>
+            <div className="rounded-md border border-border bg-white p-3">
+              <div className="text-[10px] text-ink-light mb-1">ROI（返奖/下注，倍率，确认日）</div>
               <div className="text-[11px] text-ink-muted">系统默认{" "}
-                <span className="font-bold text-ink">{finalStats.def_roi == null ? "-" : `${(finalStats.def_roi * 100).toFixed(0)}%`}</span>
+                <span className="font-bold text-ink">{finalStats.def_roi == null ? "-" : `${finalStats.def_roi.toFixed(2)}×`}</span>
               </div>
               <div className="text-[11px] mt-1">人工终稿{" "}
                 <span className={`font-bold ${(finalStats.fin_roi ?? 0) > (finalStats.def_roi ?? 0) ? "text-moss" : (finalStats.fin_roi ?? 0) < (finalStats.def_roi ?? 0) ? "text-rust" : "text-ink"}`}>
-                  {finalStats.fin_roi == null ? "-" : `${(finalStats.fin_roi * 100).toFixed(0)}%`}
+                  {finalStats.fin_roi == null ? "-" : `${finalStats.fin_roi.toFixed(2)}×`}
                 </span>
               </div>
             </div>
@@ -1754,18 +1758,18 @@ function ParlayView() {
                             <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber/15 text-amber font-semibold">系统 无方案（手工新增）</span>
                           ) : r.default.settled ? (
                             r.default.hit ? (
-                              <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-600 text-white font-bold">系统 ✓全中</span>
+                              <span className="text-[11px] px-1.5 py-0.5 rounded bg-win text-white font-bold">系统 ✓全中</span>
                             ) : (
-                              <span className="text-[11px] px-1.5 py-0.5 rounded bg-rust/10 text-rust font-bold">系统 ✗未中</span>
+                              <span className="text-[11px] px-1.5 py-0.5 rounded bg-lose/10 text-lose font-bold">系统 ✗未中</span>
                             )
                           ) : (
                             <span className="text-[11px] px-1.5 py-0.5 rounded bg-parchment-dark text-ink-muted">系统 未结算</span>
                           )}
                     {r.final.settled ? (
                       r.final.hit ? (
-                        <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-600 text-white font-bold">终稿 ✓全中</span>
+                        <span className="text-[11px] px-1.5 py-0.5 rounded bg-win text-white font-bold">终稿 ✓全中</span>
                       ) : (
-                        <span className="text-[11px] px-1.5 py-0.5 rounded bg-rust/10 text-rust font-bold">终稿 ✗未中</span>
+                        <span className="text-[11px] px-1.5 py-0.5 rounded bg-lose/10 text-lose font-bold">终稿 ✗未中</span>
                       )
                     ) : (
                       <span className="text-[11px] px-1.5 py-0.5 rounded bg-parchment-dark text-ink-muted">终稿 未结算</span>
@@ -1839,12 +1843,12 @@ function ParlayView() {
                       {res.picks.map((p) => (
                         <div key={p.pick_id ?? `${k}-${p.matchday}`} className="border-t border-highlight pt-2 first:border-t-0 first:pt-0">
                           <div className="flex items-center gap-1.5 flex-wrap text-[11px]">
-                            <span className={`font-bold ${p.hit === true ? "text-moss" : p.hit === false ? "text-rust" : "text-ink-light"}`}>
+                            <span className={`font-bold ${p.hit === true ? "text-win" : p.hit === false ? "text-lose" : "text-ink-light"}`}>
                               {p.hit === true ? "✓ 命中" : p.hit === false ? "✗ 未中" : "· 未结算"}
                             </span>
                             <span className="text-ink">串关 {p.parlay_odds.toFixed(2)}</span>
                             <span className="text-ink-muted">p_hat {(p.parlay_p_hat * 100).toFixed(1)}%</span>
-                            {p.roi != null && <span className="text-ink-light">单场ROI {p.roi.toFixed(2)}</span>}
+                            {p.roi != null && <span className="text-ink-light">单场ROI ×{p.roi.toFixed(2)}</span>}
                           </div>
                           <div className="text-[10px] text-ink-muted mt-1">
                             {p.legs.map((lg) => `${lg.match_num ? `${lg.match_num} ` : ""}${lg.home_team ?? "?"}vs${lg.away_team ?? "?"} ${lg.pick}@${lg.odds.toFixed(2)}`).join(" × ")}
@@ -1885,12 +1889,12 @@ function ParlayView() {
                     <div className="mt-2 space-y-2">
                       <div className="border-t border-highlight pt-2 first:border-t-0 first:pt-0">
                         <div className="flex items-center gap-1.5 flex-wrap text-[11px]">
-                          <span className={`font-bold ${gp.hit === true ? "text-moss" : gp.hit === false ? "text-rust" : "text-ink-light"}`}>
+                          <span className={`font-bold ${gp.hit === true ? "text-win" : gp.hit === false ? "text-lose" : "text-ink-light"}`}>
                             {gp.hit === true ? "✓ 命中" : gp.hit === false ? "✗ 未中" : "· 未结算"}
                           </span>
                           <span className="text-ink">串关 {gp.parlay_odds != null ? gp.parlay_odds.toFixed(2) : "待结算"}</span>
                           <span className="text-ink-muted">{gp.stake} 注</span>
-                          {gp.roi != null && <span className="text-ink-light">单场ROI {gp.roi.toFixed(2)}</span>}
+                          {gp.roi != null && <span className="text-ink-light">单场ROI ×{gp.roi.toFixed(2)}</span>}
                           {gp.combo_level && <span className="text-ink-muted">{gp.combo_level}</span>}
                         </div>
                         <div className="text-[10px] text-ink-muted mt-1">
@@ -1927,9 +1931,9 @@ function ParlayView() {
                 <div className="flex items-center gap-3 flex-wrap mb-2">
                   <span className="font-mono text-xs text-ink font-semibold">{p.matchday}</span>
                   {p.hit === true ? (
-                    <span className="text-[12px] px-2.5 py-1 rounded bg-red-600 text-white font-extrabold shadow-sm">✓ 全中</span>
+                    <span className="text-[12px] px-2.5 py-1 rounded bg-win text-white font-extrabold shadow-sm">✓ 全中</span>
                   ) : p.hit === false ? (
-                    <span className="text-[11px] px-2 py-0.5 rounded bg-rust/10 text-rust font-bold">✗ 未中</span>
+                    <span className="text-[11px] px-2 py-0.5 rounded bg-lose/10 text-lose font-bold">✗ 未中</span>
                   ) : (
                     <span className="text-[11px] px-2 py-0.5 rounded bg-parchment-dark text-ink-muted">未结算</span>
                   )}
@@ -1958,7 +1962,7 @@ function ParlayView() {
                   <span className="text-xs text-ink-muted">预估 p_hat {(p.parlay_p_hat * 100).toFixed(1)}%</span>
                 </div>
                 {p.hit === true && (
-                  <div className="mb-2 text-[11px] font-bold text-red-700 bg-red-50 rounded px-2 py-1 inline-block">
+                  <div className="mb-2 text-[11px] font-bold text-win bg-win/10 rounded px-2 py-1 inline-block tabular-nums">
                     命中赔率计算：{p.legs.map((lg) => `${lg.pick}@${lg.odds.toFixed(2)}`).join(" × ")} = {p.parlay_odds.toFixed(2)}
                   </div>
                 )}

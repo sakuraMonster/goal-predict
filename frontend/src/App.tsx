@@ -28,11 +28,15 @@ function AppLayout() {
           竞彩预测系统
         </Link>
         <div className="flex gap-7 text-sm font-body text-ink-muted">
-          <Link to="/" className={`hover:text-moss transition-colors ${isActive('/')}`}>赛事预测</Link>
+          <Link
+            to="/"
+            className={`hover:text-moss transition-colors ${location.pathname === "/" || location.pathname === "/market-flow" ? "text-moss font-semibold" : ""}`}
+          >
+            V2方向与比分
+          </Link>
           <Link to="/report" className={`hover:text-moss transition-colors ${isActive('/report')}`}>预测报告</Link>
-          <Link to="/review" className={`hover:text-moss transition-colors ${isActive('/review')}`}>复盘统计</Link>
           <Link to="/goals" className={`hover:text-moss transition-colors ${isActive('/goals')}`}>进球数预测</Link>
-          <Link to="/market-flow" className={`hover:text-moss transition-colors ${isActive('/market-flow')}`}>V2方向与比分</Link>
+          <Link to="/review" className={`hover:text-moss transition-colors ${isActive('/review')}`}>复盘统计</Link>
           <SystemMenu />
         </div>
         <div className="flex gap-3 items-center text-xs font-body text-ink-muted">
@@ -43,12 +47,13 @@ function AppLayout() {
       </nav>
       <main>
         <Routes>
-          <Route path="/" element={<Dashboard />} />
+          <Route path="/" element={<MarketFlowV2 />} />
+          <Route path="/market-flow" element={<MarketFlowV2 />} />
+          <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/match/:id" element={<MatchDetail />} />
           <Route path="/report" element={<Report />} />
           <Route path="/review" element={<Review />} />
           <Route path="/goals" element={<GoalsPrediction />} />
-          <Route path="/market-flow" element={<MarketFlowV2 />} />
           <Route path="/mapping" element={<Mapping />} />
           <Route path="/admin" element={<Admin />} />
         </Routes>

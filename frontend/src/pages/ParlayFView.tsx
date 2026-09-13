@@ -59,9 +59,9 @@ function LegCard({ lg }: { lg: ParlayFLeg }) {
         {lg.hit == null ? (
           <span className="text-[10px] text-ink-light bg-parchment-dark rounded px-1.5 py-0.5">未结算</span>
         ) : lg.hit ? (
-          <span className="text-[10px] text-moss font-bold bg-moss/10 rounded px-1.5 py-0.5">命中 {lg.actual}</span>
+          <span className="text-[10px] text-win font-bold bg-win/10 rounded px-1.5 py-0.5">命中 {lg.actual}</span>
         ) : (
-          <span className="text-[10px] text-rust font-bold bg-rust/10 rounded px-1.5 py-0.5">未中 {lg.actual}</span>
+          <span className="text-[10px] text-lose font-bold bg-lose/10 rounded px-1.5 py-0.5">未中 {lg.actual}</span>
         )}
       </div>
     </div>
@@ -70,7 +70,7 @@ function LegCard({ lg }: { lg: ParlayFLeg }) {
 
 function FinalStatBox({ label, value, sub, highlight }: { label: string; value: string; sub?: string; highlight?: boolean }) {
   return (
-    <div className={`rounded-md border p-3 text-center ${highlight ? "border-moss bg-moss/[0.03]" : "border-highlight bg-parchment-light/40"}`}>
+    <div className={`rounded-md border p-3 text-center ${highlight ? "border-moss bg-moss/[0.03]" : "border-border bg-white"}`}>
       <div className={`text-[10px] ${highlight ? "text-moss" : "text-ink-light"}`}>{label}</div>
       <div className={`text-xl font-bold font-heading mt-0.5 leading-tight ${highlight ? "text-moss" : "text-ink"}`}>{value}</div>
       {sub && <div className="text-[10px] text-ink-muted mt-0.5">{sub}</div>}
@@ -138,10 +138,10 @@ export default function ParlayFView({
     () => [
       { label: "已结算串", value: `${st?.n ?? 0}` },
       { label: "命中", value: `${st?.hit ?? 0}` },
-      { label: "命中率", value: st?.p_hit != null ? `${Math.round(st.p_hit * 100)}%` : "-" },
+      { label: "命中率 p_hit", value: st?.p_hit != null ? `${(st.p_hit * 100).toFixed(1)}%` : "-" },
       { label: "注数", value: `${st?.total_stake ?? 0}` },
       { label: "返奖", value: st?.total_payout != null ? st.total_payout.toFixed(2) : "-" },
-      { label: "ROI", value: st?.roi != null ? st.roi.toFixed(3) : "-" },
+      { label: "ROI（返奖/下注，倍率）", value: st?.roi != null ? `${st.roi.toFixed(2)}×` : "-" },
     ],
     [st]
   );
@@ -194,7 +194,7 @@ export default function ParlayFView({
   };
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 tabular-nums">
       <div className="px-4 py-3 bg-parchment-dark rounded-lg border border-border-dark space-y-2">
         <div className="flex items-center gap-3 min-h-8">
           <span className="flex items-center gap-2 min-w-0 flex-1 text-xs text-moss font-semibold"
@@ -251,9 +251,13 @@ export default function ParlayFView({
         <>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
             {stats.map((s) => (
-              <div key={s.label} className="bg-parchment-light rounded-lg border border-border p-3">
-                <div className="text-[10px] text-ink-muted">{s.label}</div>
-                <div className={`text-lg font-heading font-bold ${s.label === "ROI" && parseFloat(s.value) >= 2 ? "text-moss" : s.label === "ROI" ? "text-rust" : "text-ink"}`}>
+              <div key={s.label} className="bg-white rounded-md border border-border p-3 text-center">
+                <div className="text-[10px] text-ink-light">{s.label}</div>
+                <div className={`text-xl font-heading font-bold mt-0.5 leading-tight ${
+                  s.label.startsWith("ROI") && st?.roi != null
+                    ? st.roi > 1 ? "text-moss" : st.roi < 1 ? "text-lose" : "text-ink"
+                    : "text-ink"
+                }`}>
                   {s.value}
                 </div>
               </div>
@@ -280,19 +284,19 @@ export default function ParlayFView({
               ) : !finalCollapsed ? (<>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 p-3">
                   <FinalStatBox label="确认天数" value={String(finalStats.n)} sub={`已结算 ${finalStats.settled_n} 天`} />
-                  <FinalStatBox label="系统默认 p_hit（确认日）" value={finalStats.def_p_hit == null ? "-" : `${(finalStats.def_p_hit * 100).toFixed(0)}%`}
+                  <FinalStatBox label="系统默认 p_hit（确认日）" value={finalStats.def_p_hit == null ? "-" : `${(finalStats.def_p_hit * 100).toFixed(1)}%`}
                     sub={`命中 ${finalStats.def_hit_n} / ${finalStats.settled_n}`} />
-                  <FinalStatBox label="人工终稿 p_hit" value={finalStats.fin_p_hit == null ? "-" : `${(finalStats.fin_p_hit * 100).toFixed(0)}%`}
+                  <FinalStatBox label="人工终稿 p_hit" value={finalStats.fin_p_hit == null ? "-" : `${(finalStats.fin_p_hit * 100).toFixed(1)}%`}
                     sub={`命中 ${finalStats.fin_hit_n} / ${finalStats.settled_n} · 改好 ${finalStats.improved_n} / 改差 ${finalStats.worsened_n}`}
                     highlight={finalStats.fin_p_hit != null && finalStats.fin_p_hit >= 0.4} />
-                  <div className="rounded-md border border-highlight bg-parchment-light/40 p-3">
-                    <div className="text-[10px] text-ink-light mb-1">ROI（返奖/下注，确认日）</div>
+                  <div className="rounded-md border border-border bg-white p-3">
+                    <div className="text-[10px] text-ink-light mb-1">ROI（返奖/下注，倍率，确认日）</div>
                     <div className="text-[11px] text-ink-muted">系统默认{" "}
-                      <span className="font-bold text-ink">{finalStats.def_roi == null ? "-" : `${(finalStats.def_roi * 100).toFixed(0)}%`}</span>
+                      <span className="font-bold text-ink">{finalStats.def_roi == null ? "-" : `${finalStats.def_roi.toFixed(2)}×`}</span>
                     </div>
                     <div className="text-[11px] mt-1">人工终稿{" "}
-                      <span className={`font-bold ${(finalStats.fin_roi ?? 0) > (finalStats.def_roi ?? 0) ? "text-moss" : (finalStats.fin_roi ?? 0) < (finalStats.def_roi ?? 0) ? "text-rust" : "text-ink"}`}>
-                        {finalStats.fin_roi == null ? "-" : `${(finalStats.fin_roi * 100).toFixed(0)}%`}
+                      <span className={`font-bold ${(finalStats.fin_roi ?? 0) > (finalStats.def_roi ?? 0) ? "text-moss" : (finalStats.fin_roi ?? 0) < (finalStats.def_roi ?? 0) ? "text-lose" : "text-ink"}`}>
+                        {finalStats.fin_roi == null ? "-" : `${finalStats.fin_roi.toFixed(2)}×`}
                       </span>
                     </div>
                   </div>
@@ -309,18 +313,18 @@ export default function ParlayFView({
                             <span className="text-[11px] px-1.5 py-0.5 rounded bg-amber/15 text-amber font-semibold">系统 无方案（手工新增）</span>
                           ) : r.default.settled ? (
                             r.default.hit ? (
-                              <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-600 text-white font-bold">系统 ✓全中</span>
+                              <span className="text-[11px] px-1.5 py-0.5 rounded bg-win text-white font-bold">系统 ✓全中</span>
                             ) : (
-                              <span className="text-[11px] px-1.5 py-0.5 rounded bg-rust/10 text-rust font-bold">系统 ✗未中</span>
+                              <span className="text-[11px] px-1.5 py-0.5 rounded bg-lose/10 text-lose font-bold">系统 ✗未中</span>
                             )
                           ) : (
                             <span className="text-[11px] px-1.5 py-0.5 rounded bg-parchment-dark text-ink-muted">系统 未结算</span>
                           )}
                           {r.final.settled ? (
                             r.final.hit ? (
-                              <span className="text-[11px] px-1.5 py-0.5 rounded bg-red-600 text-white font-bold">终稿 ✓全中</span>
+                              <span className="text-[11px] px-1.5 py-0.5 rounded bg-win text-white font-bold">终稿 ✓全中</span>
                             ) : (
-                              <span className="text-[11px] px-1.5 py-0.5 rounded bg-rust/10 text-rust font-bold">终稿 ✗未中</span>
+                              <span className="text-[11px] px-1.5 py-0.5 rounded bg-lose/10 text-lose font-bold">终稿 ✗未中</span>
                             )
                           ) : (
                             <span className="text-[11px] px-1.5 py-0.5 rounded bg-parchment-dark text-ink-muted">终稿 未结算</span>
@@ -371,9 +375,9 @@ export default function ParlayFView({
                     <div className="flex items-center gap-3 flex-wrap">
                       <span className="font-mono text-xs text-ink font-semibold">{p.matchday}</span>
                       {p.hit === true ? (
-                        <span className="text-[12px] px-2.5 py-1 rounded bg-red-600 text-white font-extrabold shadow-sm">✓ 全中</span>
+                        <span className="text-[12px] px-2.5 py-1 rounded bg-win text-white font-extrabold shadow-sm">✓ 全中</span>
                       ) : p.hit === false ? (
-                        <span className="text-[11px] px-2 py-0.5 rounded bg-rust/10 text-rust font-bold">✗ 未中</span>
+                        <span className="text-[11px] px-2 py-0.5 rounded bg-lose/10 text-lose font-bold">✗ 未中</span>
                       ) : (
                         <span className="text-[11px] px-2 py-0.5 rounded bg-parchment-dark text-ink-muted">未结算</span>
                       )}
@@ -387,7 +391,7 @@ export default function ParlayFView({
                       </span>
                     </div>
                     {p.hit === true && calc ? (
-                      <div className="text-[11px] font-bold text-red-700 bg-red-50 rounded px-2 py-1 inline-block">
+                      <div className="text-[11px] font-bold text-win bg-win/10 rounded px-2 py-1 inline-block tabular-nums">
                         命中赔率计算：{calc}
                       </div>
                     ) : null}

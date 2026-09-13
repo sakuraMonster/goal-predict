@@ -254,7 +254,7 @@ export default function ParlayEView({
         : "23复式";
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 tabular-nums">
       <div className="px-4 py-3 bg-parchment-dark rounded-lg border border-border-dark space-y-2">
         <div className="flex items-center gap-3 min-h-8">
           <span className="flex items-center gap-2 min-w-0 flex-1 text-xs text-moss font-semibold"
@@ -293,11 +293,17 @@ export default function ParlayEView({
                 ["进球腿命中", history.stats.goal_settled_n > 0 ? `${history.stats.goal_hit_n}/${history.stats.goal_settled_n} = ${(history.stats.goal_p_hit! * 100).toFixed(1)}%` : "-"],
                 ["方向腿命中", history.stats.dir_verified_n > 0 ? `${history.stats.dir_hit_n}/${history.stats.dir_verified_n} = ${(history.stats.dir_p_hit! * 100).toFixed(1)}%` : "-"],
                 ["2串1命中", history.stats.combo_n > 0 ? `${history.stats.combo_hit_n}/${history.stats.combo_n} = ${(history.stats.combo_p_hit! * 100).toFixed(1)}%` : "-"],
-                ["ROI(返奖/下注)", history.stats.roi != null ? `${(history.stats.roi * 100).toFixed(1)}%` : "-"],
+                ["ROI（返奖/下注，倍率）", history.stats.roi != null ? `${history.stats.roi.toFixed(2)}×` : "-"],
               ].map(([k, v]) => (
-                <div key={k} className="flex-1 min-w-[150px] bg-parchment-light/40 rounded-md border border-highlight px-3 py-2">
+                <div key={k} className="flex-1 min-w-[150px] bg-white rounded-md border border-border px-3 py-2 text-center">
                   <div className="text-[10px] text-ink-light">{k}</div>
-                  <div className={`font-heading font-bold text-lg ${k === "2串1命中" && (history.stats.combo_p_hit ?? 0) >= 0.4 ? "text-moss" : k === "ROI(返奖/下注)" && (history.stats.roi ?? 0) > 1 ? "text-moss" : "text-ink"}`}>{v}</div>
+                  <div className={`font-heading font-bold text-xl mt-0.5 leading-tight ${
+                    k === "2串1命中" && (history.stats.combo_p_hit ?? 0) >= 0.4
+                      ? "text-moss"
+                      : k.startsWith("ROI") && history.stats.roi != null
+                        ? history.stats.roi > 1 ? "text-moss" : history.stats.roi < 1 ? "text-lose" : "text-ink"
+                        : "text-ink"
+                  }`}>{v}</div>
                 </div>
               ))}
             </div>
@@ -496,7 +502,7 @@ export default function ParlayEView({
                     return (
                       <label key={o.match_num ?? `${o.home_team}${o.away_team}`}
                         className={`flex items-center gap-2 rounded border px-2 py-1.5 text-[11px] cursor-pointer ${active ? "border-moss bg-moss/10" : sameGoal ? "opacity-45 cursor-not-allowed" : "border-highlight bg-white hover:border-moss/60"}`}>
-                        <input type="checkbox" className="accent-[#4a5d3a]" checked={active}
+                        <input type="checkbox" className="accent-moss" checked={active}
                           disabled={sameGoal}
                           onChange={() => toggleDir(o)} />
                         <span className="font-mono text-[10px] text-ink-light shrink-0">{o.match_num || "-"}</span>

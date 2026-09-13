@@ -260,7 +260,7 @@ export default function ParlayFinalView({
       const on = toList(chosen).includes(o.opt_id);
       return (
         <label key={o.opt_id} className={`flex items-center gap-2 rounded border px-2 py-1 cursor-pointer text-[11px] ${on ? "border-moss bg-moss/10" : "border-highlight bg-white"}`}>
-          <input type="checkbox" className="accent-[#4a5d3a]" checked={on}
+          <input type="checkbox" className="accent-moss" checked={on}
             onChange={() => toggleOpt(plan, lg, o)} />
           <span className="text-[10px] text-ink-light font-mono shrink-0">{o.match_num || "-"}</span>
           <span className={`px-1 py-0.5 rounded text-[10px] ${o.is_default ? "bg-moss/10 text-moss" : "bg-amber/15 text-amber"}`}>
@@ -460,7 +460,7 @@ export default function ParlayFinalView({
   const stats = history?.stats;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 tabular-nums">
       <div className="px-4 py-3 bg-parchment-dark rounded-lg border border-border-dark space-y-2">
         <div className="flex items-center gap-3 min-h-8">
           <span className="flex items-center gap-2 min-w-0 flex-1 text-xs text-moss font-semibold"
@@ -491,31 +491,31 @@ export default function ParlayFinalView({
           <div className="p-3 space-y-3">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
               {Object.entries(stats.by_plan || {}).map(([plan, s]) => (
-                <div key={plan} className="bg-parchment-light/40 rounded-md border border-highlight p-3">
+                <div key={plan} className="bg-white rounded-md border border-border p-3">
                   <div className="text-[10px] text-ink-light mb-1.5">{PLAN_META[plan]?.label ?? plan} · 已确认 {s.confirm_n} 天 / 已结算 {s.settled_n}</div>
                   <div className="flex items-center justify-between text-[11px]">
                     <span className="text-ink-muted">系统默认</span>
-                    <span className="font-heading font-bold">{s.default_p_hit == null ? "-" : `${(s.default_p_hit * 100).toFixed(0)}%`}</span>
+                    <span className="font-heading font-bold">{s.default_p_hit == null ? "-" : `${(s.default_p_hit * 100).toFixed(1)}%`}</span>
                   </div>
                   <div className="flex items-center justify-between text-[11px] mt-1">
                     <span className="text-ink-muted">人工终稿</span>
-                    <span className={`font-heading font-bold ${(s.final_p_hit ?? 0) > (s.default_p_hit ?? 0) ? "text-moss" : (s.final_p_hit ?? 0) < (s.default_p_hit ?? 0) ? "text-rust" : "text-ink"}`}>
-                      {s.final_p_hit == null ? "-" : `${(s.final_p_hit * 100).toFixed(0)}%`}
+                    <span className={`font-heading font-bold ${(s.final_p_hit ?? 0) > (s.default_p_hit ?? 0) ? "text-moss" : (s.final_p_hit ?? 0) < (s.default_p_hit ?? 0) ? "text-lose" : "text-ink"}`}>
+                      {s.final_p_hit == null ? "-" : `${(s.final_p_hit * 100).toFixed(1)}%`}
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-[10px] text-ink-muted mt-1.5">
                     <span>改进 {s.improved_n} / 持平 {s.same_n} / 恶化 {s.worsened_n}</span>
                   </div>
                   <div className="flex items-center justify-between text-[10px] mt-1">
-                    <span className="text-ink-muted">ROI 默认 vs 终稿</span>
-                    <span>{s.default_roi == null ? "-" : `${(s.default_roi * 100).toFixed(0)}%`} vs {s.final_roi == null ? "-" : `${(s.final_roi * 100).toFixed(0)}%`}</span>
+                    <span className="text-ink-muted">ROI 默认 vs 终稿（倍率）</span>
+                    <span>{s.default_roi == null ? "-" : `${s.default_roi.toFixed(2)}×`} vs {s.final_roi == null ? "-" : `${s.final_roi.toFixed(2)}×`}</span>
                   </div>
                   {(s.manual_n ?? 0) > 0 && (
                     <div className="flex items-center justify-between text-[10px] mt-1">
                       <span className="text-amber">手工新增（系统无对照）</span>
                       <span className="text-amber">
                         {s.manual_n} 天 · 已结算 {s.manual_settled_n ?? 0}
-                        {(s.manual_settled_n ?? 0) > 0 ? ` · 命中 ${s.manual_p_hit == null ? "-" : `${(s.manual_p_hit * 100).toFixed(0)}%`}` : ""}
+                        {(s.manual_settled_n ?? 0) > 0 ? ` · 命中 ${s.manual_p_hit == null ? "-" : `${(s.manual_p_hit * 100).toFixed(1)}%`}` : ""}
                       </span>
                     </div>
                   )}
@@ -524,8 +524,8 @@ export default function ParlayFinalView({
             </div>
             {stats.changed_legs && stats.changed_legs.n > 0 && (
               <div className="text-[11px] text-ink-muted">
-                人工改选腿级对照（共 {stats.changed_legs.n} 腿）：默认命中 {stats.changed_legs.default_p_hit == null ? "-" : `${(stats.changed_legs.default_p_hit * 100).toFixed(0)}%`}
-                {" "}→ 终稿命中 {stats.changed_legs.final_p_hit == null ? "-" : `${(stats.changed_legs.final_p_hit * 100).toFixed(0)}%`}
+                人工改选腿级对照（共 {stats.changed_legs.n} 腿）：默认命中 {stats.changed_legs.default_p_hit == null ? "-" : `${(stats.changed_legs.default_p_hit * 100).toFixed(1)}%`}
+                {" "}→ 终稿命中 {stats.changed_legs.final_p_hit == null ? "-" : `${(stats.changed_legs.final_p_hit * 100).toFixed(1)}%`}
               </div>
             )}
             <div className="divide-y divide-highlight max-h-[320px] overflow-y-auto border-t border-highlight">

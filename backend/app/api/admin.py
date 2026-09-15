@@ -2,7 +2,7 @@
 import asyncio
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import func, select
 from app.db.database import get_db
 from app.db.models import TaskLog
 from app.db.logger import AppLogger
@@ -901,6 +901,8 @@ async def predict_market_flow_batch(
         _validate_engine_result,
         _apply_v3e_postprocess,
         _mk_mfp_denorm,
+        _pool_freeze_payload,
+        _sm_ou_rows,
     )
     from sqlalchemy.orm import joinedload
 
@@ -936,6 +938,9 @@ async def predict_market_flow_batch(
 
     if not matches:
         return {"status": "ok", "message": f"{date or '今日'} 无比赛数据"}
+
+    # 池化判定冻结用：预取当日全部场次的 SM O/U 快照（避免循环内逐场查询）
+    _sm_rows_map = await _sm_ou_rows(db, [int(m.id) for m in matches])
 
     engine = MarketFlowEngineV2()
     model_version = "marketflow_v2_tuned7_0821"
@@ -1029,6 +1034,13 @@ async def predict_market_flow_batch(
             now_utc = datetime.utcnow()
             denorm = _mk_mfp_denorm(m)
 
+            # 池化判定冻结快照（预测写入时算一次；查询端只读 → 池化分析历史不再漂移）
+            _freeze = _pool_freeze_payload(
+                trace=engine_result.get("trace"), snap=snap, league_name_zh=league_name_zh,
+                matchday_date=getattr(m, "matchday_date", None),
+                sm_rows=_sm_rows_map.get(int(m.id)) or [],
+            )
+
             if pred:
                 pred.odds_snapshot_id = snap.id
                 pred.model_version = model_version
@@ -1040,6 +1052,7 @@ async def predict_market_flow_batch(
                 pred.best_score = engine_result.get("best_score")
                 pred.second_score = engine_result.get("second_score")
                 pred.trace_json = engine_result.get("trace")
+                pred.pool_freeze_json = _freeze
                 pred.league_id = denorm["league_id"]
                 pred.kickoff_time = denorm["kickoff_time"]
                 pred.matchday_date = denorm["matchday_date"]
@@ -1057,6 +1070,7 @@ async def predict_market_flow_batch(
                     best_score=engine_result.get("best_score"),
                     second_score=engine_result.get("second_score"),
                     trace_json=engine_result.get("trace"),
+                    pool_freeze_json=_freeze,
                     league_id=denorm["league_id"],
                     kickoff_time=denorm["kickoff_time"],
                     matchday_date=denorm["matchday_date"],
@@ -1096,4 +1110,98 @@ async def predict_market_flow_batch(
             "failed": failed,
             "skipped_reasons": skipped_reasons,
         }
+    }
+
+
+@router.post("/backfill-pool-freeze")
+async def backfill_pool_freeze(
+    start_date: str = Query(None, description="比赛日起 YYYY-MM-DD（含，按 mfp.matchday_date）"),
+    end_date: str = Query(None, description="比赛日止 YYYY-MM-DD（含）"),
+    only_missing: bool = Query(True, description="仅回填未冻结（pool_freeze_json 为空）的行"),
+    limit: int = Query(5000, description="单次最多处理行数"),
+    db: AsyncSession = Depends(get_db),
+):
+    """回填 MarketFlowPrediction.pool_freeze_json（池化判定冻结快照）。
+
+    加冻结列之前的存量历史行没有快照，查询端只能 runtime 兜底重算（随代码/赔率变化）。
+    本接口按**当前代码口径**一次性补齐，之后历史统计固定，只有重新预测（覆盖写入）才刷新。
+    返回 remaining > 0 时再调一次即可（分批）。
+    """
+    from app.db.models import MarketFlowPrediction, JczqPlayOddsSnapshot, League, Match
+    from app.api.market_flow import _pool_freeze_payload, _sm_ou_rows
+
+    start_time = time.time()
+
+    stmt = (
+        select(MarketFlowPrediction, JczqPlayOddsSnapshot, League)
+        .join(Match, Match.id == MarketFlowPrediction.match_id)
+        .outerjoin(JczqPlayOddsSnapshot, JczqPlayOddsSnapshot.id == MarketFlowPrediction.odds_snapshot_id)
+        .outerjoin(League, League.id == Match.league_id)
+        .order_by(MarketFlowPrediction.id.asc())
+        .limit(max(1, min(int(limit), 20000)))
+    )
+    if only_missing:
+        stmt = stmt.where(MarketFlowPrediction.pool_freeze_json.is_(None))
+    if start_date:
+        stmt = stmt.where(MarketFlowPrediction.matchday_date >= start_date)
+    if end_date:
+        stmt = stmt.where(MarketFlowPrediction.matchday_date <= end_date)
+
+    rows = (await db.execute(stmt)).all()
+    if not rows:
+        return {"status": "ok", "message": "无需回填（没有待冻结的行）", "data": {"scanned": 0, "frozen": 0}}
+
+    sm_map = await _sm_ou_rows(db, [int(r[0].match_id) for r in rows])
+    frozen = 0
+    no_snap = 0
+    failed = 0
+    for pred, snap, league in rows:
+        try:
+            if snap is None:
+                no_snap += 1
+            pred.pool_freeze_json = _pool_freeze_payload(
+                trace=pred.trace_json,
+                snap=snap,
+                league_name_zh=(getattr(league, "name_zh", None) if league else None),
+                matchday_date=getattr(pred, "matchday_date", None),
+                sm_rows=sm_map.get(int(pred.match_id)) or [],
+            )
+            frozen += 1
+        except Exception as e:
+            failed += 1
+            if failed <= 5:
+                print(f"[backfill-pool-freeze] mfp_id={pred.id} 失败: {e}", flush=True)
+
+    # 剩余待回填（仅统计，便于分批调用）
+    remaining = 0
+
+    try:
+        await db.commit()
+    except Exception as e:
+        try:
+            await db.rollback()
+        except Exception:
+            pass
+        return {"status": "error", "message": f"保存数据库失败: {e}"}
+    await cache_bump_version()  # 冻结快照写入 → 统计缓存失效
+
+    # 提交后再统计剩余量（与落库状态一致）
+    if only_missing:
+        remaining = (await db.execute(
+            select(func.count(MarketFlowPrediction.id)).where(MarketFlowPrediction.pool_freeze_json.is_(None))
+        )).scalar() or 0
+
+    duration = int((time.time() - start_time) * 1000)
+    msg = f"池化冻结回填：处理 {len(rows)} 行 → 成功 {frozen}，无竞彩快照 {no_snap}，失败 {failed}，剩余待回填 {remaining}"
+    await AppLogger.log("predict", "success", msg, duration)
+    return {
+        "status": "ok",
+        "message": msg,
+        "data": {
+            "scanned": len(rows),
+            "frozen": frozen,
+            "no_snapshot": no_snap,
+            "failed": failed,
+            "remaining": remaining,
+        },
     }

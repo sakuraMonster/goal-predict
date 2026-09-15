@@ -311,6 +311,12 @@ async def predict_market_flow(match_id: int, payload: dict = Body(...), db: Asyn
     pred_result = await db.execute(select(MarketFlowPrediction).where(MarketFlowPrediction.match_id == match_id))
     pred = pred_result.scalar_one_or_none()
 
+    # 池化判定冻结快照：预测（写入）时刻按当前口径算一次落库，查询端只读 → 池化分析历史不再漂移
+    _freeze = await _build_pool_freeze(
+        db, trace=result.get("trace"), snap=snap, league_name_zh=league_name_zh,
+        matchday_date=getattr(match, "matchday_date", None), match_id=match_id,
+    )
+
     denorm = _mk_mfp_denorm(match)
     now = datetime.utcnow()
     if pred:
@@ -324,6 +330,7 @@ async def predict_market_flow(match_id: int, payload: dict = Body(...), db: Asyn
         pred.best_score = result.get("best_score")
         pred.second_score = result.get("second_score")
         pred.trace_json = result.get("trace")
+        pred.pool_freeze_json = _freeze
         pred.league_id = denorm["league_id"]
         pred.kickoff_time = denorm["kickoff_time"]
         pred.matchday_date = denorm["matchday_date"]
@@ -340,6 +347,7 @@ async def predict_market_flow(match_id: int, payload: dict = Body(...), db: Asyn
             best_score=result.get("best_score"),
             second_score=result.get("second_score"),
             trace_json=result.get("trace"),
+            pool_freeze_json=_freeze,
             league_id=denorm["league_id"],
             kickoff_time=denorm["kickoff_time"],
             matchday_date=denorm["matchday_date"],
@@ -402,6 +410,8 @@ async def backtest_market_flow(payload: dict = Body(...), db: AsyncSession = Dep
         .order_by(Match.kickoff_time.asc())
     )
     matches = match_result.scalars().all()
+    # 池化判定冻结用：预取窗口内全部场次的 SM O/U 快照（避免循环内逐场查询）
+    _sm_rows_map = await _sm_ou_rows(db, [int(m.id) for m in matches])
 
     total = len(matches)
     predicted = 0
@@ -501,6 +511,12 @@ async def backtest_market_flow(payload: dict = Body(...), db: AsyncSession = Dep
 
             now = datetime.utcnow()
             denorm = _mk_mfp_denorm(match)
+            # 池化判定冻结快照（预测写入时算一次；查询端只读）
+            _freeze = _pool_freeze_payload(
+                trace=result.get("trace"), snap=snap, league_name_zh=_league_name,
+                matchday_date=getattr(match, "matchday_date", None),
+                sm_rows=_sm_rows_map.get(int(match.id)) or [],
+            )
             if pred:
                 pred.odds_snapshot_id = snap.id
                 pred.model_version = model_version
@@ -512,6 +528,7 @@ async def backtest_market_flow(payload: dict = Body(...), db: AsyncSession = Dep
                 pred.best_score = result.get("best_score")
                 pred.second_score = result.get("second_score")
                 pred.trace_json = result.get("trace")
+                pred.pool_freeze_json = _freeze
                 pred.league_id = denorm["league_id"]
                 pred.kickoff_time = denorm["kickoff_time"]
                 pred.matchday_date = denorm["matchday_date"]
@@ -528,6 +545,7 @@ async def backtest_market_flow(payload: dict = Body(...), db: AsyncSession = Dep
                     best_score=result.get("best_score"),
                     second_score=result.get("second_score"),
                     trace_json=result.get("trace"),
+                    pool_freeze_json=_freeze,
                     league_id=denorm["league_id"],
                     kickoff_time=denorm["kickoff_time"],
                     matchday_date=denorm["matchday_date"],
@@ -1277,6 +1295,103 @@ def _c_ttg_top3(expected_goals_c, snap_top2_c):
     return base[:3]
 
 
+async def _sm_ou_rows(db, match_ids: list[int]) -> dict[int, list]:
+    """批量取每场 SportMonks O/U 行（每个 (bookmaker, goal_line) 只取最新快照）。
+
+    原实现取全量快照（180 天窗口可高达 87 万行 → 750ms+ 传输），改为 DISTINCT ON 每组只取最新行：
+    行数从 87 万降到 ~7.5 万（10 倍+），语义等价（同 (bm,line) 多快照后写覆盖 = 取最新）。
+    """
+    out: dict[int, list] = {}
+    if not match_ids:
+        return out
+    ou_res = await db.execute(
+        select(
+            OddsSnapshot.match_id, OddsSnapshot.bookmaker, OddsSnapshot.goal_line,
+            OddsSnapshot.over_odds, OddsSnapshot.under_odds,
+        )
+        .where(
+            OddsSnapshot.match_id.in_(match_ids),
+            OddsSnapshot.goal_line.is_not(None),
+            OddsSnapshot.over_odds.is_not(None),
+            OddsSnapshot.under_odds.is_not(None),
+        )
+        .distinct(OddsSnapshot.match_id, OddsSnapshot.bookmaker, OddsSnapshot.goal_line)
+        .order_by(
+            OddsSnapshot.match_id.asc(),
+            OddsSnapshot.bookmaker.asc(),
+            OddsSnapshot.goal_line.asc(),
+            OddsSnapshot.snapshot_time.desc(),
+        )
+    )
+    for r in ou_res:
+        out.setdefault(r.match_id, []).append(
+            (r.bookmaker, r.goal_line, r.over_odds, r.under_odds)
+        )
+    return out
+
+
+def _freeze_of(pred) -> dict:
+    """读 MarketFlowPrediction.pool_freeze_json（非 dict / 缺失 → 空 dict = 未冻结，走 runtime 兜底）"""
+    fz = getattr(pred, "pool_freeze_json", None)
+    return fz if isinstance(fz, dict) else {}
+
+
+def _pool_freeze_payload(*, trace, snap, league_name_zh, matchday_date, sm_rows=None) -> dict:
+    """按『写入时刻』的口径计算池化判定冻结快照（与查询端 _market_flow_query_raw 同源）。
+
+    冻结后查询端只读不再重算 → 池化分析的历史统计不随代码改动 / 赔率快照漂移变化，
+    只有重新预测（覆盖写入 mfp）才会刷新本快照。
+    """
+    t = trace if isinstance(trace, dict) else {}
+    if isinstance(t.get("trace"), dict):
+        t = t["trace"]
+    stage_b = t.get("stage_b") or {}
+    allowed = stage_b.get("allowed_outcomes") or ["home", "draw", "away"]
+    # preferred：先读 trace 内持久化值，缺失才 runtime 重算（与查询端优先级一致）
+    pref = t.get("preferred_outcome")
+    if pref not in ("home", "draw", "away"):
+        pref = None
+    if pref is None:
+        pref, triggers = _compute_preferred_outcome(
+            t, snap, league_name_zh=league_name_zh, matchday_date=matchday_date
+        )
+        # V3g 桶 runtime fallback：允许方向同步把 D 加回，避免 pref=draw 但 allowed 不含 D
+        if triggers.get("v3g_bucket") and "draw" not in allowed:
+            allowed = sorted(set(allowed) | {"draw"})
+
+    pool_key, pool_pick, pool_fav, pool_fav_ip, pool_cold_dir, pool_cold_signal = _pool_assign_v2(
+        allowed, snap, league_name_zh
+    )
+    if pool_key in ("favorite", "upset") and not pool_cold_signal:
+        final_pref = pool_pick if pool_pick in set(allowed) else pref
+    else:
+        # 警示冷门仅展示冷门参考方向，不做方向优选
+        final_pref = None
+
+    return {
+        "frozen_at": datetime.utcnow().isoformat(),
+        "preferred_outcome": final_pref,
+        "allowed_outcomes": list(allowed),
+        "pool": pool_key,
+        "pick": pool_pick,
+        "fav": pool_fav,
+        "fav_ip": pool_fav_ip,
+        "cold_dir": pool_cold_dir,
+        "cold_signal": bool(pool_cold_signal),
+        "ou_all": ou_direction_all_tiers(getattr(snap, "ttg_odds_json", None)) if snap is not None else None,
+        "ou_sm": ou_market_from_rows(sm_rows) if sm_rows else None,
+    }
+
+
+async def _build_pool_freeze(db, *, trace, snap, league_name_zh, matchday_date, match_id) -> dict:
+    """单场入口：取该场 SM O/U 行后计算冻结快照"""
+    sm_rows = (await _sm_ou_rows(db, [match_id])).get(match_id) or []
+    return _pool_freeze_payload(
+        trace=trace, snap=snap, league_name_zh=league_name_zh,
+        matchday_date=matchday_date, sm_rows=sm_rows,
+    )
+
+
 async def _market_flow_query(db, *, start=None, end=None, model_version=None, source=None, ou_tier=DEFAULT_TIER, ou_sm_tier=OU_M_DEFAULT, use_cache=True):
     """history 查询入口（带 Redis 缓存）。
 
@@ -1412,32 +1527,11 @@ async def _market_flow_query_raw(db, *, start=None, end=None, model_version=None
     # 批量取每场 SportMonks O/U 行（ou_market_from_rows 只需每个 (bookmaker, goal_line) 的最新快照）。
     # 原实现取全量快照（180 天窗口可高达 87 万行 → 750ms+ 传输），改为 DISTINCT ON 每组只取最新行：
     # 行数从 87 万降到 ~7.5 万（10 倍+），语义等价（同 (bm,line) 多快照后写覆盖 = 取最新）。
+    # 已冻结场次的 SM 判定直接读冻结快照 → 不再受后续赔率同步影响（漂移源关闭），也不必再查快照。
     ou_map: dict[int, list] = {}
     if rows:
-        mids = [int(row[0].match_id) for row in rows]
-        ou_res = await db.execute(
-            select(
-                OddsSnapshot.match_id, OddsSnapshot.bookmaker, OddsSnapshot.goal_line,
-                OddsSnapshot.over_odds, OddsSnapshot.under_odds,
-            )
-            .where(
-                OddsSnapshot.match_id.in_(mids),
-                OddsSnapshot.goal_line.is_not(None),
-                OddsSnapshot.over_odds.is_not(None),
-                OddsSnapshot.under_odds.is_not(None),
-            )
-            .distinct(OddsSnapshot.match_id, OddsSnapshot.bookmaker, OddsSnapshot.goal_line)
-            .order_by(
-                OddsSnapshot.match_id.asc(),
-                OddsSnapshot.bookmaker.asc(),
-                OddsSnapshot.goal_line.asc(),
-                OddsSnapshot.snapshot_time.desc(),
-            )
-        )
-        for r in ou_res:
-            ou_map.setdefault(r.match_id, []).append(
-                (r.bookmaker, r.goal_line, r.over_odds, r.under_odds)
-            )
+        mids = [int(row[0].match_id) for row in rows if not _freeze_of(row[0]).get("ou_sm")]
+        ou_map = await _sm_ou_rows(db, mids)
 
     for row in rows:
         # 单分支解包（统一结构，不再 if/else）
@@ -1466,41 +1560,55 @@ async def _market_flow_query_raw(db, *, start=None, end=None, model_version=None
         stage_b = trace.get("stage_b") or {}
         allowed = stage_b.get("allowed_outcomes") or ["home", "draw", "away"]
         had_pref = stage_b.get("had_pref")
-        excluded = [x for x in ("home", "draw", "away") if x not in set(allowed)]
         enforce = stage_b.get("enforce") or []
         outcome_votes = stage_b.get("outcome_votes") or {}
         score_top3_raw = _flatten_top3_from_trace(trace)
 
-        # ========== preferred_outcome：先读持久化，再 fallback 统一重算 ==========
-        # 新数据（V4 桶持久化后）trace 顶层有 preferred_outcome，直接用 = 持久化结果
-        # 老数据没有该字段或 V3g 需要 runtime 加回 D，走 fallback runtime 重算
+        # ========== 池化判定：优先读冻结快照（只有重新预测才更新）==========
+        # 冻结快照在预测写入时按当时口径生成 → 池归属/优选方向/大小球方向不再随代码或赔率漂移变化。
+        # 未冻结（迁移前的存量行，或未走三条写入路径的脚本数据）才走 runtime 重算，且不回写 DB。
+        freeze = _freeze_of(pred)
         runtime_bucket_triggers: dict[str, bool] = {}
         _league_nz = getattr(league, "name_zh", None) if league else None
-        if (
-            isinstance(trace, dict)
-            and isinstance(trace.get("preferred_outcome"), str)
-            and trace["preferred_outcome"] in {"home", "draw", "away"}
-        ):
-            preferred_outcome = trace["preferred_outcome"]
+        if freeze:
+            allowed = freeze.get("allowed_outcomes") or allowed
+            preferred_outcome = freeze.get("preferred_outcome")
+            pool_key = freeze.get("pool") or "unpooled"
+            pool_pick = freeze.get("pick")
+            pool_fav = freeze.get("fav")
+            pool_fav_ip = freeze.get("fav_ip")
+            pool_cold_dir = freeze.get("cold_dir")
+            pool_cold_signal = bool(freeze.get("cold_signal"))
         else:
-            preferred_outcome, runtime_bucket_triggers = _compute_preferred_outcome(trace, snap, league_name_zh=_league_nz, matchday_date=getattr(pred, "matchday_date", None))
-            # V3g 桶 runtime fallback：允许方向同步把 D 加回，避免 UI 出现 pref=draw 但 allowed 不含 D 的冲突
-            if runtime_bucket_triggers.get("v3g_bucket"):
-                _allowed_set = set(allowed)
-                if "draw" not in _allowed_set:
-                    _allowed_set.add("draw")
-                    allowed = sorted(list(_allowed_set))
+            # ========== preferred_outcome：先读持久化，再 fallback 统一重算 ==========
+            # 新数据（V4 桶持久化后）trace 顶层有 preferred_outcome，直接用 = 持久化结果
+            # 老数据没有该字段或 V3g 需要 runtime 加回 D，走 fallback runtime 重算
+            if (
+                isinstance(trace, dict)
+                and isinstance(trace.get("preferred_outcome"), str)
+                and trace["preferred_outcome"] in {"home", "draw", "away"}
+            ):
+                preferred_outcome = trace["preferred_outcome"]
+            else:
+                preferred_outcome, runtime_bucket_triggers = _compute_preferred_outcome(trace, snap, league_name_zh=_league_nz, matchday_date=getattr(pred, "matchday_date", None))
+                # V3g 桶 runtime fallback：允许方向同步把 D 加回，避免 UI 出现 pref=draw 但 allowed 不含 D 的冲突
+                if runtime_bucket_triggers.get("v3g_bucket"):
+                    _allowed_set = set(allowed)
+                    if "draw" not in _allowed_set:
+                        _allowed_set.add("draw")
+                        allowed = sorted(list(_allowed_set))
 
-        # ===== 池化分类（用户口径：正路=让球方获胜，冷门=让球方未获胜）=====
-        # 四池：favorite 正路池 / upset 冷门池 / ambiguous 模糊池 / unpooled 不入池
-        # 正路池、冷门池覆盖 preferred 为池优选方向；模糊池、不入池不做方向选择（preferred=None）
-        pool_key, pool_pick, pool_fav, pool_fav_ip, pool_cold_dir, pool_cold_signal = _pool_assign_v2(allowed, snap, _league_nz)
-        if pool_key in ("favorite", "upset") and not pool_cold_signal:
-            if pool_pick in set(allowed):
-                preferred_outcome = pool_pick
-        else:
-            # 警示冷门（cold_signal=True）仅展示冷门参考方向 cold_dir，不做方向优选
-            preferred_outcome = None
+            # ===== 池化分类（用户口径：正路=让球方获胜，冷门=让球方未获胜）=====
+            # 四池：favorite 正路池 / upset 冷门池 / ambiguous 模糊池 / unpooled 不入池
+            # 正路池、冷门池覆盖 preferred 为池优选方向；模糊池、不入池不做方向选择（preferred=None）
+            pool_key, pool_pick, pool_fav, pool_fav_ip, pool_cold_dir, pool_cold_signal = _pool_assign_v2(allowed, snap, _league_nz)
+            if pool_key in ("favorite", "upset") and not pool_cold_signal:
+                if pool_pick in set(allowed):
+                    preferred_outcome = pool_pick
+            else:
+                # 警示冷门（cold_signal=True）仅展示冷门参考方向 cold_dir，不做方向优选
+                preferred_outcome = None
+        excluded = [x for x in ("home", "draw", "away") if x not in set(allowed)]
 
         # 用 preferred_outcome 对齐比分推荐
         best_score_norm, second_score_norm, score_top3_norm = _align_preferred_scores(
@@ -1557,7 +1665,10 @@ async def _market_flow_query_raw(db, *, start=None, end=None, model_version=None
         pref_bucket = hhad_sig.get("pref_bucket")
 
         # ===== 大小球方向（方向+置信度门控模型）：直接读 TTG 市场定价，各档位共享一次解析 =====
-        ou_all = ou_direction_all_tiers(getattr(snap, "ttg_odds_json", None)) if snap is not None else None
+        # 已冻结场次读冻结快照（TTG 各档位判定），未冻结才由快照现算
+        ou_all = freeze.get("ou_all") if freeze else (
+            ou_direction_all_tiers(getattr(snap, "ttg_odds_json", None)) if snap is not None else None
+        )
         if ou_all is not None:
             for _t in TIERS:
                 _v = ou_all[_t]
@@ -1580,7 +1691,10 @@ async def _market_flow_query_raw(db, *, start=None, end=None, model_version=None
 
         # ===== SportMonks O/U 独立大小球盘口（第二信号，方向+置信度门控）=====
         # 聚合口径与验证脚本一致：2.5线 / Pinnacle 优先 / 多快照取最新 / 去抽水归一化
-        ou_sm = ou_market_from_rows(ou_map.get(int(match.id)) or []) if ou_map else None
+        # 已冻结场次读冻结快照（写入时刻的最新 SM 快照判定），不再随后续赔率同步漂移
+        ou_sm = freeze.get("ou_sm") if freeze else (
+            ou_market_from_rows(ou_map.get(int(match.id)) or []) if ou_map else None
+        )
         ou_sm_dir = ou_sm["tiers"].get(ou_sm_tier) if ou_sm else None
         ou_sm_hit = None
         if ou_sm is not None:

@@ -253,6 +253,9 @@ class MarketFlowPrediction(Base):
     best_score = Column(String(20))
     second_score = Column(String(20))
     trace_json = Column(_JSON_VARIANT)
+    # 池化判定冻结快照：预测（写入）时刻按当时口径算一次，查询端优先读此列，不再 runtime 重算。
+    # 含 preferred_outcome / allowed_outcomes / pool / pick / fav / fav_ip / cold_dir / cold_signal / ou_all / ou_sm
+    pool_freeze_json = Column(_JSON_VARIANT, comment="池化判定冻结快照，仅重新预测时刷新")
 
     # ── 冗余（与 Prediction 表对齐，方便统计/筛选不 JOIN Match） ──
     league_id = Column(Integer, ForeignKey("leagues.id"), index=True, comment="冗余，联赛ID，方便按联赛统计")

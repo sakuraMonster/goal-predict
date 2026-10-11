@@ -1,0 +1,103 @@
+==================================================================================
+H2H -> OU precision-filter backtest v2  (settled MarketFlow V2)
+==================================================================================
+settled rows          : 7793
+matchday range        : 2025-01-01 ~ 2026-10-09
+base actual_over rate :  53.9%
+H2H coverage (n>=1)   : 42.9%
+h2h_n distribution    : 0:4453, 1:1387, 2:1007, 3:437, 4:316, 5:147, 6:42, 7:3, 8:1
+  mean over_rate=0.527  avg_total=2.799  btts=0.554
+
+  [monotonicity] over_rate -> actual over-rate (all settled, n>=1)
+       [0.00,0.25)  n= 994  actual_over= 51.4%
+       [0.25,0.50)  n= 265  actual_over= 50.6%
+       [0.50,0.75)  n= 840  actual_over= 55.4%
+          [0.75,+]  n=1241  actual_over= 57.5%
+
+  [monotonicity] avg_total -> actual over-rate (all settled, n>=1)
+       [0.00,2.00)  n= 668  actual_over= 50.0%
+       [2.00,2.50)  n= 685  actual_over= 52.4%
+       [2.50,3.00)  n= 340  actual_over= 53.5%
+          [3.00,+]  n=1647  actual_over= 57.6%
+
+  [monotonicity] btts_rate -> actual over-rate (all settled, n>=1)
+       [0.00,0.34)  n=1129  actual_over= 51.0%
+       [0.34,0.67)  n= 855  actual_over= 55.9%
+       [0.67,1.01)  n=1356  actual_over= 56.7%
+          [1.01,+]  n=0
+
+=== SM O/U standard  n=460  baseline_hit= 70.9% ===
+  over_rate  [weak thr] H2H avail= 87.2% of gated | agree n= 303 hit= 71.0% | disagree n=  98 hit= 72.4% | gap= -1.5pp z=-0.28
+      [strong-downgrade] drop n= 29 (their orig_hit= 62.1%) -> kept hit= 72.0% cover=80.9% of gated (vs baseline  70.9%)
+      reason: H2H `over_rate` says opposite-of-`over` n= 72 orig_hit= 70.8% (market said over, still hit this often)
+      reason: H2H `over_rate` says opposite-of-`under` n= 26 orig_hit= 76.9% (market said under, still hit this often)
+  avg_total  [weak thr] H2H avail= 87.2% of gated | agree n= 291 hit= 70.4% | disagree n= 110 hit= 73.6% | gap= -3.2pp z=-0.63
+      [strong-downgrade] drop n= 21 (their orig_hit= 61.9%) -> kept hit= 71.8% cover=82.6% of gated (vs baseline  70.9%)
+      reason: H2H `avg_total` says opposite-of-`over` n= 84 orig_hit= 72.6% (market said over, still hit this often)
+      reason: H2H `avg_total` says opposite-of-`under` n= 26 orig_hit= 76.9% (market said under, still hit this often)
+  btts_rate  [weak thr] H2H avail= 87.2% of gated | agree n= 288 hit= 71.2% | disagree n= 113 hit= 71.7% | gap= -0.5pp z=-0.10
+      [strong-downgrade] drop n= 41 (their orig_hit= 68.3%) -> kept hit= 71.7% cover=78.3% of gated (vs baseline  70.9%)
+      reason: H2H `btts_rate` says opposite-of-`over` n= 85 orig_hit= 68.2% (market said over, still hit this often)
+      reason: H2H `btts_rate` says opposite-of-`under` n= 28 orig_hit= 82.1% (market said under, still hit this often)
+  [residual] corr(actual_over - p_big, H2H stat) on gated set:
+    over_rate  r=-0.0221  (n=401)
+    avg_total  r=-0.0409  (n=401)
+    btts_rate  r=+0.0017  (n=401)
+
+=== SM O/U strict  n=211  baseline_hit= 76.3% ===
+  over_rate  [weak thr] H2H avail= 87.7% of gated | agree n= 145 hit= 74.5% | disagree n=  40 hit= 80.0% | gap= -5.5pp z=-0.72
+      [strong-downgrade] drop n= 14 (their orig_hit= 71.4%) -> kept hit= 76.0% cover=81.0% of gated (vs baseline  76.3%)
+      reason: H2H `over_rate` says opposite-of-`over` n= 36 orig_hit= 77.8% (market said over, still hit this often)
+      reason: H2H `over_rate` says opposite-of-`under` n=  4 orig_hit=100.0% (market said under, still hit this often)
+  avg_total  [weak thr] H2H avail= 87.7% of gated | agree n= 145 hit= 75.2% | disagree n=  40 hit= 77.5% | gap= -2.3pp z=-0.30
+      [strong-downgrade] drop n=  7 (their orig_hit= 57.1%) -> kept hit= 76.4% cover=84.4% of gated (vs baseline  76.3%)
+      reason: H2H `avg_total` says opposite-of-`over` n= 35 orig_hit= 74.3% (market said over, still hit this often)
+      reason: H2H `avg_total` says opposite-of-`under` n=  5 orig_hit=100.0% (market said under, still hit this often)
+  btts_rate  [weak thr] H2H avail= 87.7% of gated | agree n= 140 hit= 75.7% | disagree n=  45 hit= 75.6% | gap= +0.2pp z=+0.02
+      [strong-downgrade] drop n= 16 (their orig_hit= 68.8%) -> kept hit= 76.3% cover=80.1% of gated (vs baseline  76.3%)
+      reason: H2H `btts_rate` says opposite-of-`over` n= 37 orig_hit= 70.3% (market said over, still hit this often)
+      reason: H2H `btts_rate` says opposite-of-`under` n=  8 orig_hit=100.0% (market said under, still hit this often)
+  [residual] corr(actual_over - p_big, H2H stat) on gated set:
+    over_rate  r=-0.0280  (n=185)
+    avg_total  r=-0.0432  (n=185)
+    btts_rate  r=-0.0211  (n=185)
+
+=== TTG standard  n=2498  baseline_hit= 65.8% ===
+  over_rate  [weak thr] H2H avail= 45.2% of gated | agree n= 846 hit= 68.3% | disagree n= 283 hit= 65.0% | gap= +3.3pp z=+1.03
+      [strong-downgrade] drop n= 70 (their orig_hit= 64.3%) -> kept hit= 67.7% cover=42.4% of gated (vs baseline  65.8%)
+      reason: H2H `over_rate` says opposite-of-`over` n=264 orig_hit= 66.3% (market said over, still hit this often)
+      reason: H2H `over_rate` says opposite-of-`under` n= 19 orig_hit= 47.4% (market said under, still hit this often)
+  avg_total  [weak thr] H2H avail= 45.2% of gated | agree n= 824 hit= 68.3% | disagree n= 305 hit= 65.2% | gap= +3.1pp z=+0.98
+      [strong-downgrade] drop n= 41 (their orig_hit= 61.0%) -> kept hit= 67.7% cover=43.6% of gated (vs baseline  65.8%)
+      reason: H2H `avg_total` says opposite-of-`over` n=288 orig_hit= 66.3% (market said over, still hit this often)
+      reason: H2H `avg_total` says opposite-of-`under` n= 17 orig_hit= 47.1% (market said under, still hit this often)
+  btts_rate  [weak thr] H2H avail= 45.2% of gated | agree n= 809 hit= 69.2% | disagree n= 320 hit= 63.1% | gap= +6.1pp z=+1.97
+      [strong-downgrade] drop n= 76 (their orig_hit= 65.8%) -> kept hit= 67.6% cover=42.2% of gated (vs baseline  65.8%)
+      reason: H2H `btts_rate` says opposite-of-`over` n=296 orig_hit= 63.9% (market said over, still hit this often)
+      reason: H2H `btts_rate` says opposite-of-`under` n= 24 orig_hit= 54.2% (market said under, still hit this often)
+  [residual] corr(actual_over - p_big, H2H stat) on gated set:
+    over_rate  r=+0.0051  (n=1129)
+    avg_total  r=+0.0088  (n=1129)
+    btts_rate  r=+0.0355  (n=1129)
+
+=== TTG strict  n=1664  baseline_hit= 67.6% ===
+  over_rate  [weak thr] H2H avail= 47.4% of gated | agree n= 608 hit= 70.1% | disagree n= 181 hit= 67.4% | gap= +2.7pp z=+0.68
+      [strong-downgrade] drop n= 45 (their orig_hit= 71.1%) -> kept hit= 69.4% cover=44.7% of gated (vs baseline  67.6%)
+      reason: H2H `over_rate` says opposite-of-`over` n=175 orig_hit= 67.4% (market said over, still hit this often)
+      reason: H2H `over_rate` says opposite-of-`under` n=  6 orig_hit= 66.7% (market said under, still hit this often)
+  avg_total  [weak thr] H2H avail= 47.4% of gated | agree n= 589 hit= 70.1% | disagree n= 200 hit= 67.5% | gap= +2.6pp z=+0.69
+      [strong-downgrade] drop n= 26 (their orig_hit= 61.5%) -> kept hit= 69.7% cover=45.9% of gated (vs baseline  67.6%)
+      reason: H2H `avg_total` says opposite-of-`over` n=195 orig_hit= 67.7% (market said over, still hit this often)
+      reason: H2H `avg_total` says opposite-of-`under` n=  5 orig_hit= 60.0% (market said under, still hit this often)
+  btts_rate  [weak thr] H2H avail= 47.4% of gated | agree n= 581 hit= 71.4% | disagree n= 208 hit= 63.9% | gap= +7.5pp z=+2.01
+      [strong-downgrade] drop n= 47 (their orig_hit= 74.5%) -> kept hit= 69.1% cover=44.6% of gated (vs baseline  67.6%)
+      reason: H2H `btts_rate` says opposite-of-`over` n=203 orig_hit= 64.0% (market said over, still hit this often)
+      reason: H2H `btts_rate` says opposite-of-`under` n=  5 orig_hit= 60.0% (market said under, still hit this often)
+  [residual] corr(actual_over - p_big, H2H stat) on gated set:
+    over_rate  r=-0.0009  (n=789)
+    avg_total  r=+0.0081  (n=789)
+    btts_rate  r=+0.0382  (n=789)
+
+==================================================================================
+done
+==================================================================================

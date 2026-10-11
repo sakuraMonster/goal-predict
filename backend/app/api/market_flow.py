@@ -889,6 +889,60 @@ def _draw_intel(snap) -> dict | None:
     return None
 
 
+# ===== 组合规则情报特征（赔率特征 2~3 个组合；来源 tools/_bt_odds_combo_scan2.py，逐场门槛：选中项赔率均>=1.5）=====
+# rate=全样本命中率，lift=实际命中-市场隐含（>3 有真实超额；≈0 表示市场已充分定价）。
+COMBO_INTEL_RULES: tuple[dict, ...] = (
+    {"code": "C1", "name": "让方不胜·低平赔(胜赔1.80-2.10)", "pick": "让平+让负", "rate": 0.884, "lift": 8.2, "n": 242},
+    {"code": "C2", "name": "让方不胜·主让低平赔(2.50-3.00)", "pick": "让平+让负", "rate": 0.864, "lift": 5.5, "n": 323},
+    {"code": "C3", "name": "让满·客让深盘(受让≥5.5)", "pick": "让胜+让平", "rate": 0.712, "lift": 1.3, "n": 285},
+    {"code": "C4", "name": "主队不败·主让(胜赔1.40-1.60)", "pick": "主+平", "rate": 0.808, "lift": -0.2, "n": 291},
+    {"code": "C5", "name": "客队不败·客让(胜赔1.40-1.60)", "pick": "平+客", "rate": 0.804, "lift": -0.5, "n": 199},
+    {"code": "C6", "name": "分出胜负·中平赔(3.60-4.00)", "pick": "主+客", "rate": 0.805, "lift": 4.4, "n": 200},
+)
+
+
+def _combo_intel(snap) -> list[dict]:
+    """组合规则情报特征：命中返回 [{code,name,pick,rate,lift}, ...]（可多条），否则 []。
+
+    仅作展示标记（C4/C5 命中≈市场隐含、无超额；C1/C2/C6 有真实超额），不参与排序。
+    """
+    if snap is None:
+        return []
+    h = _as_float(getattr(snap, "had_home", None))
+    d = _as_float(getattr(snap, "had_draw", None))
+    a = _as_float(getattr(snap, "had_away", None))
+    if not (h and d and a):
+        return []
+    _hl = getattr(snap, "hhad_line", None)
+    line = float(_hl) if isinstance(_hl, (int, float)) and _hl == _hl else None
+    fav = _fav_from_line(line)
+    if fav not in ("home", "away"):
+        return []
+    fav_odds = h if fav == "home" else a
+    dog_odds = a if fav == "home" else h
+    out = []
+    for r in COMBO_INTEL_RULES:
+        c = r["code"]
+        if c == "C1":
+            ok = 1.80 <= fav_odds < 2.10 and 2.50 <= d < 3.00
+        elif c == "C2":
+            ok = 2.50 <= d < 3.00 and line == -1
+        elif c == "C3":
+            ok = fav_odds < 1.40 and dog_odds >= 5.5 and line == 1
+        elif c == "C4":
+            ok = 1.40 <= fav_odds < 1.60 and 3.60 <= d < 4.00 and line == -1
+        elif c == "C5":
+            ok = 1.40 <= fav_odds < 1.60 and line == 1
+        elif c == "C6":
+            ok = 3.60 <= d < 4.00 and 1.80 <= dog_odds < 3.00
+        else:
+            ok = False
+        if ok:
+            out.append({"code": c, "name": r["name"], "pick": r["pick"],
+                        "rate": r["rate"], "lift": r["lift"], "sample_n": r["n"]})
+    return out
+
+
 def _pool_assign_v2(allowed: list[str], snap, league_name_zh: str | None) -> tuple[str, str | None, str | None, float | None, str | None, bool]:
     """四池分配（用户口径：正路=让球方获胜，冷门=让球方未获胜）。
 
@@ -1428,6 +1482,7 @@ def _pool_freeze_payload(*, trace, snap, league_name_zh, matchday_date, sm_rows=
         "cold_dir": pool_cold_dir,
         "cold_signal": bool(pool_cold_signal),
         "draw_intel": _draw_intel(snap),
+        "combo_intel": _combo_intel(snap),
         "ou_all": ou_direction_all_tiers(getattr(snap, "ttg_odds_json", None)) if snap is not None else None,
         "ou_sm": ou_market_from_rows(sm_rows) if sm_rows else None,
     }
@@ -1660,6 +1715,7 @@ async def _market_flow_query_raw(db, *, start=None, end=None, model_version=None
                 preferred_outcome = None
         # 情报辅助特征（软性）：优先读冻结值；存量已冻结行缺该键 → runtime 兜底（不回写 DB）
         draw_intel = freeze.get("draw_intel") if (freeze and "draw_intel" in freeze) else _draw_intel(snap)
+        combo_intel = freeze.get("combo_intel") if (freeze and "combo_intel" in freeze) else _combo_intel(snap)
         excluded = [x for x in ("home", "draw", "away") if x not in set(allowed)]
 
         # 用 preferred_outcome 对齐比分推荐
@@ -1810,6 +1866,7 @@ async def _market_flow_query_raw(db, *, start=None, end=None, model_version=None
             "cold_type": ("strong" if pool_key == "upset" and not pool_cold_signal
                           else "warn" if pool_key == "upset" and pool_cold_signal else None),
             "draw_intel": draw_intel,
+            "combo_intel": combo_intel,
             "pref_bucket": pref_bucket,
             "hhad_pref": hhad_sig.get("pref"),
             "hhad_pref_odd": hhad_sig.get("pref_odd"),
@@ -2639,6 +2696,7 @@ async def market_flow_parlay_recommend(
                         "hafu_key": key,
                         "draw_warn": bool(it.get("draw_intel")),
                         "draw_intel": it.get("draw_intel"),
+                        "combo_intel": it.get("combo_intel"),
                         "p_hat": round(ip[key], 4),
                         "odds": round(odd, 4),
                         "hit": hit,
@@ -2663,6 +2721,7 @@ async def market_flow_parlay_recommend(
                     "confidence": round(float(fav_ip), 4),
                     "draw_warn": bool(it.get("draw_intel")),
                     "draw_intel": it.get("draw_intel"),
+                    "combo_intel": it.get("combo_intel"),
                     "p_hat": round(float(fav_ip), 4),
                     "odds": round(had[fav], 4),
                     "hit": (actual_outcome == fav) if settled else None,
@@ -3072,6 +3131,7 @@ async def market_flow_parlay_d_recommend(
                         "pick": "胜胜" if key == "hh" else "负负",
                         "draw_warn": bool(it.get("draw_intel")),
                         "draw_intel": it.get("draw_intel"),
+                        "combo_intel": it.get("combo_intel"),
                         "p_hat": round(ip[key], 4),
                         "odds": round(odd, 4),
                         "hit": hit,
@@ -3091,6 +3151,7 @@ async def market_flow_parlay_d_recommend(
                     "pick": DIR_ZH[fav],
                     "draw_warn": bool(it.get("draw_intel")),
                     "draw_intel": it.get("draw_intel"),
+                    "combo_intel": it.get("combo_intel"),
                     "p_hat": round(float(fav_ip), 4),
                     "odds": round(had[fav], 4),
                     "hit": (actual_outcome == fav) if settled else None,
@@ -3368,6 +3429,7 @@ async def market_flow_parlay_dir_recommend(
                     "confidence": round(float(p), 4) if isinstance(p, (int, float)) else None,
                     "draw_warn": bool(it.get("draw_intel")),
                     "draw_intel": it.get("draw_intel"),
+                    "combo_intel": it.get("combo_intel"),
                     "p_hat": round(float(p), 4) if isinstance(p, (int, float)) else round(float(had[direction]), 4),
                     "odds": round(had[direction], 4),
                     "fallback": fallback,

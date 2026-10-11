@@ -471,6 +471,15 @@ function PredictionCard({ row, onlyPreferred = false, onlyCold = false, ouActive
             情报·让方不胜风险↑ {row.draw_intel.code}
           </span>
         )}
+        {(row.combo_intel || []).map((ci) => (
+          <span
+            key={ci.code}
+            className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold ${ci.lift > 3 ? "bg-moss/10 text-moss border-moss/40" : "bg-parchment-dark text-ink-muted border-border"}`}
+            title={`组合规则${ci.code}·${ci.name}｜选中：${ci.pick}｜全样本命中 ${(ci.rate * 100).toFixed(0)}%（超额 ${ci.lift > 0 ? "+" : ""}${ci.lift.toFixed(1)}pp，样本${ci.sample_n}）${ci.lift > 3 ? "" : "｜≈市场隐含、无超额"}`}
+          >
+            组合·{ci.code} {ci.pick}
+          </span>
+        ))}
       </div>
       <div className="flex items-center justify-between gap-1.5 mb-3">
         <span className="font-heading text-[15px] font-bold text-center flex-1 truncate leading-tight">{row.home_team}</span>
@@ -1663,6 +1672,15 @@ function ParlayView() {
             情报·让方不胜风险↑
           </span>
         )}
+        {(lg.combo_intel || []).map((ci) => (
+          <span
+            key={ci.code}
+            className={`text-[10px] px-1.5 py-0.5 rounded border font-semibold ${ci.lift > 3 ? "bg-moss/10 text-moss border-moss/40" : "bg-parchment-dark text-ink-muted border-border"}`}
+            title={`组合规则${ci.code}·${ci.name}｜选中：${ci.pick}｜全样本命中 ${(ci.rate * 100).toFixed(0)}%（超额 ${ci.lift > 0 ? "+" : ""}${ci.lift.toFixed(1)}pp）${ci.lift > 3 ? "" : "｜≈市场隐含、无超额"}`}
+          >
+            组合·{ci.code}
+          </span>
+        ))}
       </div>
     </div>
   );

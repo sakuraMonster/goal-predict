@@ -371,6 +371,15 @@ export interface DrawIntel {
   note: string;
 }
 
+export interface ComboIntel {
+  code: string;
+  name: string;
+  pick: string;
+  rate: number;    // 全样本命中率
+  lift: number;    // 实际命中 - 市场隐含（pp）
+  sample_n: number;
+}
+
 export interface MarketFlowPredictionItem {
   id: number;
   match_id: number;
@@ -423,6 +432,7 @@ export interface MarketFlowPredictionItem {
   ou_sm_hit?: boolean | null;
   ou_sm_tier?: string | null;
   draw_intel?: DrawIntel | null;
+  combo_intel?: ComboIntel[] | null;
 }
 
 export interface OuTierStats {
@@ -569,6 +579,7 @@ export interface MarketFlowParlayLeg {
   actual?: string | null;
   draw_warn?: boolean | null;
   draw_intel?: DrawIntel | null;
+  combo_intel?: ComboIntel[] | null;
 }
 export interface MarketFlowParlayPick {
   matchday: string;

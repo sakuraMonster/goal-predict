@@ -357,6 +357,20 @@ export interface OuSmVerdict {
   }>;
 }
 
+export interface DrawIntel {
+  code: string;
+  name: string;
+  fav: string;
+  fav_odds: number;
+  draw_odds: number;
+  cond: string;
+  sample_n: number;
+  sample_rate: number;
+  base_rate: number;
+  lift: number;
+  note: string;
+}
+
 export interface MarketFlowPredictionItem {
   id: number;
   match_id: number;
@@ -408,6 +422,7 @@ export interface MarketFlowPredictionItem {
   ou_sm?: OuSmVerdict | null;
   ou_sm_hit?: boolean | null;
   ou_sm_tier?: string | null;
+  draw_intel?: DrawIntel | null;
 }
 
 export interface OuTierStats {
@@ -552,6 +567,8 @@ export interface MarketFlowParlayLeg {
   keep1?: boolean | null;
   hit: boolean | null;
   actual?: string | null;
+  draw_warn?: boolean | null;
+  draw_intel?: DrawIntel | null;
 }
 export interface MarketFlowParlayPick {
   matchday: string;

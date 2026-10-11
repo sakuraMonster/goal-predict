@@ -463,6 +463,14 @@ function PredictionCard({ row, onlyPreferred = false, onlyCold = false, ouActive
             {row.cold_signal ? "冷门参考:" : "冷门方向:"}{OUTCOME_LABEL[row.cold_dir] || row.cold_dir}
           </span>
         )}
+        {row.draw_intel && (
+          <span
+            className="text-[10px] px-1.5 py-0.5 rounded bg-amber/15 text-amber border border-amber/40 font-semibold"
+            title={`情报规则${row.draw_intel.code}·${row.draw_intel.name}｜条件：${row.draw_intel.cond}｜${row.draw_intel.note}｜命中=让方「让胜」概率下降（让平+让负双选风险↑，软性提示，不改变优选方向）`}
+          >
+            情报·让方不胜风险↑ {row.draw_intel.code}
+          </span>
+        )}
       </div>
       <div className="flex items-center justify-between gap-1.5 mb-3">
         <span className="font-heading text-[15px] font-bold text-center flex-1 truncate leading-tight">{row.home_team}</span>
@@ -1646,6 +1654,14 @@ function ParlayView() {
           <span className="text-[10px] text-moss font-bold bg-moss/10 rounded px-1.5 py-0.5">命中 {lg.actual}</span>
         ) : (
           <span className="text-[10px] text-lose font-bold bg-lose/10 rounded px-1.5 py-0.5">未中 {lg.actual}</span>
+        )}
+        {lg.draw_intel && (
+          <span
+            className="text-[10px] px-1.5 py-0.5 rounded bg-amber/15 text-amber border border-amber/40 font-semibold"
+            title={`情报规则${lg.draw_intel.code}·${lg.draw_intel.name}｜条件：${lg.draw_intel.cond}｜${lg.draw_intel.note}｜命中=让方「让胜」概率下降（让平+让负双选风险↑）`}
+          >
+            情报·让方不胜风险↑
+          </span>
         )}
       </div>
     </div>

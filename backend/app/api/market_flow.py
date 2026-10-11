@@ -840,6 +840,55 @@ def _cold_dir(allowed_set: set, fav: str, imp: dict | None) -> str | None:
     return others[0]
 
 
+# ===== 情报规则注册表（来源：知乎「让球方胜赔 × 平赔」异常区间；已在生产库验证）=====
+# 命中 = 平赔被拉低 → 让球方「让胜」概率下降，即「让方不胜(让平+让负)」概率↑（双选口径）。
+# 数字为生产库实测（2025-01-01~2026-10-10，n=7779，档位互斥）：rate=让方不胜率，base=同档基线。
+# 软性辅助特征，仅作展示与排序降权参考，不改变 preferred_outcome 口径。
+DRAW_INTEL_RULES: tuple[dict, ...] = (
+    {"code": "I1", "name": "强热门·平赔被拉低", "fav_lo": 1.30, "fav_hi": 1.50, "draw_max": 4.00, "n": 308, "rate": 0.672, "base": 0.630, "lift": 4.2},
+    {"code": "I2", "name": "中热门·平赔被拉低", "fav_lo": 1.50, "fav_hi": 1.70, "draw_max": 3.55, "n": 394, "rate": 0.784, "base": 0.745, "lift": 3.9},
+    {"code": "I3", "name": "中热门·平赔被拉低", "fav_lo": 1.70, "fav_hi": 1.90, "draw_max": 3.30, "n": 394, "rate": 0.832, "base": 0.774, "lift": 5.8},
+    {"code": "I4", "name": "热门·平赔被拉低", "fav_lo": 1.90, "fav_hi": 2.10, "draw_max": 3.10, "n": 345, "rate": 0.864, "base": 0.803, "lift": 6.1},
+    {"code": "I5", "name": "温和热门·平赔被拉低", "fav_lo": 2.10, "fav_hi": 2.40, "draw_max": 3.00, "n": 383, "rate": 0.843, "base": 0.824, "lift": 1.9},
+    {"code": "I6", "name": "冷门档·平赔被拉低", "fav_lo": 2.40, "fav_hi": 99.0, "draw_max": 2.95, "n": 216, "rate": 0.889, "base": 0.859, "lift": 2.9},
+)
+
+
+def _draw_intel(snap) -> dict | None:
+    """情报辅助特征：让球方胜赔 × 平赔 落入异常区间 → 返回命中规则（含样本统计），否则 None。
+
+    命中含义 = 让球方「让胜」概率下降，即「让方不胜(让平+让负)」概率↑（双选口径）。
+    作为软性标记 + 排序降权用，不改变优选方向。
+    """
+    if snap is None:
+        return None
+    h = _as_float(getattr(snap, "had_home", None))
+    d = _as_float(getattr(snap, "had_draw", None))
+    a = _as_float(getattr(snap, "had_away", None))
+    if not (h and d and a):
+        return None
+    fav = _fav_from_line(getattr(snap, "hhad_line", None))
+    if fav not in ("home", "away"):
+        return None
+    fav_odds = h if fav == "home" else a
+    for r in DRAW_INTEL_RULES:
+        if r["fav_lo"] <= fav_odds < r["fav_hi"] and d < r["draw_max"]:
+            return {
+                "code": r["code"],
+                "name": r["name"],
+                "fav": fav,
+                "fav_odds": round(float(fav_odds), 3),
+                "draw_odds": round(float(d), 3),
+                "cond": f"让方胜赔[{r['fav_lo']:.2f},{r['fav_hi']:.2f}) 且 平赔<{r['draw_max']:.2f}",
+                "sample_n": r["n"],
+                "sample_rate": r["rate"],
+                "base_rate": r["base"],
+                "lift": r["lift"],
+                "note": f"让方不胜(让平+让负) {r['rate']*100:.1f}%（同档基线 {r['base']*100:.1f}%，样本 {r['n']}）",
+            }
+    return None
+
+
 def _pool_assign_v2(allowed: list[str], snap, league_name_zh: str | None) -> tuple[str, str | None, str | None, float | None, str | None, bool]:
     """四池分配（用户口径：正路=让球方获胜，冷门=让球方未获胜）。
 
@@ -1378,6 +1427,7 @@ def _pool_freeze_payload(*, trace, snap, league_name_zh, matchday_date, sm_rows=
         "fav_ip": pool_fav_ip,
         "cold_dir": pool_cold_dir,
         "cold_signal": bool(pool_cold_signal),
+        "draw_intel": _draw_intel(snap),
         "ou_all": ou_direction_all_tiers(getattr(snap, "ttg_odds_json", None)) if snap is not None else None,
         "ou_sm": ou_market_from_rows(sm_rows) if sm_rows else None,
     }
@@ -1608,6 +1658,8 @@ async def _market_flow_query_raw(db, *, start=None, end=None, model_version=None
             else:
                 # 警示冷门（cold_signal=True）仅展示冷门参考方向 cold_dir，不做方向优选
                 preferred_outcome = None
+        # 情报辅助特征（软性）：优先读冻结值；存量已冻结行缺该键 → runtime 兜底（不回写 DB）
+        draw_intel = freeze.get("draw_intel") if (freeze and "draw_intel" in freeze) else _draw_intel(snap)
         excluded = [x for x in ("home", "draw", "away") if x not in set(allowed)]
 
         # 用 preferred_outcome 对齐比分推荐
@@ -1757,6 +1809,7 @@ async def _market_flow_query_raw(db, *, start=None, end=None, model_version=None
             "cold_signal": pool_cold_signal,
             "cold_type": ("strong" if pool_key == "upset" and not pool_cold_signal
                           else "warn" if pool_key == "upset" and pool_cold_signal else None),
+            "draw_intel": draw_intel,
             "pref_bucket": pref_bucket,
             "hhad_pref": hhad_sig.get("pref"),
             "hhad_pref_odd": hhad_sig.get("pref_odd"),
@@ -2584,6 +2637,8 @@ async def market_flow_parlay_recommend(
                         "source": "favorite_hafu",
                         "pick": "胜胜" if key == "hh" else "负负",
                         "hafu_key": key,
+                        "draw_warn": bool(it.get("draw_intel")),
+                        "draw_intel": it.get("draw_intel"),
                         "p_hat": round(ip[key], 4),
                         "odds": round(odd, 4),
                         "hit": hit,
@@ -2606,6 +2661,8 @@ async def market_flow_parlay_recommend(
                     "pick": DIR_ZH[fav],
                     "pref": fav,
                     "confidence": round(float(fav_ip), 4),
+                    "draw_warn": bool(it.get("draw_intel")),
+                    "draw_intel": it.get("draw_intel"),
                     "p_hat": round(float(fav_ip), 4),
                     "odds": round(had[fav], 4),
                     "hit": (actual_outcome == fav) if settled else None,
@@ -2622,7 +2679,8 @@ async def market_flow_parlay_recommend(
             x.get("tier", 0),
             -x["p_hat"],
         ))
-        ds = sorted(grp["dirs"], key=lambda x: x["p_hat"], reverse=True)
+        # 方向腿排序：命中「平赔被拉低」情报规则（让方不胜风险↑）的场次降权，同等 p_hat 下优先无风险场次
+        ds = sorted(grp["dirs"], key=lambda x: (1 if x.get("draw_warn") else 0, -x["p_hat"]))
         if not ds:
             continue
         d0 = ds[0]
@@ -3012,6 +3070,8 @@ async def market_flow_parlay_d_recommend(
                         "kind": "dir",
                         "source": "favorite_hafu",
                         "pick": "胜胜" if key == "hh" else "负负",
+                        "draw_warn": bool(it.get("draw_intel")),
+                        "draw_intel": it.get("draw_intel"),
                         "p_hat": round(ip[key], 4),
                         "odds": round(odd, 4),
                         "hit": hit,
@@ -3029,6 +3089,8 @@ async def market_flow_parlay_d_recommend(
                     "kind": "dir",
                     "source": "ambiguous_had",
                     "pick": DIR_ZH[fav],
+                    "draw_warn": bool(it.get("draw_intel")),
+                    "draw_intel": it.get("draw_intel"),
                     "p_hat": round(float(fav_ip), 4),
                     "odds": round(had[fav], 4),
                     "hit": (actual_outcome == fav) if settled else None,
@@ -3056,7 +3118,8 @@ async def market_flow_parlay_d_recommend(
     for matchday, grp in sorted(by_day.items()):
         gs = sorted(grp["goals"], key=lambda x: (0 if x.get("gate") == "strict" else 1, x.get("tier", 0), -x["p_hat"]))
         hs = sorted(grp["hafu"], key=lambda x: -x["p_hat"])
-        ds = sorted(grp["dirs"], key=lambda x: -x["p_hat"])
+        # 方向腿排序：命中情报规则（让方不胜风险↑）的场次降权（软性，不改优选口径）
+        ds = sorted(grp["dirs"], key=lambda x: (1 if x.get("draw_warn") else 0, -x["p_hat"]))
         if not gs or not hs or not ds:
             continue
         best = None
@@ -3303,6 +3366,8 @@ async def market_flow_parlay_dir_recommend(
                     "pick": DIR_ZH[direction],
                     "pref": direction,
                     "confidence": round(float(p), 4) if isinstance(p, (int, float)) else None,
+                    "draw_warn": bool(it.get("draw_intel")),
+                    "draw_intel": it.get("draw_intel"),
                     "p_hat": round(float(p), 4) if isinstance(p, (int, float)) else round(float(had[direction]), 4),
                     "odds": round(had[direction], 4),
                     "fallback": fallback,
@@ -3328,7 +3393,8 @@ async def market_flow_parlay_dir_recommend(
     picks = []
     for matchday, grp in sorted(by_day.items()):
         hafu = sorted(grp["hafu"], key=lambda x: x["p_hat"], reverse=True)
-        had = sorted(grp["had"], key=lambda x: x["p_hat"], reverse=True)
+        # 胜平负腿排序：命中情报规则（让方不胜风险↑）的场次降权（软性，不改优选口径）
+        had = sorted(grp["had"], key=lambda x: (1 if x.get("draw_warn") else 0, -x["p_hat"]))
         if not hafu or not had:
             continue  # 缺半全场或缺胜平负腿 → 该日不组合
         # 优先非兜底胜平负腿（模糊池/强冷门），无非兜底腿时才用冷门信号兜底

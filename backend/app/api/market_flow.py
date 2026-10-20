@@ -3296,7 +3296,7 @@ async def market_flow_parlay_dir_recommend(
 
     每比赛日强制 1 场半全场 + 1 场胜平负，组合成 2串1：
       - 半全场腿：不限池，选市场隐含概率最高且 hafu 收盘赔率>=2.0 的半全场选项（9 选 1）；
-      - 胜平负腿：不限池——模糊池选让球方正路(fav)，冷门池选高置信度冷门方向(二选内隐含最高)，HAD 赔率>=1.8。
+      - 胜平负腿：模糊池选让球方正路(fav, HAD>=1.8)；正路池选半全场胜胜/负负(hafu>=1.8)。
     组合：串关赔率落在 [min_odds, max_odds]（默认 4~10 倍）；区间外 in_range=false 标记（结构仍强制）。
     stats 仅统计已结算且可验证（半全场需半场比分）的串关 p_hit / 均赔 / ROI。
     """
@@ -3365,7 +3365,7 @@ async def market_flow_parlay_dir_recommend(
 
     # ===== 收集方向腿 =====
     # 半全场腿：不限池，选市场隐含概率最高且赔率>=2.0 的半全场选项（支撑 4~10 组合）
-    # 胜平负腿：模糊池正路单选（HAD 赔率>=1.8），冷门池高置信冷门方向（无优选时冷门信号兜底）
+    # 胜平负腿：模糊池正路单选（HAD 赔率>=1.8），正路池半全场胜胜/负负（hafu 赔率>=1.8）
     dirs = []
     for it in items:
         settled = it.get("actual_outcome") is not None
@@ -3401,18 +3401,9 @@ async def market_flow_parlay_dir_recommend(
                                    if settled and ahk is not None else None),
                     })
 
-        # 胜平负腿（不限池：模糊池选让球方正路，冷门池选高置信度冷门方向；冷门信号兜底）
-        if pool in ("ambiguous", "upset"):
-            fallback = False
-            if pool == "upset":
-                direction = it.get("preferred_outcome")  # 强冷门方向（二选内非fav隐含最高）
-                if direction is None:
-                    direction = it.get("cold_dir")  # 冷门信号：兜底选冷门方向（优先平局）
-                    fallback = True
-                src = "had_upset"
-            else:
-                direction = it.get("fav")  # 让球方正路
-                src = "ambiguous_had"
+        # 胜平负腿（模糊池选让球方正路 HAD；正路池选半全场胜胜/负负）
+        if pool == "ambiguous":
+            direction = it.get("fav")  # 让球方正路
             if direction and direction in had and had.get(direction) and had[direction] >= 1.8:
                 ip_had = _implied(had) if had else None
                 p = ip_had.get(direction) if ip_had else None
@@ -3423,7 +3414,7 @@ async def market_flow_parlay_dir_recommend(
                     "league_name": it.get("league_name"),
                     "kickoff_time": it["kickoff_time"],
                     "kind": "dir",
-                    "source": src,
+                    "source": "ambiguous_had",
                     "pick": DIR_ZH[direction],
                     "pref": direction,
                     "confidence": round(float(p), 4) if isinstance(p, (int, float)) else None,
@@ -3432,10 +3423,38 @@ async def market_flow_parlay_dir_recommend(
                     "combo_intel": it.get("combo_intel"),
                     "p_hat": round(float(p), 4) if isinstance(p, (int, float)) else round(float(had[direction]), 4),
                     "odds": round(had[direction], 4),
-                    "fallback": fallback,
+                    "fallback": False,
                     "hit": (actual_outcome == direction) if settled else None,
                     "actual": DIR_ZH.get(actual_outcome, actual_outcome) if settled else None,
                 })
+        elif pool == "favorite":
+            fav = it.get("fav")
+            hafu_odds = _parse_hafu(it.get("hafu_odds"))
+            if fav in ("home", "away") and hafu_odds:
+                key = "hh" if fav == "home" else "aa"
+                odd = hafu_odds.get(key)
+                ip = _implied(hafu_odds) if hafu_odds else None
+                if odd and odd >= 1.8 and ip and ip.get(key):
+                    hd = _half_dir(it)
+                    hit = None
+                    if settled and hd is not None:
+                        hit = (hd == "home" and actual_outcome == "home") if fav == "home" else (hd == "away" and actual_outcome == "away")
+                    dirs.append({
+                        "match_num": it.get("match_num"),
+                        "home_team": it.get("home_team"),
+                        "away_team": it.get("away_team"),
+                        "league_name": it.get("league_name"),
+                        "kickoff_time": it["kickoff_time"],
+                        "kind": "dir",
+                        "source": "favorite_hafu",
+                        "pick": "胜胜" if key == "hh" else "负负",
+                        "draw_warn": bool(it.get("draw_intel")),
+                        "draw_intel": it.get("draw_intel"),
+                        "combo_intel": it.get("combo_intel"),
+                        "p_hat": round(ip[key], 4),
+                        "odds": round(odd, 4),
+                        "hit": hit,
+                    })
 
     # ===== 按比赛日分组，强制 1 场半全场(hafu) + 1 场胜平负(ambiguous_had) =====
     by_day: dict[str, dict] = {}

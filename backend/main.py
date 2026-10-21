@@ -87,7 +87,7 @@ async def log_requests(request: Request, call_next):
 async def health():
     return {"status": "ok", "version": "0.1.0"}
 
-from app.api import matches, predictions, reports, admin, mappings, teams, market_flow
+from app.api import matches, predictions, reports, admin, mappings, teams, market_flow, value_analysis
 
 app.include_router(matches.router)
 app.include_router(predictions.router)
@@ -96,6 +96,7 @@ app.include_router(admin.router)
 app.include_router(mappings.router)
 app.include_router(teams.router)
 app.include_router(market_flow.router)
+app.include_router(value_analysis.router)
 
 
 @app.on_event("startup")

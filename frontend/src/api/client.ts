@@ -135,6 +135,9 @@ export const getTeamForm = (teamId: number) =>
 export const getMatchTeamComparison = (matchId: number) =>
   api.get(`/teams/match/${matchId}/comparison`).then((r) => r.data);
 
+export const getFootballMath = (matchId: number) =>
+  api.get(`/matches/${matchId}/football-math`).then((r) => r.data);
+
 export const getDailyReport = (date?: string) =>
   api.get("/reports/daily", { params: date ? { date } : {} }).then((r) => r.data);
 
@@ -1029,5 +1032,71 @@ export const getMarketFlowModelVersions = () =>
 
 export const predictMarketFlow = (params?: { date?: string; overwrite?: boolean }) =>
   api.post("/admin/predict-market-flow", null, { params }).then((r) => r.data);
+
+// ===== 价值分析（锐利盘基准 + 去水 + EV + 风险提示） =====
+export interface ValueRiskFlag {
+  key: string;
+  level: "低" | "中" | "高";
+  label: string;
+  desc: string;
+}
+export interface ValueRisk {
+  level: "低" | "中" | "高";
+  flags: ValueRiskFlag[];
+}
+export interface ValueOutcome {
+  odds: number;
+  fair_prob: number;
+  ev: number;
+}
+export interface MarketValue {
+  verdict: string;
+  reason?: string;
+  best_side?: string;
+  best_ev?: number;
+  outcomes?: Record<string, ValueOutcome>;
+  fair_prob?: Record<string, number>;
+  cheap_side?: string;
+  edge?: number;
+  jczq_p_big?: number;
+  sharp_p_big?: number;
+}
+export interface ValueMarket {
+  name: string;
+  jczq_odds?: Record<string, number>;
+  sharp_odds?: Record<string, number>;
+  jczq_p_big?: number | null;
+  sharp_p_big?: number | null;
+  value: MarketValue;
+  risk: ValueRisk;
+}
+export interface ValueRiskSummary {
+  overall_risk: "低" | "中" | "高";
+  value_markets: string[];
+  best_market: string | null;
+  best_ev: number | null;
+  hints: string[];
+}
+export interface ValueAnalysisItem {
+  match_id: number;
+  match_num: string | null;
+  league: string | null;
+  home: string;
+  away: string;
+  kickoff: string | null;
+  status: string;
+  analysis: {
+    markets: Record<string, ValueMarket>;
+    risk_summary: ValueRiskSummary;
+  } | null;
+}
+export interface ValueAnalysisResponse {
+  date: string;
+  total: number;
+  value_match_count: number;
+  matches: ValueAnalysisItem[];
+}
+export const getValueAnalysis = (params?: { date?: string }) =>
+  api.get("/value-analysis", { params }).then((r) => r.data as ValueAnalysisResponse);
 
 export default api;

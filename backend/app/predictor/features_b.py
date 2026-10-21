@@ -29,6 +29,7 @@ class FeatureEngineerB(BaseDataFetcher):
     DEFAULT_PPG = 1.5
     DEFAULT_CLEAN_SHEET_RATE = 0.2
     DEFAULT_XG = 0.0
+    DEFAULT_PASSES = 0.0
     POINTS_PER_WIN = 3
     POINTS_PER_DRAW = 1
     DENOM_MIN = 0.01
@@ -704,6 +705,13 @@ class FeatureEngineerB(BaseDataFetcher):
             feats["home_clean_sheet_rate"] = home.clean_sheets / max(p, self.DENOM_MIN_1)
             feats["home_xG"] = self._safe_xg_per_game(home.xG, p)
             feats["home_xGA"] = self._safe_xg_per_game(home.xGA, p)
+            feats["home_avg_passes"] = (home.avg_passes or 0.0) / 1000.0
+            _home_off_div = feats["home_xG"] - feats["home_goals_avg"]
+            _home_def_div = feats["home_xGA"] - feats["home_goals_against_avg"]
+            feats["home_off_div_pos"] = max(_home_off_div, 0.0)
+            feats["home_off_div_neg"] = max(-_home_off_div, 0.0)
+            feats["home_def_div_pos"] = max(_home_def_div, 0.0)
+            feats["home_def_div_neg"] = max(-_home_def_div, 0.0)
             home_pts = home.wins * self.POINTS_PER_WIN + home.draws
             feats["home_points_per_game"] = home_pts / p
         else:
@@ -715,6 +723,11 @@ class FeatureEngineerB(BaseDataFetcher):
             feats["home_clean_sheet_rate"] = self.DEFAULT_CLEAN_SHEET_RATE
             feats["home_xG"] = self.DEFAULT_XG
             feats["home_xGA"] = self.DEFAULT_XG
+            feats["home_avg_passes"] = 0.0
+            feats["home_off_div_pos"] = 0.0
+            feats["home_off_div_neg"] = 0.0
+            feats["home_def_div_pos"] = 0.0
+            feats["home_def_div_neg"] = 0.0
             feats["home_points_per_game"] = baseline.get("league_home_win_rate", self.TEAM_STRENGTH_DEFAULT_HWR) * self.POINTS_PER_WIN + baseline.get("league_draw_rate", self.DEFAULT_DRAW_RATE)
 
         # 客队
@@ -726,6 +739,13 @@ class FeatureEngineerB(BaseDataFetcher):
             feats["away_away_win_rate"] = (away.away_wins or 0) / max((away.away_wins or 0) + (away.away_draws or 0) + (away.away_losses or 0), self.DENOM_MIN_1)
             feats["away_xG"] = self._safe_xg_per_game(away.xG, p)
             feats["away_xGA"] = self._safe_xg_per_game(away.xGA, p)
+            feats["away_avg_passes"] = (away.avg_passes or 0.0) / 1000.0
+            _away_off_div = feats["away_xG"] - feats["away_goals_avg"]
+            _away_def_div = feats["away_xGA"] - feats["away_goals_against_avg"]
+            feats["away_off_div_pos"] = max(_away_off_div, 0.0)
+            feats["away_off_div_neg"] = max(-_away_off_div, 0.0)
+            feats["away_def_div_pos"] = max(_away_def_div, 0.0)
+            feats["away_def_div_neg"] = max(-_away_def_div, 0.0)
             away_pts = away.wins * self.POINTS_PER_WIN + away.draws
             feats["away_points_per_game"] = away_pts / p
         else:
@@ -735,12 +755,18 @@ class FeatureEngineerB(BaseDataFetcher):
             feats["away_away_win_rate"] = self.SAME_LEAGUE_YES - baseline.get("league_home_win_rate", self.TEAM_STRENGTH_DEFAULT_HWR) - baseline.get("league_draw_rate", self.DEFAULT_DRAW_RATE)
             feats["away_xG"] = self.DEFAULT_XG
             feats["away_xGA"] = self.DEFAULT_XG
+            feats["away_avg_passes"] = 0.0
+            feats["away_off_div_pos"] = 0.0
+            feats["away_off_div_neg"] = 0.0
+            feats["away_def_div_pos"] = 0.0
+            feats["away_def_div_neg"] = 0.0
             feats["away_points_per_game"] = (self.SAME_LEAGUE_YES - baseline.get("league_home_win_rate", self.TEAM_STRENGTH_DEFAULT_HWR) - baseline.get("league_draw_rate", self.DEFAULT_DRAW_RATE)) * self.POINTS_PER_WIN + baseline.get("league_draw_rate", self.DEFAULT_DRAW_RATE)
 
         # 差值
         feats["win_rate_diff"] = feats.get("home_win_rate", self.DEFAULT_XG) - feats.get("away_win_rate", self.DEFAULT_XG)
         feats["goals_avg_diff"] = feats.get("home_goals_avg", self.DEFAULT_XG) - feats.get("away_goals_against_avg", self.DEFAULT_XG)
         feats["xG_diff"] = feats.get("home_xG", self.DEFAULT_XG) - feats.get("away_xGA", self.DEFAULT_XG)
+        feats["passes_diff"] = feats.get("home_avg_passes", 0.0) - feats.get("away_avg_passes", 0.0)
         feats["points_per_game_diff"] = feats.get("home_points_per_game", self.DEFAULT_XG) - feats.get("away_points_per_game", self.DEFAULT_XG)
 
         hwr = max(feats.get("home_win_rate", self.DEFAULT_XG), self.DENOM_MIN)

@@ -331,3 +331,85 @@ async def get_h2h(match_id: int, db: AsyncSession = Depends(get_db)):
         "home_score": h.home_score,
         "away_score": h.away_score,
     } for h in h2h]}
+
+
+def _football_math_conclusion(home: dict, away: dict) -> str:
+    """根据 xG/xGA/背离信号生成足球数学角度的结论"""
+    parts = []
+    if home.get("xg") is not None and away.get("xg") is not None:
+        hxg, axg = home["xg"], away["xg"]
+        if hxg > axg + 0.3:
+            parts.append(f"{home['name']}进攻创造力更强(xG {hxg} vs {axg})")
+        elif axg > hxg + 0.3:
+            parts.append(f"{away['name']}进攻创造力更强(xG {axg} vs {hxg})")
+        else:
+            parts.append(f"两队进攻创造力接近(xG {hxg} vs {axg})")
+    if home.get("xga") is not None and away.get("xga") is not None:
+        hxa, axa = home["xga"], away["xga"]
+        if hxa < axa - 0.2:
+            parts.append(f"{home['name']}防守更稳(xGA {hxa} vs {axa})")
+        elif axa < hxa - 0.2:
+            parts.append(f"{away['name']}防守更稳(xGA {axa} vs {hxa})")
+    for t in (home, away):
+        od = t.get("off_divergence")
+        if od is not None:
+            if od > 0.3:
+                parts.append(f"{t['name']}近期xG高于实际进球，结果或被低估")
+            elif od < -0.3:
+                parts.append(f"{t['name']}实际进球高于xG，finishing超常需警惕回归")
+    return "；".join(parts) if parts else "数据不足，暂无法生成足球数学结论"
+
+
+@router.get("/{match_id}/football-math")
+async def get_football_math(match_id: int, db: AsyncSession = Depends(get_db)):
+    """足球数学角度分析：xG/xGA/传球/背离信号"""
+    result = await db.execute(select(Match).where(Match.id == match_id))
+    match = result.scalar_one_or_none()
+    if not match:
+        return {"error": "not found"}, 404
+
+    async def _latest_stats(team_id):
+        if not team_id:
+            return None
+        r = await db.execute(
+            select(TeamSeasonStats)
+            .where(TeamSeasonStats.team_id == team_id, TeamSeasonStats.played.isnot(None), TeamSeasonStats.played > 0)
+            .order_by(TeamSeasonStats.played.desc())
+            .limit(1)
+        )
+        return r.scalar_one_or_none()
+
+    home_stats = await _latest_stats(match.home_team_id)
+    away_stats = await _latest_stats(match.away_team_id)
+    home_name = match.home_team.name_zh if match.home_team else (match.home_team_name or "主队")
+    away_name = match.away_team.name_zh if match.away_team else (match.away_team_name or "客队")
+
+    def _build(stats, name):
+        if not stats:
+            return {"name": name, "available": False}
+        played = stats.played or 0
+        goals_avg = stats.goals_for / played if played > 0 else None
+        goals_against_avg = stats.goals_against / played if played > 0 else None
+        xg = stats.xG
+        xga = stats.xGA
+        off_div = (xg - goals_avg) if (xg is not None and goals_avg is not None) else None
+        def_div = (xga - goals_against_avg) if (xga is not None and goals_against_avg is not None) else None
+        return {
+            "name": name,
+            "available": True,
+            "played": played,
+            "xg": round(xg, 2) if xg is not None else None,
+            "xga": round(xga, 2) if xga is not None else None,
+            "avg_passes": round(stats.avg_passes, 1) if stats.avg_passes else None,
+            "goals_avg": round(goals_avg, 2) if goals_avg is not None else None,
+            "goals_against_avg": round(goals_against_avg, 2) if goals_against_avg is not None else None,
+            "league_position": stats.league_position,
+            "form": stats.form,
+            "off_divergence": round(off_div, 2) if off_div is not None else None,
+            "def_divergence": round(def_div, 2) if def_div is not None else None,
+        }
+
+    home = _build(home_stats, home_name)
+    away = _build(away_stats, away_name)
+
+    return {"data": {"home": home, "away": away, "conclusion": _football_math_conclusion(home, away)}}

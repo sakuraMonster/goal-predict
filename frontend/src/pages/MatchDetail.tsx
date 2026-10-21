@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, Link } from "react-router-dom";
-import { getMatchDetail, getOddsHistory, getH2H, getPrediction, getMatchTeamComparison } from "../api/client";
+import { getMatchDetail, getOddsHistory, getH2H, getPrediction, getMatchTeamComparison, getFootballMath } from "../api/client";
 import OddsTrendChart from "../components/OddsTrendChart";
 import ErrorState from "../components/ErrorState";
 
@@ -108,6 +108,60 @@ function RadarChart({ homeData, awayData, homeName, awayName }: {
       <rect x={125} y={234} width={12} height={12} fill={awayColor} rx={2} />
       <text x={142} y={244} fill="#3d3628" fontSize="12" fontFamily="system-ui">{truncName(awayName)}</text>
     </svg>
+  );
+}
+
+/* ======== 足球数学分析面板 ======== */
+function FootballMathPanel({ data }: { data: any }) {
+  if (!data?.home || !data?.away) return null;
+  const { home, away, conclusion } = data;
+
+  const renderTeam = (t: any) => (
+    <div className="flex-1">
+      <div className="text-xs font-bold mb-1 truncate">{t.name}</div>
+      {t.available ? (
+        <div className="text-[11px] space-y-1 text-ink-muted font-body">
+          <div>
+            xG <span className="font-semibold text-ink">{t.xg ?? "-"}</span>
+            <span className="mx-1">·</span>
+            xGA <span className="font-semibold text-ink">{t.xga ?? "-"}</span>
+          </div>
+          <div>
+            场均传球 <span className="font-semibold text-ink">{t.avg_passes ?? "-"}</span>
+          </div>
+          <div>
+            近{t.played ?? "-"}场 进 <span className="font-semibold text-ink">{t.goals_avg ?? "-"}</span>
+            <span className="mx-1">·</span>
+            失 <span className="font-semibold text-ink">{t.goals_against_avg ?? "-"}</span>
+          </div>
+          {t.off_divergence != null && t.off_divergence !== 0 && (
+            <div className={t.off_divergence > 0 ? "text-rust" : "text-moss"}>
+              进攻背离 {t.off_divergence > 0 ? "+" : ""}{t.off_divergence}
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="text-[11px] text-ink-light">暂无数据</div>
+      )}
+    </div>
+  );
+
+  return (
+    <div className="bg-white rounded-md border border-border p-3.5 mb-2.5">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-[13px] font-bold">足球数学分析</span>
+        <span className="font-body text-[10px] text-ink-light">xG · 传球 · 背离</span>
+      </div>
+      <div className="flex gap-3 mb-2">
+        {renderTeam(home)}
+        {renderTeam(away)}
+      </div>
+      {conclusion && (
+        <div className="text-[11px] text-ink-muted bg-parchment-light rounded p-2 leading-relaxed font-body">
+          {conclusion}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -390,6 +444,7 @@ export default function MatchDetail() {
   const [matchHcpLine, setMatchHcpLine] = useState<number | null>(null);
   const [h2h, setH2h] = useState<any[]>([]);
   const [teamComp, setTeamComp] = useState<any>(null);
+  const [footballMath, setFootballMath] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -401,7 +456,8 @@ export default function MatchDetail() {
       getOddsHistory(Number(id)),
       getH2H(Number(id)),
       getMatchTeamComparison(Number(id)),
-    ]).then(([m, p, o, h, tc]) => {
+      getFootballMath(Number(id)),
+    ]).then(([m, p, o, h, tc, fm]) => {
       setMatch(m.data);
       setPrediction(p.data);
       setOddsData(o.data || {});
@@ -409,6 +465,7 @@ export default function MatchDetail() {
       setMatchHcpLine(o.match_handicap_line ?? null);
       setH2h(h.data || []);
       setTeamComp(tc.data || null);
+      setFootballMath(fm.data || null);
       setLoading(false);
     }).catch((err) => { setError(err?.message || "加载失败"); setLoading(false); });
   }, [id]);
@@ -514,6 +571,8 @@ export default function MatchDetail() {
               </div>
             )}
           </div>
+
+          <FootballMathPanel data={footballMath} />
 
           {/* 交锋 + 状态并排 */}
           <div className="flex gap-2.5 mb-2.5">

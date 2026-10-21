@@ -1068,6 +1068,7 @@ class SyncPipeline:
         89: "clean_sheets",     # Clean Sheets
         90: "failed_to_score",  # Failed to Score
         209: "avg_possession",  # Average Possession %
+        27253: "avg_passes",    # Passes per game（场均传球）
         201: "xG",             # Expected Goals（备选 type，部分 endpoint 用）
         202: "xGA",            # Expected Goals Against（备选 type）
         5304: "xG",            # Expected Goals（/statistics/seasons/teams 端点）
@@ -1075,8 +1076,9 @@ class SyncPipeline:
 
     # type_id → 从 value 对象中提取的 key
     STAT_VALUE_KEY = {
-        5304: "expected",   # xG: value.expected
-        1677: "total",      # Shots: value.total
+        5304: "expected",       # xG: value.expected
+        1677: "total",          # Shots: value.total
+        27253: "passes_per_game",  # Passes: value.passes_per_game
     }
 
     async def sync_team_info(self):
@@ -1195,14 +1197,34 @@ class SyncPipeline:
                             except Exception as e:
                                 AppLogger.warning("update_teams", f"team={sm_id} 统计详情拉取失败: {e}")
 
-                        # 解析赛季统计数据
+                        # 解析赛季统计数据：选「有 xG(type_id 5304) 数据的最新赛季」，
+                        # 避免 max(season_id) 选中未来占位赛季（其 details 无 xG）。
                         matched = None
+                        matched_season_id = -1
                         for ss in (season_stats if isinstance(season_stats, list) else []):
-                            if isinstance(ss, dict) and str(ss.get("season_id", "")) == season_id_str:
+                            if not isinstance(ss, dict):
+                                continue
+                            ss_details = ss.get("details", [])
+                            has_xg = (
+                                isinstance(ss_details, list)
+                                and any(
+                                    isinstance(d, dict)
+                                    and (d.get("type_id") == 5304 or str(d.get("type_id")) == "5304")
+                                    for d in ss_details
+                                )
+                            )
+                            sid = ss.get("season_id", 0)
+                            try:
+                                sid = int(sid)
+                            except (ValueError, TypeError):
+                                sid = 0
+                            if has_xg and sid > matched_season_id:
                                 matched = ss
-                                break
-                        if not matched and isinstance(season_stats, list) and season_stats:
+                                matched_season_id = sid
+                        if matched is None and isinstance(season_stats, list) and season_stats:
                             matched = season_stats[-1] if isinstance(season_stats[-1], dict) else None
+                        if matched is not None:
+                            season_id_str = str(matched.get("season_id", ""))
 
                         if matched and isinstance(matched, dict):
                             details = matched.get("details", [])
@@ -1233,6 +1255,13 @@ class SyncPipeline:
                                         pass
 
                                 if stat_values:
+                                    # 从 fixtures 聚合近 N 场 xG/xGA（场均口径），覆盖 statistics 的赛季总计口径。
+                                    # statistics 无 xGA(type_id 9687)，且「近 N 场」比赛季总计更符合特征需求。
+                                    recent_xg = await self._aggregate_recent_xg(sm_id)
+                                    xg_avg = xga_avg = None
+                                    if recent_xg:
+                                        xg_avg, xga_avg = recent_xg
+
                                     exist_result = await db.execute(
                                         select(TeamSeasonStats).where(
                                             (TeamSeasonStats.team_id == team.id) &
@@ -1245,11 +1274,19 @@ class SyncPipeline:
                                         for type_id, field_name in self.STAT_TYPE_MAP.items():
                                             if type_id in stat_values:
                                                 setattr(existing_stats, field_name, stat_values[type_id])
+                                        if xg_avg is not None:
+                                            existing_stats.xG = round(xg_avg, 2)
+                                        if xga_avg is not None:
+                                            existing_stats.xGA = round(xga_avg, 2)
                                     else:
                                         kwargs = {"team_id": team.id, "season": season_id_str}
                                         for type_id, field_name in self.STAT_TYPE_MAP.items():
                                             if type_id in stat_values:
                                                 kwargs[field_name] = stat_values[type_id]
+                                        if xg_avg is not None:
+                                            kwargs["xG"] = round(xg_avg, 2)
+                                        if xga_avg is not None:
+                                            kwargs["xGA"] = round(xga_avg, 2)
                                         db.add(TeamSeasonStats(**kwargs))
                                         stats_count += 1
 
@@ -1311,6 +1348,54 @@ class SyncPipeline:
         except Exception as e:
             duration = int((datetime.utcnow() - start).total_seconds() * 1000)
             await self._log_task("update_teams", "failed", str(e), duration)
+
+    XG_RECENT_N = 10  # 近 N 场 xG/xGA 聚合窗口
+
+    async def _aggregate_recent_xg(self, sm_id: int):
+        """从 fixtures 接口聚合近 N 场 xG/xGA（场均口径）。
+
+        statistics endpoint 只返回赛季 xG(type_id 5304)，不返回 xGA(type_id 9687)，
+        因此 xGA 需从 fixtures 的 xGFixture 聚合。返回 (xg_avg, xga_avg)，失败返回 None。
+        """
+        date_from = (datetime.utcnow() - timedelta(days=180)).strftime("%Y-%m-%d")
+        date_to = datetime.utcnow().strftime("%Y-%m-%d")
+        try:
+            fx_list = await self.sm.get_fixtures_between_for_team(
+                date_from, date_to, sm_id, includes="xGFixture.type"
+            )
+        except Exception:
+            return None
+        if not isinstance(fx_list, list) or not fx_list:
+            return None
+        # fixtures/between 按日期升序，取最近 N 场
+        recent = fx_list[-self.XG_RECENT_N:] if len(fx_list) > self.XG_RECENT_N else fx_list
+        xg_sum = xga_sum = 0.0
+        n = 0
+        for fx in recent:
+            if not isinstance(fx, dict):
+                continue
+            xgfx = fx.get("xGFixture", [])
+            if not isinstance(xgfx, list) or not xgfx:
+                continue
+            n += 1
+            for x in xgfx:
+                if not isinstance(x, dict) or x.get("participant_id") != sm_id:
+                    continue
+                tid = x.get("type_id")
+                val = (x.get("data") or {}).get("value") if isinstance(x.get("data"), dict) else None
+                if val is None:
+                    continue
+                try:
+                    val = float(val)
+                except (ValueError, TypeError):
+                    continue
+                if tid == 5304:
+                    xg_sum += val
+                elif tid == 9687:
+                    xga_sum += val
+        if n == 0:
+            return None
+        return (xg_sum / n, xga_sum / n)
 
     def _aggregate_from_latest(self, latest_matches: list, sm_id: int) -> dict:
         """从最近比赛结果聚合 played/wins/draws/losses/goals_for/goals_against"""

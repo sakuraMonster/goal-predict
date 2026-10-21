@@ -8,6 +8,7 @@ import GoalsPrediction from "./pages/GoalsPrediction";
 import MarketFlowV2 from "./pages/MarketFlowV2";
 import Mapping from "./pages/Mapping";
 import Admin from "./pages/Admin";
+import ValueAnalysis from "./pages/ValueAnalysis";
 
 function App() {
   return (
@@ -28,6 +29,7 @@ function AppLayout() {
           竞彩预测系统
         </Link>
         <div className="flex gap-7 text-sm font-body text-ink-muted">
+          <Link to="/dashboard" className={`hover:text-moss transition-colors ${isActive('/dashboard')}`}>赛事列表</Link>
           <Link
             to="/"
             className={`hover:text-moss transition-colors ${location.pathname === "/" || location.pathname === "/market-flow" ? "text-moss font-semibold" : ""}`}
@@ -37,6 +39,7 @@ function AppLayout() {
           <Link to="/report" className={`hover:text-moss transition-colors ${isActive('/report')}`}>预测报告</Link>
           <Link to="/goals" className={`hover:text-moss transition-colors ${isActive('/goals')}`}>进球数预测</Link>
           <Link to="/review" className={`hover:text-moss transition-colors ${isActive('/review')}`}>复盘统计</Link>
+          <Link to="/value" className={`hover:text-moss transition-colors ${isActive('/value')}`}>价值分析</Link>
           <SystemMenu />
         </div>
         <div className="flex gap-3 items-center text-xs font-body text-ink-muted">
@@ -54,6 +57,7 @@ function AppLayout() {
           <Route path="/report" element={<Report />} />
           <Route path="/review" element={<Review />} />
           <Route path="/goals" element={<GoalsPrediction />} />
+          <Route path="/value" element={<ValueAnalysis />} />
           <Route path="/mapping" element={<Mapping />} />
           <Route path="/admin" element={<Admin />} />
         </Routes>

@@ -132,6 +132,7 @@ class TeamSeasonStats(Base):
     clean_sheets = Column(Integer, default=0)
     failed_to_score = Column(Integer, default=0)
     avg_possession = Column(Float)
+    avg_passes = Column(Float)
     xG = Column(Float)
     xGA = Column(Float)
     xPTS = Column(Float)

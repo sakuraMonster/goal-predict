@@ -1374,7 +1374,7 @@ class SyncPipeline:
         for fx in recent:
             if not isinstance(fx, dict):
                 continue
-            xgfx = fx.get("xGFixture", [])
+            xgfx = fx.get("xgfixture", [])
             if not isinstance(xgfx, list) or not xgfx:
                 continue
             n += 1

@@ -109,6 +109,32 @@ async def _run_predict():
     print(f"[SCHEDULER] predict 完成: {result}", flush=True)
 
 
+async def _run_refresh_value_analysis():
+    """刷新当天价值分析数据：竞彩盘口 + SportMonks O/U。
+
+    价值分析读 JczqPlayOddsSnapshot（竞彩 HAD/HHAD/TTG/CRS/HAFU）+ odds_snapshots 的
+    锐利盘 1X2（bet365/Pinnacle，由 sync_odds 每 30 分钟覆盖）与 SM O/U（由本任务补齐）。
+    竞彩盘口与 SM O/U 当前仅靠手动「生成方案」触发，故本任务在 15:00/19:00 补齐刷新。
+    """
+    print(f"[SCHEDULER] refresh_value_analysis 触发", flush=True)
+
+    async def _refresh():
+        from app.db.database import async_session
+        from app.api import admin
+
+        async with async_session() as db:
+            r1 = await admin.sync_market_flow_odds(db)
+            msg1 = r1.get("message") if isinstance(r1, dict) else r1
+            print(f"[SCHEDULER] refresh_value_analysis 竞彩盘口: {msg1}", flush=True)
+
+        async with async_session() as db:
+            r2 = await admin.sync_market_flow_sm_odds(db)
+            msg2 = r2.get("message") if isinstance(r2, dict) else r2
+            print(f"[SCHEDULER] refresh_value_analysis SM O/U: {msg2}", flush=True)
+
+    await _run_with_lock("refresh_value_analysis", _refresh)
+
+
 def init_scheduler():
     """初始化并启动所有定时任务（在 FastAPI startup 事件中调用，确保事件循环已就绪）"""
     from pytz import timezone
@@ -132,6 +158,10 @@ def init_scheduler():
 
     # 每日赛果结算：昨日比赛日 [昨日12:00, 今日12:00) 已完场 → 回写结果并同步 Match status=finished
     scheduler.add_job(_run_update_results, CronTrigger(hour=12, minute=0, timezone=tz), id="update_results_1200")
+
+    # 价值分析数据刷新：竞彩盘口 + SportMonks O/U（每天 15:00 / 19:00 两个固定时间点）
+    scheduler.add_job(_run_refresh_value_analysis, CronTrigger(hour=15, minute=0, timezone=tz), id="refresh_value_analysis_1500")
+    scheduler.add_job(_run_refresh_value_analysis, CronTrigger(hour=19, minute=0, timezone=tz), id="refresh_value_analysis_1900")
 
     scheduler.start()
     print("[SCHEDULER] 定时任务调度器已启动，jobs:", [j.id for j in scheduler.get_jobs()], flush=True)

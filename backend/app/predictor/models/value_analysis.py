@@ -397,7 +397,7 @@ def analyze_match(
     # --- 1X2 胜平负：价值 + 风险 ---
     if had:
         mv = market_value(had, sharp_1x2 or {})
-        best_odds = mv["outcomes"].get(mv.get("best_side"), {}).get("odds")
+        best_odds = (mv.get("outcomes") or {}).get(mv.get("best_side"), {}).get("odds")
         flags = [
             margin_flag(had),
             benchmark_flag(bool(_odds_dict(sharp_1x2 or {}))),

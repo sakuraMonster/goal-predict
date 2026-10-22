@@ -138,15 +138,12 @@ async def trigger_sync_odds():
         return {"status": "error", "message": str(e)}
 
 
-@router.post("/sync-market-flow-odds")
-async def trigger_sync_market_flow_odds(
-    date: str = Query(None, description="YYYY-MM-DD 竞彩比赛日，不传默认今天起未来7天"),
-    db: AsyncSession = Depends(get_db),
-):
+async def sync_market_flow_odds(db: AsyncSession, date: str | None = None) -> dict:
     """MarketFlow V2 赔率拉取：从竞彩网 getMatchCalculatorV1 拉实时赔率（HAD/HHAD/TTG/CRS 四玩法），写入 JczqPlayOddsSnapshot 表。
 
     MarketFlow V2 的预测逻辑只认 JczqPlayOddsSnapshot（竞彩收盘/实时赔率，带 TTG/CRS 进球与比分赔率），
-    与通用 sync_odds 写入的 SportMonks odds_snapshots 表是两张完全不同的表。"""
+    与通用 sync_odds 写入的 SportMonks odds_snapshots 表是两张完全不同的表。
+    供手动端点与定时任务共用。"""
     start = time.time()
     try:
         from tools import fetch_market_flow_odds_live as _live_mod
@@ -250,6 +247,15 @@ async def trigger_sync_market_flow_odds(
         return {"status": "error", "message": str(e)}
 
 
+@router.post("/sync-market-flow-odds")
+async def trigger_sync_market_flow_odds(
+    date: str = Query(None, description="YYYY-MM-DD 竞彩比赛日，不传默认今天起未来7天"),
+    db: AsyncSession = Depends(get_db),
+):
+    """手动触发 MarketFlow V2 赔率拉取（竞彩网 HAD/HHAD/TTG/CRS/HAFU）"""
+    return await sync_market_flow_odds(db, date)
+
+
 # SportMonks O/U（大小球）market_id 常量 + 博彩公司名映射（与 tools/_backfill_sm_ou.py 一致）
 _SM_OU_MID = 80
 _SM_BOOKMAKER_NAMES = {
@@ -302,17 +308,14 @@ def _parse_sm_ou_odds(odds: list) -> tuple[dict, dict]:
     return ou_rows, bm_names
 
 
-@router.post("/sync-market-flow-sm-odds")
-async def trigger_sync_market_flow_sm_odds(
-    date: str = Query(None, description="YYYY-MM-DD 比赛日，不传默认今天起未来7天"),
-    db: AsyncSession = Depends(get_db),
-):
+async def sync_market_flow_sm_odds(db: AsyncSession, date: str | None = None) -> dict:
     """MarketFlow V2 SM O/U 盘口拉取：从 SportMonks 拉赛前 O/U（大小球 over/under）赔率，写入 odds_snapshots 表。
 
     MarketFlow V2 的 O/U 盘口判断（ou_sm）读 odds_snapshots 中 goal_line=2.5 的 over_odds/under_odds 行
     （Pinnacle 优先、多博彩公司中位数），同时按整半线（0.5~6.5）独立判定并展示多线徽标。
     竞彩网 sync-market-flow-odds 只覆盖 HAD/HHAD/TTG/CRS，O/U 独立连续盘口需本端点从 SportMonks 补齐。
-    已同步完整多线的比赛自动跳过（不重复拉取）；仅 2.5 单线或缺数据的比赛重新拉取补全其他盘口线。"""
+    已同步完整多线的比赛自动跳过（不重复拉取）；仅 2.5 单线或缺数据的比赛重新拉取补全其他盘口线。
+    供手动端点与定时任务共用。"""
     start = time.time()
     try:
         from app.collector.sportmonks.client import SportMonksClient
@@ -415,6 +418,15 @@ async def trigger_sync_market_flow_sm_odds(
         duration = int((time.time() - start) * 1000)
         await AppLogger.log("sync_odds", "failed", f"SM O/U拉取失败: {e}", duration)
         return {"status": "error", "message": str(e)}
+
+
+@router.post("/sync-market-flow-sm-odds")
+async def trigger_sync_market_flow_sm_odds(
+    date: str = Query(None, description="YYYY-MM-DD 比赛日，不传默认今天起未来7天"),
+    db: AsyncSession = Depends(get_db),
+):
+    """手动触发 MarketFlow V2 SM O/U 盘口拉取（SportMonks 大小球）"""
+    return await sync_market_flow_sm_odds(db, date)
 
 
 @router.post("/update-teams")

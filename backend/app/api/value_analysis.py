@@ -319,12 +319,13 @@ async def value_analysis_history(
             "matches": d["matches"],
         })
 
-    # 汇总
-    total = sum(d["total"] for d in daily)
-    all_hit = sum(d["all_hit"] for d in daily)
-    value_n = sum(d["value_n"] for d in daily)
-    value_hit = sum(d["value_hit"] for d in daily)
-    value_fp_sum = sum(d["value_fp_sum"] for d in daily)
+    # 汇总（从 daily_map 取，含未写入响应的中间字段 value_fp_sum）
+    dm_vals = daily_map.values()
+    total = sum(d["total"] for d in dm_vals)
+    all_hit = sum(d["all_hit"] for d in dm_vals)
+    value_n = sum(d["value_n"] for d in dm_vals)
+    value_hit = sum(d["value_hit"] for d in dm_vals)
+    value_fp_sum = sum(d["value_fp_sum"] for d in dm_vals)
     ou_n = sum(1 for r in records if r["ou_cheap"])
     ou_hit = sum(1 for r in records if r["ou_cheap"] and r["ou_hit"])
 

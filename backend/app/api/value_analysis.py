@@ -183,21 +183,33 @@ def _rate(n: int, d: int) -> float | None:
 
 @router.get("/history")
 async def value_analysis_history(
-    days: int = Query(90, description="回溯天数（默认近 90 天，1~365）"),
+    days: int = Query(7, description="回溯天数（默认近 7 天，1~365）"),
+    date: str | None = Query(None, description="指定比赛日 YYYY-MM-DD（优先于 days）"),
     db: AsyncSession = Depends(get_db),
 ):
     """价值分析历史命中统计：近 N 天每日「有价值」1X2 方向命中 + 每日预测/命中明细。
 
     口径与 /api/value-analysis 完全一致（每场取最新快照），仅对已结算场次（有比分）统计。
     命中定义：1X2 = best_side（最大 EV 方向）== 实际胜平负；大小球 = cheap_side 方向 == 实际方向。
+    传入 date 时仅返回该比赛日的数据（覆盖 days）。
     """
-    days = max(1, min(days, 365))
     today = datetime.now(_BEIJING).date()
-    start_day = today - timedelta(days=days - 1)
-
-    # 比赛周期：matchday = (kickoff - 12h) 的北京时间日期
-    start_ts = datetime.combine(start_day, datetime.min.time()) + timedelta(hours=12)
-    end_ts = datetime.combine(today, datetime.min.time()) + timedelta(days=1, hours=12)
+    if date:
+        try:
+            start_day = datetime.strptime(date, "%Y-%m-%d").date()
+        except ValueError:
+            return {"error": "date 需为 YYYY-MM-DD 格式"}
+        start_ts = datetime.combine(start_day, datetime.min.time()) + timedelta(hours=12)
+        end_ts = start_ts + timedelta(days=1)
+        range_days = [start_day.isoformat(), start_day.isoformat()]
+        out_days = None
+    else:
+        days = max(1, min(days, 365))
+        start_day = today - timedelta(days=days - 1)
+        start_ts = datetime.combine(start_day, datetime.min.time()) + timedelta(hours=12)
+        end_ts = datetime.combine(today, datetime.min.time()) + timedelta(days=1, hours=12)
+        range_days = [start_day.isoformat(), today.isoformat()]
+        out_days = days
 
     HomeTeam = aliased(Team, name="home_team")
     AwayTeam = aliased(Team, name="away_team")
@@ -330,8 +342,8 @@ async def value_analysis_history(
     ou_hit = sum(1 for r in records if r["ou_cheap"] and r["ou_hit"])
 
     return {
-        "days": days,
-        "range": [start_day.isoformat(), today.isoformat()],
+        "days": out_days,
+        "range": range_days,
         "summary": {
             "total": total,
             "all_hit": all_hit,

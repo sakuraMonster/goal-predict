@@ -1127,7 +1127,7 @@ export interface ValueHistoryDay {
   matches: ValueHistoryMatch[];
 }
 export interface ValueHistoryResponse {
-  days: number;
+  days: number | null;
   range: [string, string];
   summary: {
     total: number;
@@ -1143,7 +1143,7 @@ export interface ValueHistoryResponse {
   };
   daily: ValueHistoryDay[];
 }
-export const getValueAnalysisHistory = (params?: { days?: number }) =>
+export const getValueAnalysisHistory = (params?: { days?: number; date?: string }) =>
   api.get("/value-analysis/history", { params }).then((r) => r.data as ValueHistoryResponse);
 
 export default api;

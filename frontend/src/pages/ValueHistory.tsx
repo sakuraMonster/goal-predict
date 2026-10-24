@@ -15,6 +15,12 @@ const fmtPct = (p: number | null | undefined, digits = 1) =>
 const fmtPp = (pp: number | null | undefined) =>
   pp == null ? "—" : `${pp >= 0 ? "+" : ""}${(pp * 100).toFixed(1)}pp`;
 
+function beijingToday(): string {
+  const now = new Date();
+  const bj = new Date(now.getTime() + (now.getTimezoneOffset() + 480) * 60000);
+  return bj.toISOString().slice(0, 10);
+}
+
 function sideZh(s: string | null | undefined) {
   return (s && SIDE_ZH[s]) || s || "";
 }
@@ -95,7 +101,9 @@ function DayCard({ day }: { day: ValueHistoryDay }) {
 }
 
 export default function ValueHistory() {
-  const [days, setDays] = useState(90);
+  const [mode, setMode] = useState<"range" | "date">("range");
+  const [days, setDays] = useState(7);
+  const [date, setDate] = useState<string>(beijingToday);
   const [data, setData] = useState<ValueHistoryResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -104,32 +112,59 @@ export default function ValueHistory() {
     let alive = true;
     setLoading(true);
     setError(null);
-    getValueAnalysisHistory({ days })
+    const params = mode === "date" ? { date } : { days };
+    getValueAnalysisHistory(params)
       .then((d) => { if (alive) setData(d); })
       .catch((e) => { if (alive) setError(e?.message ?? "加载失败"); })
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
-  }, [days]);
+  }, [mode, days, date]);
 
   const s = data?.summary;
   const bias = s && s.value_rate != null && s.value_avg_fp != null ? s.value_rate - s.value_avg_fp : null;
 
   return (
     <div>
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2 text-sm">
-          <span className="text-ink-muted">回溯范围</span>
-          {[30, 60, 90, 180].map((d) => (
+      <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+        <div className="flex items-center gap-2 text-sm flex-wrap">
+          <div className="flex gap-0.5 bg-white border border-border rounded p-0.5">
             <button
-              key={d}
-              onClick={() => setDays(d)}
-              className={`px-3 py-1 rounded text-xs border ${days === d ? "bg-moss text-white border-moss" : "bg-white text-ink border-border hover:bg-highlight"}`}
+              onClick={() => setMode("range")}
+              className={`px-3 py-1 rounded text-xs ${mode === "range" ? "bg-moss text-white" : "text-ink hover:bg-highlight"}`}
             >
-              近 {d} 天
+              近 N 天
             </button>
-          ))}
+            <button
+              onClick={() => setMode("date")}
+              className={`px-3 py-1 rounded text-xs ${mode === "date" ? "bg-moss text-white" : "text-ink hover:bg-highlight"}`}
+            >
+              指定日期
+            </button>
+          </div>
+          {mode === "range" ? (
+            [7, 30, 60, 90, 180].map((d) => (
+              <button
+                key={d}
+                onClick={() => setDays(d)}
+                className={`px-3 py-1 rounded text-xs border ${days === d ? "bg-moss text-white border-moss" : "bg-white text-ink border-border hover:bg-highlight"}`}
+              >
+                近 {d} 天
+              </button>
+            ))
+          ) : (
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="border border-border rounded px-2 py-1 text-sm text-ink bg-white"
+            />
+          )}
         </div>
-        {data && <span className="text-xs text-ink-muted">{data.range[0]} ~ {data.range[1]}</span>}
+        {data && (
+          <span className="text-xs text-ink-muted">
+            {data.range[0]}{data.range[1] !== data.range[0] ? ` ~ ${data.range[1]}` : ""}
+          </span>
+        )}
       </div>
 
       {loading && <p className="text-sm text-ink-muted">统计中…</p>}
@@ -162,7 +197,7 @@ export default function ValueHistory() {
 
       {data && !loading && (
         <div className="space-y-2">
-          {data.daily.length === 0 && <p className="text-sm text-ink-muted">该范围无已结算比赛。</p>}
+          {data.daily.length === 0 && <p className="text-sm text-ink-muted">{mode === "date" ? "该日期无已结算比赛。" : "该范围无已结算比赛。"}</p>}
           {data.daily.map((d) => <DayCard key={d.matchday} day={d} />)}
         </div>
       )}

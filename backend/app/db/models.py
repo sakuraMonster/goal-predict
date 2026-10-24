@@ -111,6 +111,21 @@ class JczqPlayOddsSnapshot(Base):
     crs_odds_json = Column(_JSON_VARIANT)
     hafu_odds_json = Column(_JSON_VARIANT, comment="半全场收盘赔率 {hh/hd/ha/dh/dd/da/ah/ad/aa: odds}")
 
+class ValueAnalysisSnapshot(Base):
+    """价值分析持久化快照：每场一个（最新一次「计算」的结果）。
+
+    价值分析此前每次请求都现算（读最新赔率快照），导致历史统计随赔率快照漂移、
+    且重复计算浪费。本表在「计算」时落库一次，查询端只读，不再重算。
+    analysis_json 为 analyze_match 完整结果（markets + risk_summary）。
+    """
+    __tablename__ = "value_analysis_snapshots"
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    match_id = Column(Integer, ForeignKey("matches.id"), nullable=False, unique=True, index=True)
+    matchday_date = Column(Date, index=True, comment="竞彩比赛日（北京时间，kickoff-12h 的日期）")
+    analysis_json = Column(_JSON_VARIANT, nullable=False, comment="analyze_match 完整结果")
+    computed_at = Column(DateTime, default=datetime.utcnow, comment="计算落库时间")
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
 class TeamSeasonStats(Base):
     __tablename__ = "team_season_stats"
     id = Column(Integer, primary_key=True)

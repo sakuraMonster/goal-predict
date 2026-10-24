@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   getValueAnalysis,
+  computeValueAnalysis,
   ValueAnalysisResponse,
   ValueAnalysisItem,
   ValueMarket,
@@ -204,18 +205,18 @@ function MatchCard({ item }: { item: ValueAnalysisItem }) {
           {oneX2 && <VerdictBadge verdict={oneX2.value.verdict} />}
         </div>
         <div className="flex items-center gap-2 shrink-0">
-          {a ? (
+          {item.computed && a ? (
             <RiskBadge level={a.risk_summary.overall_risk} />
           ) : (
-            <span className="text-xs text-ink-muted">无盘口数据</span>
+            <span className="text-xs text-ink-muted">未计算</span>
           )}
           <span className="text-xs text-ink-muted">{open ? "▴" : "▾"}</span>
         </div>
       </button>
 
-      {open && !a && (
+      {open && !item.computed && (
         <div className="px-4 pb-4">
-          <p className="text-xs text-ink-muted">该场无竞彩盘口快照，无法分析。</p>
+          <p className="text-xs text-ink-muted">该场尚未计算，请点击右上角「计算」按钮。</p>
         </div>
       )}
 
@@ -259,6 +260,7 @@ export default function ValueAnalysis() {
   const [data, setData] = useState<ValueAnalysisResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [computing, setComputing] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -270,6 +272,20 @@ export default function ValueAnalysis() {
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, [date]);
+
+  const handleCompute = async () => {
+    setComputing(true);
+    setError(null);
+    try {
+      await computeValueAnalysis({ date });
+      const d = await getValueAnalysis({ date });
+      setData(d);
+    } catch (e: any) {
+      setError(e?.message ?? "计算失败");
+    } finally {
+      setComputing(false);
+    }
+  };
 
   // 按比赛周期分组（保持接口返回的 kickoff 顺序）
   const groups = useMemo(() => {
@@ -292,12 +308,21 @@ export default function ValueAnalysis() {
           </p>
         </div>
         {tab === "day" && (
-          <input
-            type="date"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
-            className="border border-border rounded px-2 py-1 text-sm text-ink bg-white"
-          />
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="border border-border rounded px-2 py-1 text-sm text-ink bg-white"
+            />
+            <button
+              onClick={handleCompute}
+              disabled={computing}
+              className="px-3 py-1 rounded text-xs font-medium bg-moss text-white disabled:opacity-50 hover:opacity-90"
+            >
+              {computing ? "计算中…" : "计算"}
+            </button>
+          </div>
         )}
       </div>
 
@@ -328,6 +353,12 @@ export default function ValueAnalysis() {
                 <span className="text-ink-muted">有价值场次 </span>
                 <span className={`font-semibold ${data.value_match_count > 0 ? "text-emerald-600" : "text-ink"}`}>
                   {data.value_match_count}
+                </span>
+              </div>
+              <div className="bg-white border border-border rounded-lg px-4 py-2">
+                <span className="text-ink-muted">已计算 </span>
+                <span className={`font-semibold ${data.computed_count === data.total ? "text-emerald-600" : "text-amber-600"}`}>
+                  {data.computed_count} / {data.total}
                 </span>
               </div>
             </div>

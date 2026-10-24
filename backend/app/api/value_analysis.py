@@ -17,7 +17,7 @@ from sqlalchemy.orm import aliased
 
 from app.api.market_flow import _sm_ou_rows
 from app.db.database import get_db
-from app.db.models import JczqPlayOddsSnapshot, League, Match, OddsSnapshot, Team
+from app.db.models import JczqPlayOddsSnapshot, League, Match, OddsSnapshot, Team, ValueAnalysisSnapshot
 from app.predictor.models.ou_market import ou_market_from_rows
 from app.predictor.models.value_analysis import analyze_match
 
@@ -89,6 +89,61 @@ def _jczq_dict(snap: JczqPlayOddsSnapshot) -> dict:
     }
 
 
+async def _query_matches(db, start, end):
+    """查询比赛周期内的比赛（含队名/联赛名）。"""
+    HomeTeam = aliased(Team, name="home_team")
+    AwayTeam = aliased(Team, name="away_team")
+    m_res = await db.execute(
+        select(Match, HomeTeam.name_zh, AwayTeam.name_zh, League.name_zh)
+        .outerjoin(HomeTeam, HomeTeam.id == Match.home_team_id)
+        .outerjoin(AwayTeam, AwayTeam.id == Match.away_team_id)
+        .outerjoin(League, League.id == Match.league_id)
+        .where(Match.kickoff_time >= start, Match.kickoff_time < end)
+        .order_by(Match.kickoff_time.asc(), Match.id.asc())
+    )
+    return m_res.all()
+
+
+async def _compute_range_items(db, start, end):
+    """现算 [start, end) 内所有比赛的价值分析（不落库），返回 item dict 列表。"""
+    mrows = await _query_matches(db, start, end)
+    mids = [int(m.id) for m, *_ in mrows]
+    latest_jczq = await _jczq_map(db, mids, desc=True)
+    earliest_jczq = await _jczq_map(db, mids, desc=False)
+    sharp_1x2_map = await _sharp_1x2_map(db, mids)
+    ou_map = await _sm_ou_rows(db, mids)
+
+    items = []
+    for m, hname, aname, lname in mrows:
+        mid = int(m.id)
+        snap = latest_jczq.get(mid)
+        analysis = None
+        if snap:
+            jczq = _jczq_dict(snap)
+            jczq_early = _jczq_dict(earliest_jczq[mid]) if earliest_jczq.get(mid) else None
+            s1x2 = sharp_1x2_map.get(mid)
+            ou = ou_market_from_rows(ou_map.get(mid) or [])
+            analysis = analyze_match(
+                jczq=jczq,
+                sharp_1x2=s1x2,
+                sharp_ou_p_big=ou["p_big"] if ou else None,
+                sharp_ou_n_books=ou["n_books"] if ou else None,
+                jczq_early=jczq_early,
+            )
+        items.append({
+            "match_id": mid,
+            "match_num": m.match_num,
+            "league": lname or getattr(m, "league_name", None),
+            "home": hname or m.home_team_name,
+            "away": aname or m.away_team_name,
+            "kickoff": m.kickoff_time,
+            "status": m.status,
+            "matchday_date": (m.kickoff_time - timedelta(hours=12)).date(),
+            "analysis": analysis,
+        })
+    return items
+
+
 @router.get("")
 async def value_analysis(
     date: str | None = Query(None, description="比赛日 YYYY-MM-DD（北京时间），缺省=今天"),
@@ -103,49 +158,26 @@ async def value_analysis(
     # 比赛周期：当日 12:00 ~ 次日 12:00（竞彩比赛日口径）
     start = day + timedelta(hours=12)
     end = start + timedelta(days=1)
-    HomeTeam = aliased(Team, name="home_team")
-    AwayTeam = aliased(Team, name="away_team")
-
-    m_res = await db.execute(
-        select(Match, HomeTeam.name_zh, AwayTeam.name_zh, League.name_zh)
-        .outerjoin(HomeTeam, HomeTeam.id == Match.home_team_id)
-        .outerjoin(AwayTeam, AwayTeam.id == Match.away_team_id)
-        .outerjoin(League, League.id == Match.league_id)
-        .where(Match.kickoff_time >= start, Match.kickoff_time < end)
-        .order_by(Match.kickoff_time.asc(), Match.id.asc())
-    )
-    mrows = m_res.all()
+    mrows = await _query_matches(db, start, end)
     mids = [int(m.id) for m, *_ in mrows]
 
-    latest_jczq = await _jczq_map(db, mids, desc=True)
-    earliest_jczq = await _jczq_map(db, mids, desc=False)
-    sharp_1x2_map = await _sharp_1x2_map(db, mids)
-    ou_map = await _sm_ou_rows(db, mids)
+    # 读持久化快照（不再现算）
+    snap_map: dict[int, dict] = {}
+    if mids:
+        s_res = await db.execute(
+            select(ValueAnalysisSnapshot).where(ValueAnalysisSnapshot.match_id.in_(mids))
+        )
+        for s in s_res.scalars():
+            snap_map[int(s.match_id)] = s.analysis_json
 
     items = []
+    computed_count = 0
     for m, hname, aname, lname in mrows:
         mid = int(m.id)
-        snap = latest_jczq.get(mid)
-        jczq = _jczq_dict(snap) if snap else None
-        jczq_early = _jczq_dict(earliest_jczq[mid]) if earliest_jczq.get(mid) else None
-
-        s1x2 = sharp_1x2_map.get(mid)
-        ou = ou_market_from_rows(ou_map.get(mid) or [])
-        sharp_ou_p_big = ou["p_big"] if ou else None
-        sharp_ou_n_books = ou["n_books"] if ou else None
-
-        analysis = (
-            analyze_match(
-                jczq=jczq,
-                sharp_1x2=s1x2,
-                sharp_ou_p_big=sharp_ou_p_big,
-                sharp_ou_n_books=sharp_ou_n_books,
-                jczq_early=jczq_early,
-            )
-            if jczq
-            else None
-        )
-
+        analysis = snap_map.get(mid)
+        computed = mid in snap_map
+        if computed:
+            computed_count += 1
         items.append({
             "match_id": mid,
             "match_num": m.match_num,
@@ -155,6 +187,7 @@ async def value_analysis(
             "kickoff": m.kickoff_time.isoformat() if m.kickoff_time else None,
             "status": m.status,
             "analysis": analysis,
+            "computed": computed,
         })
 
     value_match_count = sum(
@@ -163,8 +196,66 @@ async def value_analysis(
     return {
         "date": date,
         "total": len(items),
+        "computed_count": computed_count,
         "value_match_count": value_match_count,
         "matches": items,
+    }
+
+
+@router.post("/compute")
+async def compute_value_analysis(
+    date: str | None = Query(None, description="指定比赛日 YYYY-MM-DD（优先于 days）"),
+    days: int | None = Query(None, description="回溯天数，计算近 N 天（1~365）"),
+    db: AsyncSession = Depends(get_db),
+):
+    """计算并持久化价值分析：将指定范围（date 单日 / days 近 N 天 / 默认今天）的结果写入 value_analysis_snapshots。"""
+    today = datetime.now(_BEIJING).date()
+    if date:
+        try:
+            d0 = datetime.strptime(date, "%Y-%m-%d").date()
+        except ValueError:
+            return {"error": "date 需为 YYYY-MM-DD 格式"}
+        start_day = d0
+        end_day = d0
+    elif days:
+        days = max(1, min(days, 365))
+        start_day = today - timedelta(days=days - 1)
+        end_day = today
+    else:
+        start_day = today
+        end_day = today
+
+    start_ts = datetime.combine(start_day, datetime.min.time()) + timedelta(hours=12)
+    end_ts = datetime.combine(end_day, datetime.min.time()) + timedelta(days=1, hours=12)
+
+    items = await _compute_range_items(db, start_ts, end_ts)
+    computed = 0
+    for it in items:
+        if it["analysis"] is None:
+            continue
+        mid = it["match_id"]
+        existing = (await db.execute(
+            select(ValueAnalysisSnapshot).where(ValueAnalysisSnapshot.match_id == mid)
+        )).scalar_one_or_none()
+        if existing:
+            existing.analysis_json = it["analysis"]
+            existing.matchday_date = it["matchday_date"]
+            existing.computed_at = datetime.utcnow()
+        else:
+            db.add(ValueAnalysisSnapshot(
+                match_id=mid,
+                matchday_date=it["matchday_date"],
+                analysis_json=it["analysis"],
+                computed_at=datetime.utcnow(),
+            ))
+        computed += 1
+    await db.commit()
+
+    return {
+        "status": "ok",
+        "range": [start_day.isoformat(), end_day.isoformat()],
+        "total": len(items),
+        "computed": computed,
     }
 
 
@@ -230,28 +321,21 @@ async def value_analysis_history(
     mrows = m_res.all()
     mids = [int(m.id) for m, *_ in mrows]
 
-    latest_jczq = await _jczq_map(db, mids, desc=True)
-    sharp_1x2_map = await _sharp_1x2_map(db, mids)
-    ou_map = await _sm_ou_rows(db, mids)
+    # 读持久化快照（不再现算）
+    snap_map: dict[int, dict] = {}
+    if mids:
+        s_res = await db.execute(
+            select(ValueAnalysisSnapshot).where(ValueAnalysisSnapshot.match_id.in_(mids))
+        )
+        for s in s_res.scalars():
+            snap_map[int(s.match_id)] = s.analysis_json
 
     records = []
     for m, hname, aname, lname in mrows:
         mid = int(m.id)
-        snap = latest_jczq.get(mid)
-        if not snap:
+        analysis = snap_map.get(mid)
+        if analysis is None:
             continue
-        jczq = _jczq_dict(snap)
-        s1x2 = sharp_1x2_map.get(mid)
-        ou = ou_market_from_rows(ou_map.get(mid) or [])
-        sharp_ou_p_big = ou["p_big"] if ou else None
-        sharp_ou_n_books = ou["n_books"] if ou else None
-
-        analysis = analyze_match(
-            jczq=jczq,
-            sharp_1x2=s1x2,
-            sharp_ou_p_big=sharp_ou_p_big,
-            sharp_ou_n_books=sharp_ou_n_books,
-        )
 
         hs, aw = m.home_score, m.away_score
         actual = _actual_outcome(hs, aw)

@@ -1085,6 +1085,7 @@ export interface ValueAnalysisItem {
   away: string;
   kickoff: string | null;
   status: string;
+  computed: boolean;
   analysis: {
     markets: Record<string, ValueMarket>;
     risk_summary: ValueRiskSummary;
@@ -1093,11 +1094,21 @@ export interface ValueAnalysisItem {
 export interface ValueAnalysisResponse {
   date: string;
   total: number;
+  computed_count: number;
   value_match_count: number;
   matches: ValueAnalysisItem[];
 }
 export const getValueAnalysis = (params?: { date?: string }) =>
   api.get("/value-analysis", { params }).then((r) => r.data as ValueAnalysisResponse);
+
+export interface ComputeValueAnalysisResponse {
+  status: string;
+  range: [string, string];
+  total: number;
+  computed: number;
+}
+export const computeValueAnalysis = (params?: { date?: string; days?: number }) =>
+  api.post("/value-analysis/compute", null, { params }).then((r) => r.data as ComputeValueAnalysisResponse);
 
 export interface ValueHistoryMatch {
   matchday: string;

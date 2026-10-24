@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getValueAnalysisHistory, ValueHistoryResponse, ValueHistoryDay, ValueHistoryMatch } from "../api/client";
+import { getValueAnalysisHistory, computeValueAnalysis, ValueHistoryResponse, ValueHistoryDay, ValueHistoryMatch } from "../api/client";
 
 const SIDE_ZH: Record<string, string> = { home: "主胜", draw: "平", away: "客胜" };
 
@@ -107,6 +107,7 @@ export default function ValueHistory() {
   const [data, setData] = useState<ValueHistoryResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [computing, setComputing] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -119,6 +120,21 @@ export default function ValueHistory() {
       .finally(() => { if (alive) setLoading(false); });
     return () => { alive = false; };
   }, [mode, days, date]);
+
+  const handleCompute = async () => {
+    setComputing(true);
+    setError(null);
+    try {
+      const params = mode === "date" ? { date } : { days };
+      await computeValueAnalysis(params);
+      const d = await getValueAnalysisHistory(params);
+      setData(d);
+    } catch (e: any) {
+      setError(e?.message ?? "补算失败");
+    } finally {
+      setComputing(false);
+    }
+  };
 
   const s = data?.summary;
   const bias = s && s.value_rate != null && s.value_avg_fp != null ? s.value_rate - s.value_avg_fp : null;
@@ -160,11 +176,20 @@ export default function ValueHistory() {
             />
           )}
         </div>
-        {data && (
-          <span className="text-xs text-ink-muted">
-            {data.range[0]}{data.range[1] !== data.range[0] ? ` ~ ${data.range[1]}` : ""}
-          </span>
-        )}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleCompute}
+            disabled={computing}
+            className="px-3 py-1 rounded text-xs font-medium bg-moss text-white disabled:opacity-50 hover:opacity-90"
+          >
+            {computing ? "补算中…" : "补算"}
+          </button>
+          {data && (
+            <span className="text-xs text-ink-muted">
+              {data.range[0]}{data.range[1] !== data.range[0] ? ` ~ ${data.range[1]}` : ""}
+            </span>
+          )}
+        </div>
       </div>
 
       {loading && <p className="text-sm text-ink-muted">统计中…</p>}

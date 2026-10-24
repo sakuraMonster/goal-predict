@@ -95,7 +95,8 @@ function MarketTable({ market }: { market: ValueMarket }) {
   const outcomes = market.value.outcomes;
   const sharp = market.sharp_odds ?? {};
   if (!outcomes) return null;
-  const keys = Object.keys(outcomes);
+  // 固定顺序：主胜 → 平 → 客胜（避免 JSONB 持久化后键序被打乱成 away/draw/home）
+  const keys = ["home", "draw", "away"].filter((k) => k in outcomes);
   const best = market.value.best_side;
   return (
     <div className="overflow-x-auto">

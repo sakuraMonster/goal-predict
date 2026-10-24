@@ -166,3 +166,182 @@ async def value_analysis(
         "value_match_count": value_match_count,
         "matches": items,
     }
+
+
+def _actual_outcome(home_score: int, away_score: int) -> str:
+    if home_score > away_score:
+        return "home"
+    if home_score == away_score:
+        return "draw"
+    return "away"
+
+
+def _rate(n: int, d: int) -> float | None:
+    """命中率：无分母返回 None（避免除零）。"""
+    return round(n / d, 4) if d else None
+
+
+@router.get("/history")
+async def value_analysis_history(
+    days: int = Query(90, description="回溯天数（默认近 90 天，1~365）"),
+    db: AsyncSession = Depends(get_db),
+):
+    """价值分析历史命中统计：近 N 天每日「有价值」1X2 方向命中 + 每日预测/命中明细。
+
+    口径与 /api/value-analysis 完全一致（每场取最新快照），仅对已结算场次（有比分）统计。
+    命中定义：1X2 = best_side（最大 EV 方向）== 实际胜平负；大小球 = cheap_side 方向 == 实际方向。
+    """
+    days = max(1, min(days, 365))
+    today = datetime.now(_BEIJING).date()
+    start_day = today - timedelta(days=days - 1)
+
+    # 比赛周期：matchday = (kickoff - 12h) 的北京时间日期
+    start_ts = datetime.combine(start_day, datetime.min.time()) + timedelta(hours=12)
+    end_ts = datetime.combine(today, datetime.min.time()) + timedelta(days=1, hours=12)
+
+    HomeTeam = aliased(Team, name="home_team")
+    AwayTeam = aliased(Team, name="away_team")
+
+    m_res = await db.execute(
+        select(Match, HomeTeam.name_zh, AwayTeam.name_zh, League.name_zh)
+        .outerjoin(HomeTeam, HomeTeam.id == Match.home_team_id)
+        .outerjoin(AwayTeam, AwayTeam.id == Match.away_team_id)
+        .outerjoin(League, League.id == Match.league_id)
+        .where(
+            Match.kickoff_time >= start_ts,
+            Match.kickoff_time < end_ts,
+            Match.home_score.is_not(None),
+            Match.away_score.is_not(None),
+        )
+        .order_by(Match.kickoff_time.asc(), Match.id.asc())
+    )
+    mrows = m_res.all()
+    mids = [int(m.id) for m, *_ in mrows]
+
+    latest_jczq = await _jczq_map(db, mids, desc=True)
+    sharp_1x2_map = await _sharp_1x2_map(db, mids)
+    ou_map = await _sm_ou_rows(db, mids)
+
+    records = []
+    for m, hname, aname, lname in mrows:
+        mid = int(m.id)
+        snap = latest_jczq.get(mid)
+        if not snap:
+            continue
+        jczq = _jczq_dict(snap)
+        s1x2 = sharp_1x2_map.get(mid)
+        ou = ou_market_from_rows(ou_map.get(mid) or [])
+        sharp_ou_p_big = ou["p_big"] if ou else None
+        sharp_ou_n_books = ou["n_books"] if ou else None
+
+        analysis = analyze_match(
+            jczq=jczq,
+            sharp_1x2=s1x2,
+            sharp_ou_p_big=sharp_ou_p_big,
+            sharp_ou_n_books=sharp_ou_n_books,
+        )
+
+        hs, aw = m.home_score, m.away_score
+        actual = _actual_outcome(hs, aw)
+        actual_over = (hs + aw) > 2.5
+
+        v1 = analysis["markets"].get("1x2", {}).get("value", {})
+        best_side = v1.get("best_side")
+        verdict = v1.get("verdict")
+        best_ev = v1.get("best_ev")
+        outcomes = v1.get("outcomes") or {}
+        best_fp = outcomes.get(best_side, {}).get("fair_prob") if best_side else None
+        hit = (best_side == actual) if best_side else None
+
+        ou_v = analysis["markets"].get("ou", {}).get("value", {})
+        ou_cheap = ou_v.get("cheap_side")
+        ou_hit = None
+        if ou_cheap == "小球":
+            ou_hit = not actual_over
+        elif ou_cheap == "大球":
+            ou_hit = actual_over
+
+        matchday = (m.kickoff_time - timedelta(hours=12)).date().isoformat()
+
+        records.append({
+            "matchday": matchday,
+            "match_num": m.match_num,
+            "league": lname or getattr(m, "league_name", None),
+            "home": hname or m.home_team_name,
+            "away": aname or m.away_team_name,
+            "kickoff": m.kickoff_time.strftime("%H:%M") if m.kickoff_time else None,
+            "actual": actual,
+            "verdict": verdict,
+            "best_side": best_side,
+            "best_ev": round(best_ev, 4) if best_ev is not None else None,
+            "best_fp": round(best_fp, 4) if best_fp is not None else None,
+            "hit": hit,
+            "ou_cheap": ou_cheap,
+            "ou_hit": ou_hit,
+        })
+
+    # 按比赛日聚合（新→旧）
+    daily_map: dict[str, dict] = {}
+    for r in records:
+        d = daily_map.setdefault(r["matchday"], {
+            "matchday": r["matchday"],
+            "matches": [],
+            "total": 0,
+            "all_hit": 0,
+            "value_n": 0,
+            "value_hit": 0,
+            "value_fp_sum": 0.0,
+        })
+        d["matches"].append(r)
+        if r["best_side"] is not None:
+            d["total"] += 1
+            if r["hit"]:
+                d["all_hit"] += 1
+            if r["verdict"] == "有价值":
+                d["value_n"] += 1
+                if r["hit"]:
+                    d["value_hit"] += 1
+                if r["best_fp"] is not None:
+                    d["value_fp_sum"] += r["best_fp"]
+
+    daily = []
+    for matchday in sorted(daily_map, reverse=True):
+        d = daily_map[matchday]
+        daily.append({
+            "matchday": d["matchday"],
+            "total": d["total"],
+            "all_hit": d["all_hit"],
+            "all_rate": _rate(d["all_hit"], d["total"]),
+            "value_n": d["value_n"],
+            "value_hit": d["value_hit"],
+            "value_rate": _rate(d["value_hit"], d["value_n"]),
+            "value_avg_fp": round(d["value_fp_sum"] / d["value_n"], 4) if d["value_n"] else None,
+            "matches": d["matches"],
+        })
+
+    # 汇总
+    total = sum(d["total"] for d in daily)
+    all_hit = sum(d["all_hit"] for d in daily)
+    value_n = sum(d["value_n"] for d in daily)
+    value_hit = sum(d["value_hit"] for d in daily)
+    value_fp_sum = sum(d["value_fp_sum"] for d in daily)
+    ou_n = sum(1 for r in records if r["ou_cheap"])
+    ou_hit = sum(1 for r in records if r["ou_cheap"] and r["ou_hit"])
+
+    return {
+        "days": days,
+        "range": [start_day.isoformat(), today.isoformat()],
+        "summary": {
+            "total": total,
+            "all_hit": all_hit,
+            "all_rate": _rate(all_hit, total),
+            "value_n": value_n,
+            "value_hit": value_hit,
+            "value_rate": _rate(value_hit, value_n),
+            "value_avg_fp": round(value_fp_sum / value_n, 4) if value_n else None,
+            "ou_n": ou_n,
+            "ou_hit": ou_hit,
+            "ou_rate": _rate(ou_hit, ou_n),
+        },
+        "daily": daily,
+    }

@@ -7,6 +7,7 @@ import {
   ValueRiskFlag,
   MarketValue,
 } from "../api/client";
+import ValueHistory from "./ValueHistory";
 
 const SIDE_ZH: Record<string, string> = { home: "主胜", draw: "平", away: "客胜" };
 
@@ -253,6 +254,7 @@ function MatchCard({ item }: { item: ValueAnalysisItem }) {
 }
 
 export default function ValueAnalysis() {
+  const [tab, setTab] = useState<"day" | "history">("day");
   const [date, setDate] = useState<string>(beijingToday);
   const [data, setData] = useState<ValueAnalysisResponse | null>(null);
   const [loading, setLoading] = useState(false);
@@ -282,57 +284,80 @@ export default function ValueAnalysis() {
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-6">
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-xl font-bold font-heading text-ink">价值分析</h1>
           <p className="text-xs text-ink-muted mt-1">
             锐利盘基准 · 去水 · EV · 风险提示（价值判定仅 1X2 / 大小球方向；其余玩法仅风险）
           </p>
         </div>
-        <input
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-          className="border border-border rounded px-2 py-1 text-sm text-ink bg-white"
-        />
+        {tab === "day" && (
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="border border-border rounded px-2 py-1 text-sm text-ink bg-white"
+          />
+        )}
       </div>
 
-      {data && (
-        <div className="flex gap-4 mb-5 text-sm">
-          <div className="bg-white border border-border rounded-lg px-4 py-2">
-            <span className="text-ink-muted">总场次 </span>
-            <span className="font-semibold text-ink">{data.total}</span>
-          </div>
-          <div className="bg-white border border-border rounded-lg px-4 py-2">
-            <span className="text-ink-muted">有价值场次 </span>
-            <span className={`font-semibold ${data.value_match_count > 0 ? "text-emerald-600" : "text-ink"}`}>
-              {data.value_match_count}
-            </span>
-          </div>
-        </div>
-      )}
+      <div className="flex gap-1 mb-5 border-b border-border">
+        <button
+          onClick={() => setTab("day")}
+          className={`px-4 py-2 text-sm ${tab === "day" ? "text-moss font-semibold border-b-2 border-moss" : "text-ink-muted hover:text-ink"}`}
+        >
+          当日分析
+        </button>
+        <button
+          onClick={() => setTab("history")}
+          className={`px-4 py-2 text-sm ${tab === "history" ? "text-moss font-semibold border-b-2 border-moss" : "text-ink-muted hover:text-ink"}`}
+        >
+          历史报告
+        </button>
+      </div>
 
-      {loading && <p className="text-sm text-ink-muted">分析中…</p>}
-      {error && <p className="text-sm text-red-600">{error}</p>}
-
-      {data && !loading && (
-        <div className="space-y-5">
-          {data.matches.length === 0 && <p className="text-sm text-ink-muted">该日期无比赛。</p>}
-          {groups.map(([day, matches]) => (
-            <div key={day}>
-              <div className="flex items-center gap-2 mb-2">
-                <h2 className="text-sm font-semibold text-ink">{day}</h2>
-                <span className="text-xs text-ink-muted">{matches.length} 场</span>
+      {tab === "day" && (
+        <>
+          {data && (
+            <div className="flex gap-4 mb-5 text-sm">
+              <div className="bg-white border border-border rounded-lg px-4 py-2">
+                <span className="text-ink-muted">总场次 </span>
+                <span className="font-semibold text-ink">{data.total}</span>
               </div>
-              <div className="space-y-2">
-                {matches.map((m) => (
-                  <MatchCard key={m.match_id} item={m} />
-                ))}
+              <div className="bg-white border border-border rounded-lg px-4 py-2">
+                <span className="text-ink-muted">有价值场次 </span>
+                <span className={`font-semibold ${data.value_match_count > 0 ? "text-emerald-600" : "text-ink"}`}>
+                  {data.value_match_count}
+                </span>
               </div>
             </div>
-          ))}
-        </div>
+          )}
+
+          {loading && <p className="text-sm text-ink-muted">分析中…</p>}
+          {error && <p className="text-sm text-red-600">{error}</p>}
+
+          {data && !loading && (
+            <div className="space-y-5">
+              {data.matches.length === 0 && <p className="text-sm text-ink-muted">该日期无比赛。</p>}
+              {groups.map(([day, matches]) => (
+                <div key={day}>
+                  <div className="flex items-center gap-2 mb-2">
+                    <h2 className="text-sm font-semibold text-ink">{day}</h2>
+                    <span className="text-xs text-ink-muted">{matches.length} 场</span>
+                  </div>
+                  <div className="space-y-2">
+                    {matches.map((m) => (
+                      <MatchCard key={m.match_id} item={m} />
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
+
+      {tab === "history" && <ValueHistory />}
     </div>
   );
 }

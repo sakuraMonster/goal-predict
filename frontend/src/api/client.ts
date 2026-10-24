@@ -1099,4 +1099,51 @@ export interface ValueAnalysisResponse {
 export const getValueAnalysis = (params?: { date?: string }) =>
   api.get("/value-analysis", { params }).then((r) => r.data as ValueAnalysisResponse);
 
+export interface ValueHistoryMatch {
+  matchday: string;
+  match_num: string | null;
+  league: string | null;
+  home: string;
+  away: string;
+  kickoff: string | null;
+  actual: "home" | "draw" | "away";
+  verdict: string | null;
+  best_side: string | null;
+  best_ev: number | null;
+  best_fp: number | null;
+  hit: boolean | null;
+  ou_cheap: string | null;
+  ou_hit: boolean | null;
+}
+export interface ValueHistoryDay {
+  matchday: string;
+  total: number;
+  all_hit: number;
+  all_rate: number | null;
+  value_n: number;
+  value_hit: number;
+  value_rate: number | null;
+  value_avg_fp: number | null;
+  matches: ValueHistoryMatch[];
+}
+export interface ValueHistoryResponse {
+  days: number;
+  range: [string, string];
+  summary: {
+    total: number;
+    all_hit: number;
+    all_rate: number | null;
+    value_n: number;
+    value_hit: number;
+    value_rate: number | null;
+    value_avg_fp: number | null;
+    ou_n: number;
+    ou_hit: number;
+    ou_rate: number | null;
+  };
+  daily: ValueHistoryDay[];
+}
+export const getValueAnalysisHistory = (params?: { days?: number }) =>
+  api.get("/value-analysis/history", { params }).then((r) => r.data as ValueHistoryResponse);
+
 export default api;

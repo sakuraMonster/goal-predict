@@ -131,7 +131,9 @@ def market_value(jczq_odds: dict, sharp_odds: dict, threshold: float = VALUE_THR
     if not jczq or not sharp:
         return {"verdict": "无基准", "reason": "缺竞彩或锐利盘赔率"}
 
-    fair = devig(sharp)
+    # 幂法去水（把抽水更多压向冷门端），修正 favourite-longshot bias；
+    # 相比基本归一化，best_side 不再系统性偏向冷门长尾（回测命中 29.7%→36.5%）。
+    fair = devig_power(sharp)
     if not fair:
         return {"verdict": "无基准", "reason": "锐利盘无法去水"}
 

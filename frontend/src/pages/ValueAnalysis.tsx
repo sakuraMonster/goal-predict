@@ -2,11 +2,13 @@ import { useEffect, useMemo, useState } from "react";
 import {
   getValueAnalysis,
   computeValueAnalysis,
+  getPredictionLabelStats,
   ValueAnalysisResponse,
   ValueAnalysisItem,
   ValueMarket,
   ValueRiskFlag,
   MarketValue,
+  PredictionLabelStatsResponse,
 } from "../api/client";
 import ValueHistory from "./ValueHistory";
 
@@ -290,6 +292,15 @@ export default function ValueAnalysis() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [computing, setComputing] = useState(false);
+  const [labelStats, setLabelStats] = useState<PredictionLabelStatsResponse | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    getPredictionLabelStats({ days: 30 })
+      .then((d) => { if (alive) setLabelStats(d); })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -389,6 +400,34 @@ export default function ValueAnalysis() {
                 <span className={`font-semibold ${data.computed_count === data.total ? "text-emerald-600" : "text-amber-600"}`}>
                   {data.computed_count} / {data.total}
                 </span>
+              </div>
+            </div>
+          )}
+
+          {labelStats && labelStats.labels.length > 0 && (
+            <div className="bg-white border border-border rounded-lg p-4 mb-5">
+              <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
+                <h3 className="text-sm font-semibold text-ink">规则标签命中率</h3>
+                <span className="text-xs text-ink-muted">
+                  近 {labelStats.days} 天 · 合计 {labelStats.total_hit}/{labelStats.total_n}（{fmtPct(labelStats.total_rate)}）
+                </span>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {labelStats.labels.map((s) => {
+                  const rateColor = s.rate == null
+                    ? "text-ink-muted"
+                    : s.rate >= 0.7 ? "text-emerald-600" : s.rate < 0.5 ? "text-red-500" : "text-ink-muted";
+                  return (
+                    <div
+                      key={s.label}
+                      className={`inline-flex items-center gap-1.5 px-2 py-1 rounded border text-xs ${s.n === 0 ? "border-border opacity-50" : "border-moss/20"}`}
+                    >
+                      <span className="font-medium text-ink">{s.label}</span>
+                      <span className="text-ink-muted">{s.hit}/{s.n}</span>
+                      <span className={`font-semibold ${rateColor}`}>{fmtPct(s.rate)}</span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           )}

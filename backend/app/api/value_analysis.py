@@ -19,7 +19,12 @@ from app.api.market_flow import _sm_ou_rows
 from app.db.database import get_db
 from app.db.models import JczqPlayOddsSnapshot, League, Match, OddsSnapshot, Team, ValueAnalysisSnapshot
 from app.predictor.models.ou_market import ou_market_from_rows
-from app.predictor.models.value_analysis import analyze_match, hit_prediction, prediction_from_analysis
+from app.predictor.models.value_analysis import (
+    PREDICTION_LABEL_ORDER,
+    analyze_match,
+    hit_prediction,
+    prediction_from_analysis,
+)
 
 router = APIRouter(prefix="/api/value-analysis", tags=["value_analysis"])
 
@@ -503,4 +508,82 @@ async def value_analysis_history(
             "ou_rate": _rate(ou_hit, ou_n),
         },
         "daily": daily,
+    }
+
+
+@router.get("/prediction-label-stats")
+async def prediction_label_stats(
+    days: int = Query(30, description="回溯天数（默认近 30 天，1~365）"),
+    db: AsyncSession = Depends(get_db),
+):
+    """规则标签命中率统计：近 N 天已结算场次，按预测提取规则标签分组统计命中率。
+
+    命中口径与 /history 的 pred 一致（双选任一命中），赛果更新后本接口现算自动刷新。
+    """
+    days = max(1, min(days, 365))
+    today = datetime.now(_BEIJING).date()
+    start_day = today - timedelta(days=days - 1)
+    start_ts = datetime.combine(start_day, datetime.min.time()) + timedelta(hours=12)
+    end_ts = datetime.combine(today, datetime.min.time()) + timedelta(days=1, hours=12)
+
+    m_res = await db.execute(
+        select(Match.id, Match.home_score, Match.away_score).where(
+            Match.kickoff_time >= start_ts,
+            Match.kickoff_time < end_ts,
+            Match.home_score.is_not(None),
+            Match.away_score.is_not(None),
+        )
+    )
+    mrows = m_res.all()
+    mids = [int(r.id) for r in mrows]
+
+    snap_map: dict[int, dict] = {}
+    if mids:
+        s_res = await db.execute(
+            select(ValueAnalysisSnapshot).where(ValueAnalysisSnapshot.match_id.in_(mids))
+        )
+        for s in s_res.scalars():
+            snap_map[int(s.match_id)] = s.analysis_json
+
+    jczq_map: dict[int, JczqPlayOddsSnapshot] = await _jczq_map(db, mids, desc=True)
+
+    label_stats: dict[str, list[int]] = {}
+    for r in mrows:
+        mid = int(r.id)
+        analysis = snap_map.get(mid)
+        if not isinstance(analysis, dict):
+            continue
+        prediction = analysis.get("prediction")
+        if not isinstance(prediction, dict):
+            prediction = prediction_from_analysis(analysis)
+        if not isinstance(prediction, dict):
+            continue
+        hhad_line = jczq_map.get(mid).hhad_line if jczq_map.get(mid) else None
+        prediction_hit, _ = hit_prediction(prediction, r.home_score - r.away_score, hhad_line)
+        if prediction_hit is None:
+            continue
+        label = prediction.get("label") or "未知"
+        n_hit = label_stats.setdefault(label, [0, 0])
+        n_hit[0] += 1
+        if prediction_hit:
+            n_hit[1] += 1
+
+    labels = []
+    for label in PREDICTION_LABEL_ORDER:
+        n, hit = label_stats.get(label, [0, 0])
+        labels.append({"label": label, "n": n, "hit": hit, "rate": _rate(hit, n)})
+    for label in sorted(label_stats):
+        if label not in PREDICTION_LABEL_ORDER:
+            n, hit = label_stats[label]
+            labels.append({"label": label, "n": n, "hit": hit, "rate": _rate(hit, n)})
+
+    total_n = sum(v[0] for v in label_stats.values())
+    total_hit = sum(v[1] for v in label_stats.values())
+
+    return {
+        "days": days,
+        "total_n": total_n,
+        "total_hit": total_hit,
+        "total_rate": _rate(total_hit, total_n),
+        "labels": labels,
     }

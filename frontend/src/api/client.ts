@@ -1186,4 +1186,20 @@ export const backfillValueAnalysisPrediction = (params?: { only_missing?: boolea
     with_prediction: number;
   });
 
+export interface PredictionLabelStat {
+  label: string;
+  n: number;
+  hit: number;
+  rate: number | null;
+}
+export interface PredictionLabelStatsResponse {
+  days: number;
+  total_n: number;
+  total_hit: number;
+  total_rate: number | null;
+  labels: PredictionLabelStat[];
+}
+export const getPredictionLabelStats = (params?: { days?: number }) =>
+  api.get("/value-analysis/prediction-label-stats", { params }).then((r) => r.data as PredictionLabelStatsResponse);
+
 export default api;

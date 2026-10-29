@@ -204,6 +204,11 @@ function MatchCard({ item }: { item: ValueAnalysisItem }) {
           </span>
           <span className="text-xs text-ink-muted shrink-0">{kickoff}</span>
           {oneX2 && <VerdictBadge verdict={oneX2.value.verdict} />}
+          {a?.prediction && (
+            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-moss/10 text-moss border border-moss/20 whitespace-nowrap">
+              预测：{a.prediction.label}
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2 shrink-0">
           {item.computed && a ? (
@@ -225,11 +230,23 @@ function MatchCard({ item }: { item: ValueAnalysisItem }) {
         <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
           {/* 预测信息提取 */}
           {a.prediction && (
-            <div className="text-xs rounded px-3 py-2 bg-moss/5 border border-moss/20 flex items-center gap-2 flex-wrap">
-              <span className="font-semibold text-ink">预测提取</span>
-              <span className="font-semibold text-moss">{a.prediction.label}</span>
-              {a.prediction.mode === "deep_draw" && a.prediction.picks.length > 0 && (
-                <span className="text-ink-muted">（{a.prediction.picks.map((p) => p.label).join(" + ")}）</span>
+            <div className="text-xs rounded px-3 py-2 bg-moss/5 border border-moss/20">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-semibold text-ink">预测提取</span>
+                <span className="font-semibold text-moss">{a.prediction.label}</span>
+              </div>
+              {a.prediction.picks.length > 0 && (
+                <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+                  {a.prediction.picks.map((p, i) => (
+                    <span
+                      key={i}
+                      className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-white border border-border text-[11px] text-ink-muted"
+                    >
+                      <span>{p.market === "had" ? "胜平负" : "让球"}</span>
+                      <span className="font-medium text-ink">{p.label}</span>
+                    </span>
+                  ))}
+                </div>
               )}
             </div>
           )}

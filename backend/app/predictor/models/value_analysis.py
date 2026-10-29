@@ -20,6 +20,43 @@ from typing import Optional
 VALUE_THRESHOLD = 0.02
 # 大小球方向价值阈值：竞彩 P大 与锐利盘 P大 的偏离超过 2pp 才认作可操作价值。
 OU_EDGE_THRESHOLD = 0.02
+# 深盘判定：让球方锐利盘 1X2 胜赔低于此值 → 深盘（强热门）；否则均衡盘。
+DEEP_FAV_ODDS = 1.50
+# 均衡盘平预测细分：让球方锐利盘 1X2 胜赔落在 [DECISIVE_FAV_LO, DECISIVE_FAV_HI) → 实际易分出胜负，
+# 预测改为「胜+让负」(客让) 或「负+让胜」(主让)，而非「平+让平」。
+DECISIVE_FAV_LO = 1.80
+DECISIVE_FAV_HI = 2.00
+# 让负(冷门负)场景细分：主队为让球方且锐利盘胜赔落在 [FAV_COVER_LO, FAV_COVER_HI) 时，
+# 价值分析预测客胜(负)系统失败，主队大概率净胜2+ → 提取「让胜」。
+FAV_COVER_LO = 1.40
+FAV_COVER_HI = 1.60
+# 让负(冷门负)场景细分2：主队为让球方且锐利盘胜赔落在 [FAV_PUSH_LO, FAV_PUSH_HI) 时，
+# 主队赢球多为净胜1(让平)、否则客胜(负) → 提取「让平 + 负」。
+FAV_PUSH_LO = 1.60
+FAV_PUSH_HI = 1.80
+# 让负(冷门负)场景细分3：主队为让球方且锐利盘胜赔 >= FAV_DRAW_LO 时，
+# 主队赢球多为净胜1(让平)、否则平局(平) → 提取「让平 + 平」。
+FAV_DRAW_LO = 2.00
+# 胜(正路胜)场景细分：主队为让球方且锐利盘胜赔落在 [FAV_WIN_DRAW_LO, FAV_WIN_DRAW_HI) 时，
+# 主队不败概率高(胜+平) → 提取「胜 + 平」。
+FAV_WIN_DRAW_LO = 2.00
+FAV_WIN_DRAW_HI = 2.30
+# 胜(正路胜)场景细分2：主队为让球方且锐利盘胜赔 >= FAV_NO_WIN_LO 时主队无胜，
+# 平赔 < FAV_NO_WIN_DRAW_SPLIT → 平+负；否则 → 负。
+FAV_NO_WIN_LO = 2.60
+FAV_NO_WIN_DRAW_SPLIT = 3.40
+# 平(均衡盘)场景细分1：主队为让球方且锐利盘胜赔落在 [DRAW_HOME_FAV_LO, DRAW_HOME_FAV_HI) 时，
+# 主队净胜2+(让胜)或平局概率高 → 提取「让胜 + 平」。
+DRAW_HOME_FAV_LO = 1.50
+DRAW_HOME_FAV_HI = 1.60
+# 平(均衡盘)场景细分2：客队为让球方且锐利盘胜赔落在 [DRAW_AWAY_PUSH_LO, DRAW_AWAY_PUSH_HI) 时，
+# 主队受让赢盘(让胜)或客胜(负)概率高 → 提取「让胜 + 负」。
+DRAW_AWAY_PUSH_LO = 1.60
+DRAW_AWAY_PUSH_HI = 1.80
+# 平(均衡盘)场景细分3：客队为让球方且锐利盘胜赔落在 [DRAW_AWAY_DECISIVE_LO, DRAW_AWAY_DECISIVE_HI) 时，
+# 实际分出胜负(胜/负)概率高 → 提取「胜 + 负」。
+DRAW_AWAY_DECISIVE_LO = 2.00
+DRAW_AWAY_DECISIVE_HI = 2.30
 
 
 # ---------------------------------------------------------------------------
@@ -367,6 +404,318 @@ def assemble_risk(flags: list[dict]) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# 预测信息提取
+# ---------------------------------------------------------------------------
+def _fav_from_1x2(odds_1x2) -> Optional[str]:
+    """让球方（热门方）判定：按 1X2 胜赔，主胜赔<客胜赔 → 主队(fav=home)；反之客队(fav=away)；相等/缺失 → None。"""
+    if not isinstance(odds_1x2, dict):
+        return None
+    h = _to_f(odds_1x2.get("home"))
+    a = _to_f(odds_1x2.get("away"))
+    if h is None or a is None or h <= 0 or a <= 0:
+        return None
+    if h < a:
+        return "home"
+    if a < h:
+        return "away"
+    return None
+
+
+def _pick(market: str, outcome: str, label: str) -> dict:
+    return {"market": market, "outcome": outcome, "label": label}
+
+
+def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True) -> Optional[dict]:
+    """从价值分析 1X2 预测（best_side = home/draw/away）提取投注预测（胜平负 + 让球胜平负）。
+
+    规则（用户口径，用锐利盘 1X2 赔率定义让球方与深盘，不依赖让球线）：
+      让球方 = 锐利盘 1X2 胜赔更低的一方（主胜赔<客胜赔 → 主队，反之客队）。
+      平：均衡盘(让球方锐利盘胜赔 >= DEEP_FAV_ODDS 或无让球方) → 平 + 让平；
+         其中让球方锐利盘胜赔落在 [DECISIVE_FAV_LO, DECISIVE_FAV_HI) 时实际易分出胜负，
+         客让 → 胜 + 让负，主让 → 负 + 让胜；
+         深盘(让球方锐利盘胜赔 < DEEP_FAV_ODDS) → 让球方负 + 让球方平。
+      胜：正路(让球方=主队) → 胜；冷门(让球方=客队，主队受让) → 让胜；
+         其中主队锐利盘胜赔 [FAV_WIN_DRAW_LO, FAV_WIN_DRAW_HI) → 胜 + 平，
+         >= FAV_NO_WIN_LO → 主队无胜（平赔<FAV_NO_WIN_DRAW_SPLIT→平+负，否则→负）。
+      负：正路(让球方=客队) → 负；冷门(让球方=主队，客队受让) → 让负；
+         其中主队锐利盘胜赔 [FAV_COVER_LO, FAV_COVER_HI) → 让胜，
+         [FAV_PUSH_LO, FAV_PUSH_HI) → 让平 + 负，>= FAV_DRAW_LO → 让平 + 平。
+      has_hhad=False（无竞彩让球盘数据）时仅提取胜平负。
+
+    返回 None 当 best_side 非法；否则返回 {side, mode, fav, label, picks}。
+    """
+    if best_side not in ("home", "draw", "away"):
+        return None
+
+    fav = _fav_from_1x2(sharp_1x2)
+    fav_odds = _to_f((sharp_1x2 or {}).get(fav)) if fav else None
+    draw_odds = _to_f((sharp_1x2 or {}).get("draw"))
+
+    if not has_hhad:
+        # 无让球盘数据 → 仅胜平负
+        side_label = {"home": "胜", "draw": "平", "away": "负"}[best_side]
+        return {
+            "side": best_side,
+            "mode": "had_only",
+            "fav": None,
+            "label": side_label,
+            "picks": [_pick("had", best_side, side_label)],
+        }
+
+    if best_side == "draw":
+        if fav is None or fav_odds is None or fav_odds >= DEEP_FAV_ODDS:
+            # 均衡盘细分：让球方锐利盘胜赔落在 [DECISIVE_FAV_LO, DECISIVE_FAV_HI) 时实际易分出胜负
+            if fav is not None and fav_odds is not None and DECISIVE_FAV_LO <= fav_odds < DECISIVE_FAV_HI:
+                if fav == "home":
+                    # 主让 → 负 + 让胜（客胜 或 主净胜2+）
+                    return {
+                        "side": "draw",
+                        "mode": "decisive_draw_home",
+                        "fav": fav,
+                        "label": "负 + 让胜",
+                        "picks": [
+                            _pick("had", "away", "负"),
+                            _pick("hhad", "home", "让胜"),
+                        ],
+                    }
+                # 客让 → 胜 + 让负（主胜 或 客净胜2+）
+                return {
+                    "side": "draw",
+                    "mode": "decisive_draw_away",
+                    "fav": fav,
+                    "label": "胜 + 让负",
+                    "picks": [
+                        _pick("had", "home", "胜"),
+                        _pick("hhad", "away", "让负"),
+                    ],
+                }
+            # 平(均衡盘)细分1：主让 1.5~1.6 → 让胜 + 平
+            if fav == "home" and fav_odds is not None and DRAW_HOME_FAV_LO <= fav_odds < DRAW_HOME_FAV_HI:
+                return {
+                    "side": "draw",
+                    "mode": "draw_home_fav_win",
+                    "fav": fav,
+                    "label": "让胜 + 平",
+                    "picks": [
+                        _pick("hhad", "home", "让胜"),
+                        _pick("had", "draw", "平"),
+                    ],
+                }
+            # 平(均衡盘)细分2：客让 1.6~1.8 → 让胜 + 负
+            if fav == "away" and fav_odds is not None and DRAW_AWAY_PUSH_LO <= fav_odds < DRAW_AWAY_PUSH_HI:
+                return {
+                    "side": "draw",
+                    "mode": "draw_away_fav_push",
+                    "fav": fav,
+                    "label": "让胜 + 负",
+                    "picks": [
+                        _pick("hhad", "home", "让胜"),
+                        _pick("had", "away", "负"),
+                    ],
+                }
+            # 平(均衡盘)细分3：客让 2.0~2.3 → 胜 + 负
+            if fav == "away" and fav_odds is not None and DRAW_AWAY_DECISIVE_LO <= fav_odds < DRAW_AWAY_DECISIVE_HI:
+                return {
+                    "side": "draw",
+                    "mode": "draw_away_fav_decisive",
+                    "fav": fav,
+                    "label": "胜 + 负",
+                    "picks": [
+                        _pick("had", "home", "胜"),
+                        _pick("had", "away", "负"),
+                    ],
+                }
+            # 其余均衡盘：平 + 让平
+            return {
+                "side": "draw",
+                "mode": "balanced_draw",
+                "fav": fav,
+                "label": "平 + 让平",
+                "picks": [
+                    _pick("had", "draw", "平"),
+                    _pick("hhad", "draw", "让平"),
+                ],
+            }
+        # 深盘：让球方负 + 让球方平（映射到主队视角让球胜平负标签）
+        loss_outcome, loss_label = ("away", "让负") if fav == "home" else ("home", "让胜")
+        return {
+            "side": "draw",
+            "mode": "deep_draw",
+            "fav": fav,
+            "label": "让球方负 + 让球方平",
+            "picks": [
+                _pick("hhad", loss_outcome, loss_label),
+                _pick("hhad", "draw", "让平"),
+            ],
+        }
+
+    if best_side == "home":
+        if fav == "away":
+            # 冷门的胜：主队受让（客队让球）→ 让胜
+            return {
+                "side": "home",
+                "mode": "upset_win",
+                "fav": fav,
+                "label": "让胜",
+                "picks": [_pick("hhad", "home", "让胜")],
+            }
+        # 主队锐利盘胜赔 2.0~2.3 → 胜 + 平（主队不败）
+        if fav_odds is not None and FAV_WIN_DRAW_LO <= fav_odds < FAV_WIN_DRAW_HI:
+            return {
+                "side": "home",
+                "mode": "fav_win_draw",
+                "fav": fav,
+                "label": "胜 + 平",
+                "picks": [
+                    _pick("had", "home", "胜"),
+                    _pick("had", "draw", "平"),
+                ],
+            }
+        # 主队锐利盘胜赔 >= 2.6 时主队无胜，按平赔分两种情况
+        if fav_odds is not None and fav_odds >= FAV_NO_WIN_LO:
+            if draw_odds is not None and draw_odds < FAV_NO_WIN_DRAW_SPLIT:
+                # 平赔 < 3.4 → 平 + 负（主队不胜）
+                return {
+                    "side": "home",
+                    "mode": "fav_no_win_draw_loss",
+                    "fav": fav,
+                    "label": "平 + 负",
+                    "picks": [
+                        _pick("had", "draw", "平"),
+                        _pick("had", "away", "负"),
+                    ],
+                }
+            # 平赔 >= 3.4 → 负（客胜）
+            return {
+                "side": "home",
+                "mode": "fav_no_win_loss",
+                "fav": fav,
+                "label": "负",
+                "picks": [_pick("had", "away", "负")],
+            }
+        # 正路的胜（让球方=主队，或平手盘）
+        return {
+            "side": "home",
+            "mode": "favorite_win",
+            "fav": fav,
+            "label": "胜",
+            "picks": [_pick("had", "home", "胜")],
+        }
+
+    # best_side == "away"
+    if fav == "home":
+        # 主队强热门(锐利盘胜赔 1.4~1.6)时，价值分析预测客胜(冷门负)系统失败，主队多净胜2+ → 让胜
+        if fav_odds is not None and FAV_COVER_LO <= fav_odds < FAV_COVER_HI:
+            return {
+                "side": "away",
+                "mode": "fav_cover",
+                "fav": fav,
+                "label": "让胜",
+                "picks": [_pick("hhad", "home", "让胜")],
+            }
+        # 主队中等热门(锐利盘胜赔 1.6~1.8)时，主队赢球多为净胜1(让平)、否则客胜(负) → 让平 + 负
+        if fav_odds is not None and FAV_PUSH_LO <= fav_odds < FAV_PUSH_HI:
+            return {
+                "side": "away",
+                "mode": "fav_push_loss",
+                "fav": fav,
+                "label": "让平 + 负",
+                "picks": [
+                    _pick("hhad", "draw", "让平"),
+                    _pick("had", "away", "负"),
+                ],
+            }
+        # 主队弱热门(锐利盘胜赔 >=2.0)时，主队赢球多为净胜1(让平)、否则平局(平) → 让平 + 平
+        if fav_odds is not None and fav_odds >= FAV_DRAW_LO:
+            return {
+                "side": "away",
+                "mode": "fav_push_draw",
+                "fav": fav,
+                "label": "让平 + 平",
+                "picks": [
+                    _pick("hhad", "draw", "让平"),
+                    _pick("had", "draw", "平"),
+                ],
+            }
+        # 冷门的负：客队受让（主队让球）→ 让负
+        return {
+            "side": "away",
+            "mode": "upset_loss",
+            "fav": fav,
+            "label": "让负",
+            "picks": [_pick("hhad", "away", "让负")],
+        }
+    # 正路的负（让球方=客队，或平手盘）
+    return {
+        "side": "away",
+        "mode": "favorite_loss",
+        "fav": fav,
+        "label": "负",
+        "picks": [_pick("had", "away", "负")],
+    }
+
+
+def prediction_from_analysis(analysis) -> Optional[dict]:
+    """从已持久化的 analysis_json（冻结口径）重建预测提取结果，供回填 / 历史回测使用。
+
+    analysis_json 内已含冻结的 1X2 best_side、锐利盘 1X2 赔率、竞彩让球赔率，据此重算即可，无需回源赔率快照。
+    """
+    if not isinstance(analysis, dict):
+        return None
+    m1 = (analysis.get("markets") or {}).get("1x2") or {}
+    best_side = (m1.get("value") or {}).get("best_side")
+    sharp_1x2 = m1.get("sharp_odds")
+    handicap = (analysis.get("markets") or {}).get("handicap") or {}
+    has_hhad = bool(handicap.get("jczq_odds"))
+    return extract_prediction(best_side, sharp_1x2, has_hhad)
+
+
+def actual_hhad(diff: int, hhad_line) -> Optional[str]:
+    """实际让球胜平负：diff=主队净胜球(主-客)，hhad_line=让球线(负=主队让球)。
+
+    让球结果 = 主队净胜球 + 让球线：
+      > 0 → 让胜(home)；== 0 → 让平(draw)；< 0 → 让负(away)。
+    """
+    line = _to_f(hhad_line)
+    if line is None:
+        return None
+    adj = diff + line
+    if adj > 0:
+        return "home"
+    if adj == 0:
+        return "draw"
+    return "away"
+
+
+def hit_prediction(prediction, diff: int, hhad_line):
+    """预测命中判定：返回 (any_hit, pick_hits)。
+
+    any_hit = 任一 pick 命中（None 表示无法判定，如缺让球线导致 hhad 项无法判）；
+    pick_hits = 每个 pick 的命中 bool / None。
+    """
+    if not isinstance(prediction, dict):
+        return None, []
+    picks = prediction.get("picks") or []
+    if not picks:
+        return None, []
+
+    had_actual = "home" if diff > 0 else ("draw" if diff == 0 else "away")
+    hhad_actual = actual_hhad(diff, hhad_line)
+
+    pick_hits: list = []
+    for p in picks:
+        if p.get("market") == "had":
+            pick_hits.append(had_actual == p.get("outcome"))
+        else:  # hhad
+            pick_hits.append(None if hhad_actual is None else (hhad_actual == p.get("outcome")))
+
+    non_none = [h for h in pick_hits if h is not None]
+    if not non_none:
+        return None, pick_hits
+    return any(non_none), pick_hits
+
+
+# ---------------------------------------------------------------------------
 # 主入口
 # ---------------------------------------------------------------------------
 def analyze_match(
@@ -385,7 +734,7 @@ def analyze_match(
       sharp_ou_p_big   锐利盘大小球去水后 P大（2.5 线）
       sharp_ou_n_books 锐利盘大小球参与庄家数（用于基准可信度）
       jczq_early   竞彩最早快照（用于盘口漂移，可省）
-    返回 {markets: {...}, risk_summary: {...}}
+    返回 {markets: {...}, risk_summary: {...}, prediction: {...}|None}
     """
     jczq = jczq or {}
     had = _odds_dict(jczq.get("had"))
@@ -395,6 +744,7 @@ def analyze_match(
     hafu = _odds_dict(jczq.get("hafu"))
 
     markets: dict = {}
+    prediction = None
 
     # --- 1X2 胜平负：价值 + 风险 ---
     if had:
@@ -416,6 +766,7 @@ def analyze_match(
             "value": mv,
             "risk": assemble_risk(flags),
         }
+        prediction = extract_prediction(mv.get("best_side"), _odds_dict(sharp_1x2 or {}), bool(hhad))
 
     # --- 让球：仅风险（竞彩让球=欧盘3-way -1，锐利盘=亚盘2-way，口径不对齐，无法直接估值）---
     if hhad:
@@ -478,7 +829,7 @@ def analyze_match(
 
     # --- 汇总 ---
     risk_summary = _summarize(markets)
-    return {"markets": markets, "risk_summary": risk_summary}
+    return {"markets": markets, "risk_summary": risk_summary, "prediction": prediction}
 
 
 def _top_odds(odds: dict) -> Optional[float]:

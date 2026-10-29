@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { getValueAnalysisHistory, computeValueAnalysis, ValueHistoryResponse, ValueHistoryDay, ValueHistoryMatch } from "../api/client";
+import { getValueAnalysisHistory, computeValueAnalysis, backfillValueAnalysisPrediction, ValueHistoryResponse, ValueHistoryDay, ValueHistoryMatch } from "../api/client";
 
 const SIDE_ZH: Record<string, string> = { home: "主胜", draw: "平", away: "客胜" };
 
@@ -57,6 +57,14 @@ function MatchRow({ m }: { m: ValueHistoryMatch }) {
       ) : (
         <span className="shrink-0 text-gray-400 w-24 text-right">无基准</span>
       )}
+      {m.prediction ? (
+        <span className="shrink-0 text-ink w-40 text-right whitespace-nowrap">
+          提取 {m.prediction.label}
+        </span>
+      ) : (
+        <span className="shrink-0 text-gray-400 w-40 text-right">—</span>
+      )}
+      <span className="shrink-0 w-12 text-right"><HitMark hit={m.prediction_hit} /></span>
       <span className="shrink-0 text-ink-muted w-16 text-right">实际 {sideZh(m.actual)}</span>
       <span className="shrink-0 w-14 text-right"><HitMark hit={m.hit} /></span>
     </div>
@@ -84,6 +92,11 @@ function DayCard({ day }: { day: ValueHistoryDay }) {
             </span>
           )}
           <span className="text-xs text-ink-muted">全方向命中率 {fmtPct(day.all_rate)}</span>
+          {day.pred_n > 0 && (
+            <span className={`text-xs font-semibold ${(day.pred_rate ?? 0) >= 0.5 ? "text-emerald-600" : "text-red-500"}`}>
+              预测提取 {day.pred_n}场·中{day.pred_hit}
+            </span>
+          )}
         </div>
         <span className="text-xs text-ink-muted shrink-0">{open ? "▴" : "▾"}</span>
       </button>
@@ -108,6 +121,7 @@ export default function ValueHistory() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [computing, setComputing] = useState(false);
+  const [backfilling, setBackfilling] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -133,6 +147,21 @@ export default function ValueHistory() {
       setError(e?.message ?? "补算失败");
     } finally {
       setComputing(false);
+    }
+  };
+
+  const handleBackfill = async () => {
+    setBackfilling(true);
+    setError(null);
+    try {
+      await backfillValueAnalysisPrediction({ only_missing: false });
+      const params = mode === "date" ? { date } : { days };
+      const d = await getValueAnalysisHistory(params);
+      setData(d);
+    } catch (e: any) {
+      setError(e?.message ?? "回填预测失败");
+    } finally {
+      setBackfilling(false);
     }
   };
 
@@ -184,6 +213,13 @@ export default function ValueHistory() {
           >
             {computing ? "补算中…" : "补算"}
           </button>
+          <button
+            onClick={handleBackfill}
+            disabled={backfilling}
+            className="px-3 py-1 rounded text-xs font-medium border border-moss text-moss disabled:opacity-50 hover:bg-moss/5"
+          >
+            {backfilling ? "回填中…" : "回填预测"}
+          </button>
           {data && (
             <span className="text-xs text-ink-muted">
               {data.range[0]}{data.range[1] !== data.range[0] ? ` ~ ${data.range[1]}` : ""}
@@ -196,7 +232,7 @@ export default function ValueHistory() {
       {error && <p className="text-sm text-red-600">{error}</p>}
 
       {s && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
           <div className="bg-white border border-border rounded-lg px-4 py-3">
             <div className="text-xs text-ink-muted">有价值信号命中率</div>
             <div className="text-xl font-bold text-emerald-600 mt-1">{fmtPct(s.value_rate)}</div>
@@ -216,6 +252,11 @@ export default function ValueHistory() {
             <div className="text-xs text-ink-muted">大小球错价方向命中率</div>
             <div className={`text-xl font-bold mt-1 ${(s.ou_rate ?? 0) < 0.5 ? "text-red-500" : "text-emerald-600"}`}>{fmtPct(s.ou_rate)}</div>
             <div className="text-xs text-ink-muted mt-0.5">{s.ou_n} 个错价信号（仅方向参考）</div>
+          </div>
+          <div className="bg-white border border-border rounded-lg px-4 py-3">
+            <div className="text-xs text-ink-muted">预测提取命中率</div>
+            <div className={`text-xl font-bold mt-1 ${(s.pred_rate ?? 0) < 0.5 ? "text-red-500" : "text-emerald-600"}`}>{fmtPct(s.pred_rate)}</div>
+            <div className="text-xs text-ink-muted mt-0.5">{s.pred_n} 个预测 · 中 {s.pred_hit}</div>
           </div>
         </div>
       )}

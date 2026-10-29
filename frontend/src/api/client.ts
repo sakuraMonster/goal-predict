@@ -1077,6 +1077,18 @@ export interface ValueRiskSummary {
   best_ev: number | null;
   hints: string[];
 }
+export interface ValuePredictionPick {
+  market: "had" | "hhad";
+  outcome: "home" | "draw" | "away";
+  label: string;
+}
+export interface ValuePrediction {
+  side: "home" | "draw" | "away";
+  mode: string;
+  fav: "home" | "away" | null;
+  label: string;
+  picks: ValuePredictionPick[];
+}
 export interface ValueAnalysisItem {
   match_id: number;
   match_num: string | null;
@@ -1089,6 +1101,7 @@ export interface ValueAnalysisItem {
   analysis: {
     markets: Record<string, ValueMarket>;
     risk_summary: ValueRiskSummary;
+    prediction?: ValuePrediction | null;
   } | null;
 }
 export interface ValueAnalysisResponse {
@@ -1123,6 +1136,8 @@ export interface ValueHistoryMatch {
   best_ev: number | null;
   best_fp: number | null;
   hit: boolean | null;
+  prediction: ValuePrediction | null;
+  prediction_hit: boolean | null;
   ou_cheap: string | null;
   ou_hit: boolean | null;
 }
@@ -1135,6 +1150,9 @@ export interface ValueHistoryDay {
   value_hit: number;
   value_rate: number | null;
   value_avg_fp: number | null;
+  pred_n: number;
+  pred_hit: number;
+  pred_rate: number | null;
   matches: ValueHistoryMatch[];
 }
 export interface ValueHistoryResponse {
@@ -1148,6 +1166,9 @@ export interface ValueHistoryResponse {
     value_hit: number;
     value_rate: number | null;
     value_avg_fp: number | null;
+    pred_n: number;
+    pred_hit: number;
+    pred_rate: number | null;
     ou_n: number;
     ou_hit: number;
     ou_rate: number | null;
@@ -1156,5 +1177,13 @@ export interface ValueHistoryResponse {
 }
 export const getValueAnalysisHistory = (params?: { days?: number; date?: string }) =>
   api.get("/value-analysis/history", { params }).then((r) => r.data as ValueHistoryResponse);
+
+export const backfillValueAnalysisPrediction = (params?: { only_missing?: boolean }) =>
+  api.post("/value-analysis/backfill-prediction", null, { params }).then((r) => r.data as {
+    status: string;
+    total: number;
+    updated: number;
+    with_prediction: number;
+  });
 
 export default api;

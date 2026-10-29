@@ -19,7 +19,7 @@ from app.api.market_flow import _sm_ou_rows
 from app.db.database import get_db
 from app.db.models import JczqPlayOddsSnapshot, League, Match, OddsSnapshot, Team, ValueAnalysisSnapshot
 from app.predictor.models.ou_market import ou_market_from_rows
-from app.predictor.models.value_analysis import analyze_match
+from app.predictor.models.value_analysis import analyze_match, hit_prediction, prediction_from_analysis
 
 router = APIRouter(prefix="/api/value-analysis", tags=["value_analysis"])
 
@@ -259,6 +259,42 @@ async def compute_value_analysis(
     }
 
 
+@router.post("/backfill-prediction")
+async def backfill_prediction(
+    only_missing: bool = Query(False, description="仅回填缺失 prediction 的快照（已存在则跳过）"),
+    db: AsyncSession = Depends(get_db),
+):
+    """回填预测提取：从已持久化 analysis_json（冻结口径）重建 prediction 并写回。
+
+    预测提取基于冻结在 analysis_json 内的 1X2 best_side / HAD 赔率 / 让球赔率，
+    无需回源赔率快照，避免历史漂移。
+    """
+    rows = (await db.execute(select(ValueAnalysisSnapshot))).scalars().all()
+    updated = 0
+    with_prediction = 0
+    for s in rows:
+        analysis = s.analysis_json
+        if not isinstance(analysis, dict):
+            continue
+        if only_missing and analysis.get("prediction") is not None:
+            with_prediction += 1
+            continue
+        pred = prediction_from_analysis(analysis)
+        new_analysis = dict(analysis)
+        new_analysis["prediction"] = pred
+        s.analysis_json = new_analysis
+        if pred is not None:
+            with_prediction += 1
+        updated += 1
+    await db.commit()
+    return {
+        "status": "ok",
+        "total": len(rows),
+        "updated": updated,
+        "with_prediction": with_prediction,
+    }
+
+
 def _actual_outcome(home_score: int, away_score: int) -> str:
     if home_score > away_score:
         return "home"
@@ -330,6 +366,9 @@ async def value_analysis_history(
         for s in s_res.scalars():
             snap_map[int(s.match_id)] = s.analysis_json
 
+    # 读最新竞彩快照的让球线（仅用于预测命中判定，让球线历史稳定）
+    jczq_map: dict[int, JczqPlayOddsSnapshot] = await _jczq_map(db, mids, desc=True)
+
     records = []
     for m, hname, aname, lname in mrows:
         mid = int(m.id)
@@ -357,6 +396,13 @@ async def value_analysis_history(
         elif ou_cheap == "大球":
             ou_hit = actual_over
 
+        # 预测提取 + 命中判定（预测持久化于 analysis_json；缺漏时按冻结口径重建）
+        prediction = analysis.get("prediction")
+        if not isinstance(prediction, dict):
+            prediction = prediction_from_analysis(analysis)
+        hhad_line = jczq_map.get(mid).hhad_line if jczq_map.get(mid) else None
+        prediction_hit, _ = hit_prediction(prediction, hs - aw, hhad_line)
+
         matchday = (m.kickoff_time - timedelta(hours=12)).date().isoformat()
 
         records.append({
@@ -372,6 +418,8 @@ async def value_analysis_history(
             "best_ev": round(best_ev, 4) if best_ev is not None else None,
             "best_fp": round(best_fp, 4) if best_fp is not None else None,
             "hit": hit,
+            "prediction": prediction,
+            "prediction_hit": prediction_hit,
             "ou_cheap": ou_cheap,
             "ou_hit": ou_hit,
         })
@@ -387,6 +435,8 @@ async def value_analysis_history(
             "value_n": 0,
             "value_hit": 0,
             "value_fp_sum": 0.0,
+            "pred_n": 0,
+            "pred_hit": 0,
         })
         d["matches"].append(r)
         if r["best_side"] is not None:
@@ -399,6 +449,10 @@ async def value_analysis_history(
                     d["value_hit"] += 1
                 if r["best_fp"] is not None:
                     d["value_fp_sum"] += r["best_fp"]
+        if r["prediction_hit"] is not None:
+            d["pred_n"] += 1
+            if r["prediction_hit"]:
+                d["pred_hit"] += 1
 
     daily = []
     for matchday in sorted(daily_map, reverse=True):
@@ -412,6 +466,9 @@ async def value_analysis_history(
             "value_hit": d["value_hit"],
             "value_rate": _rate(d["value_hit"], d["value_n"]),
             "value_avg_fp": round(d["value_fp_sum"] / d["value_n"], 4) if d["value_n"] else None,
+            "pred_n": d["pred_n"],
+            "pred_hit": d["pred_hit"],
+            "pred_rate": _rate(d["pred_hit"], d["pred_n"]),
             "matches": d["matches"],
         })
 
@@ -422,6 +479,8 @@ async def value_analysis_history(
     value_n = sum(d["value_n"] for d in dm_vals)
     value_hit = sum(d["value_hit"] for d in dm_vals)
     value_fp_sum = sum(d["value_fp_sum"] for d in dm_vals)
+    pred_n = sum(d["pred_n"] for d in dm_vals)
+    pred_hit = sum(d["pred_hit"] for d in dm_vals)
     ou_n = sum(1 for r in records if r["ou_cheap"])
     ou_hit = sum(1 for r in records if r["ou_cheap"] and r["ou_hit"])
 
@@ -436,6 +495,9 @@ async def value_analysis_history(
             "value_hit": value_hit,
             "value_rate": _rate(value_hit, value_n),
             "value_avg_fp": round(value_fp_sum / value_n, 4) if value_n else None,
+            "pred_n": pred_n,
+            "pred_hit": pred_hit,
+            "pred_rate": _rate(pred_hit, pred_n),
             "ou_n": ou_n,
             "ou_hit": ou_hit,
             "ou_rate": _rate(ou_hit, ou_n),

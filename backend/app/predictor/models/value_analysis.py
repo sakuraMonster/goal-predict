@@ -64,6 +64,16 @@ UPSET_WIN_DEEP_ODDS = 1.50
 # 主队不胜(平/负)概率高 → 提取「平 + 负」。
 UPSET_WIN_DRAW_LOSS_LO = 2.00
 UPSET_WIN_DRAW_LOSS_HI = 2.30
+# 冷门负(主让)细分1：主让 <1.4 深盘 → 让胜 + 让负（主队要么大胜赢盘，要么输盘）
+UPSET_LOSS_DEEP_ODDS = 1.40
+# 冷门负(主让)细分2：主让 [1.8, 2.0) → 胜 + 平（主队不败）
+UPSET_LOSS_MID_LO = 1.80
+UPSET_LOSS_MID_HI = 2.00
+# 正路负(客让)细分1：客让 <1.5 深盘 → 让平 + 让负（客队赢盘或小胜让平）
+FAVORITE_LOSS_DEEP_ODDS = 1.50
+# 正路负(客让)细分2：客让 [2.3, 2.6) → 胜 + 平（客队高赔赢不了，主队不败）
+FAVORITE_LOSS_DRAW_HOME_LO = 2.30
+FAVORITE_LOSS_DRAW_HOME_HI = 2.60
 
 # 预测提取规则标签（固定顺序，用于命中率统计与前端展示）。
 # 顺序：方向类（正路/冷门）在前，平类（均衡盘/深盘）在后。
@@ -74,11 +84,15 @@ PREDICTION_LABEL_ORDER = [
     "客让<1.5-胜",
     "客让2.0~2.3-胜",
     "客让-胜",
+    "客让<1.5-负",
+    "客让2.3~2.6-负",
     "客让-负",
-    "主让-负",
+    "主让<1.4-负",
     "主让1.4~1.6-负",
     "主让1.6~1.8-负",
+    "主让1.8~2.0-负",
     "主让≥2.0-负",
+    "主让-负",
     "主让<1.5-平",
     "客让<1.5-平",
     "主让1.5~1.6-平",
@@ -673,7 +687,19 @@ def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True) -> Optional[
 
     # best_side == "away"
     if fav == "home":
-        # 主队强热门(锐利盘胜赔 1.4~1.6)时，价值分析预测客胜(冷门负)系统失败，主队多净胜2+ → 让胜
+        # 主让 <1.4 深盘 → 让胜 + 让负（主队要么大胜赢盘，要么输盘）
+        if fav_odds is not None and fav_odds < UPSET_LOSS_DEEP_ODDS:
+            return {
+                "side": "away",
+                "mode": "upset_loss_deep",
+                "fav": fav,
+                "label": "主让<1.4-负",
+                "picks": [
+                    _pick("hhad", "home", "让胜"),
+                    _pick("hhad", "away", "让负"),
+                ],
+            }
+        # 主让 1.4~1.6 → 让胜
         if fav_odds is not None and FAV_COVER_LO <= fav_odds < FAV_COVER_HI:
             return {
                 "side": "away",
@@ -682,7 +708,7 @@ def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True) -> Optional[
                 "label": "主让1.4~1.6-负",
                 "picks": [_pick("hhad", "home", "让胜")],
             }
-        # 主队中等热门(锐利盘胜赔 1.6~1.8)时，主队赢球多为净胜1(让平)、否则客胜(负) → 让平 + 负
+        # 主让 1.6~1.8 → 让平 + 负
         if fav_odds is not None and FAV_PUSH_LO <= fav_odds < FAV_PUSH_HI:
             return {
                 "side": "away",
@@ -694,7 +720,19 @@ def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True) -> Optional[
                     _pick("had", "away", "负"),
                 ],
             }
-        # 主队弱热门(锐利盘胜赔 >=2.0)时，主队赢球多为净胜1(让平)、否则平局(平) → 让平 + 平
+        # 主让 1.8~2.0 → 胜 + 平（主队不败）
+        if fav_odds is not None and UPSET_LOSS_MID_LO <= fav_odds < UPSET_LOSS_MID_HI:
+            return {
+                "side": "away",
+                "mode": "upset_loss_mid",
+                "fav": fav,
+                "label": "主让1.8~2.0-负",
+                "picks": [
+                    _pick("had", "home", "胜"),
+                    _pick("had", "draw", "平"),
+                ],
+            }
+        # 主让 >=2.0 → 让平 + 平
         if fav_odds is not None and fav_odds >= FAV_DRAW_LO:
             return {
                 "side": "away",
@@ -706,7 +744,7 @@ def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True) -> Optional[
                     _pick("had", "draw", "平"),
                 ],
             }
-        # 冷门的负：客队受让（主队让球）→ 让负
+        # 冷门的负（兜底）→ 让负
         return {
             "side": "away",
             "mode": "upset_loss",
@@ -714,7 +752,31 @@ def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True) -> Optional[
             "label": "主让-负",
             "picks": [_pick("hhad", "away", "让负")],
         }
-    # 正路的负（让球方=客队，或平手盘）
+    # 客让 <1.5 深盘 → 让平 + 让负（客队赢盘或小胜让平）
+    if fav_odds is not None and fav_odds < FAVORITE_LOSS_DEEP_ODDS:
+        return {
+            "side": "away",
+            "mode": "favorite_loss_deep",
+            "fav": fav,
+            "label": "客让<1.5-负",
+            "picks": [
+                _pick("hhad", "draw", "让平"),
+                _pick("hhad", "away", "让负"),
+            ],
+        }
+    # 客让 2.3~2.6 → 胜 + 平（客队高赔赢不了，主队不败）
+    if fav_odds is not None and FAVORITE_LOSS_DRAW_HOME_LO <= fav_odds < FAVORITE_LOSS_DRAW_HOME_HI:
+        return {
+            "side": "away",
+            "mode": "favorite_loss_draw_home",
+            "fav": fav,
+            "label": "客让2.3~2.6-负",
+            "picks": [
+                _pick("had", "home", "胜"),
+                _pick("had", "draw", "平"),
+            ],
+        }
+    # 正路的负（客让其余：1.5~2.0 待区分、2.0~2.3、≥2.6）→ 负
     return {
         "side": "away",
         "mode": "favorite_loss",

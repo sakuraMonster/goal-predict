@@ -1202,4 +1202,29 @@ export interface PredictionLabelStatsResponse {
 export const getPredictionLabelStats = (params?: { days?: number }) =>
   api.get("/value-analysis/prediction-label-stats", { params }).then((r) => r.data as PredictionLabelStatsResponse);
 
+export interface PredictionLabelMatch {
+  matchday: string;
+  match_num: string | null;
+  league: string | null;
+  home: string | null;
+  away: string | null;
+  kickoff: string | null;
+  score: string;
+  actual: "home" | "draw" | "away";
+  hhad: "home" | "draw" | "away" | null;
+  hhad_line: number | null;
+  picks: string;
+  prediction_hit: boolean;
+}
+export interface PredictionLabelMatchesResponse {
+  label: string;
+  days: number;
+  n: number;
+  hit: number;
+  rate: number | null;
+  matches: PredictionLabelMatch[];
+}
+export const getPredictionLabelMatches = (params: { label: string; days?: number }) =>
+  api.get("/value-analysis/prediction-label-matches", { params }).then((r) => r.data as PredictionLabelMatchesResponse);
+
 export default api;

@@ -21,6 +21,7 @@ from app.db.models import JczqPlayOddsSnapshot, League, Match, OddsSnapshot, Tea
 from app.predictor.models.ou_market import ou_market_from_rows
 from app.predictor.models.value_analysis import (
     PREDICTION_LABEL_ORDER,
+    actual_hhad,
     analyze_match,
     hit_prediction,
     prediction_from_analysis,
@@ -586,4 +587,98 @@ async def prediction_label_stats(
         "total_hit": total_hit,
         "total_rate": _rate(total_hit, total_n),
         "labels": labels,
+    }
+
+
+@router.get("/prediction-label-matches")
+async def prediction_label_matches(
+    label: str = Query(..., description="规则标签"),
+    days: int = Query(30, description="回溯天数（默认近 30 天，1~365）"),
+    db: AsyncSession = Depends(get_db),
+):
+    """规则标签下近 N 天赛事明细（含实际赛果）。
+
+    命中口径与 /history 的 pred 一致（双选任一命中），赛果更新后本接口现算自动刷新。
+    """
+    days = max(1, min(days, 365))
+    today = datetime.now(_BEIJING).date()
+    start_day = today - timedelta(days=days - 1)
+    start_ts = datetime.combine(start_day, datetime.min.time()) + timedelta(hours=12)
+    end_ts = datetime.combine(today, datetime.min.time()) + timedelta(days=1, hours=12)
+
+    HomeTeam = aliased(Team, name="home_team")
+    AwayTeam = aliased(Team, name="away_team")
+
+    m_res = await db.execute(
+        select(Match, HomeTeam.name_zh, AwayTeam.name_zh, League.name_zh)
+        .outerjoin(HomeTeam, HomeTeam.id == Match.home_team_id)
+        .outerjoin(AwayTeam, AwayTeam.id == Match.away_team_id)
+        .outerjoin(League, League.id == Match.league_id)
+        .where(
+            Match.kickoff_time >= start_ts,
+            Match.kickoff_time < end_ts,
+            Match.home_score.is_not(None),
+            Match.away_score.is_not(None),
+        )
+        .order_by(Match.kickoff_time.desc(), Match.id.desc())
+    )
+    mrows = m_res.all()
+    mids = [int(m.id) for m, *_ in mrows]
+
+    snap_map: dict[int, dict] = {}
+    if mids:
+        s_res = await db.execute(
+            select(ValueAnalysisSnapshot).where(ValueAnalysisSnapshot.match_id.in_(mids))
+        )
+        for s in s_res.scalars():
+            snap_map[int(s.match_id)] = s.analysis_json
+
+    jczq_map: dict[int, JczqPlayOddsSnapshot] = await _jczq_map(db, mids, desc=True)
+
+    matches = []
+    n = 0
+    hit = 0
+    for m, hname, aname, lname in mrows:
+        mid = int(m.id)
+        analysis = snap_map.get(mid)
+        if not isinstance(analysis, dict):
+            continue
+        prediction = analysis.get("prediction")
+        if not isinstance(prediction, dict):
+            prediction = prediction_from_analysis(analysis)
+        if not isinstance(prediction, dict):
+            continue
+        if (prediction.get("label") or "未知") != label:
+            continue
+        hs, aw = m.home_score, m.away_score
+        diff = hs - aw
+        hhad_line = jczq_map.get(mid).hhad_line if jczq_map.get(mid) else None
+        prediction_hit, _ = hit_prediction(prediction, diff, hhad_line)
+        if prediction_hit is None:
+            continue
+        n += 1
+        if prediction_hit:
+            hit += 1
+        matches.append({
+            "matchday": (m.kickoff_time - timedelta(hours=12)).date().isoformat(),
+            "match_num": m.match_num,
+            "league": lname or None,
+            "home": hname or None,
+            "away": aname or None,
+            "kickoff": m.kickoff_time.strftime("%H:%M") if m.kickoff_time else None,
+            "score": f"{hs}-{aw}",
+            "actual": _actual_outcome(hs, aw),
+            "hhad": actual_hhad(diff, hhad_line),
+            "hhad_line": hhad_line,
+            "picks": " + ".join(p.get("label", "") for p in (prediction.get("picks") or [])),
+            "prediction_hit": prediction_hit,
+        })
+
+    return {
+        "label": label,
+        "days": days,
+        "n": n,
+        "hit": hit,
+        "rate": _rate(hit, n),
+        "matches": matches,
     }

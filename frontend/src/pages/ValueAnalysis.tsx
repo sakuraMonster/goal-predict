@@ -3,6 +3,7 @@ import {
   getValueAnalysis,
   computeValueAnalysis,
   getPredictionLabelStats,
+  getPredictionLabelMatches,
   ValueAnalysisResponse,
   ValueAnalysisItem,
   ValueMarket,
@@ -10,10 +11,12 @@ import {
   MarketValue,
   PredictionLabelStatsResponse,
   PredictionLabelStat,
+  PredictionLabelMatchesResponse,
 } from "../api/client";
 import ValueHistory from "./ValueHistory";
 
 const SIDE_ZH: Record<string, string> = { home: "主胜", draw: "平", away: "客胜" };
+const HHAD_ZH: Record<string, string> = { home: "让胜", draw: "让平", away: "让负" };
 
 const RISK_BADGE: Record<string, string> = {
   低: "bg-emerald-50 text-emerald-700 border-emerald-200",
@@ -291,6 +294,9 @@ export default function ValueAnalysis() {
   const [computing, setComputing] = useState(false);
   const [labelStats, setLabelStats] = useState<PredictionLabelStatsResponse | null>(null);
   const [sortMode, setSortMode] = useState<"default" | "hitrate">("default");
+  const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
+  const [labelMatches, setLabelMatches] = useState<PredictionLabelMatchesResponse | null>(null);
+  const [labelMatchesLoading, setLabelMatchesLoading] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -299,6 +305,20 @@ export default function ValueAnalysis() {
       .catch(() => {});
     return () => { alive = false; };
   }, []);
+
+  useEffect(() => {
+    if (!selectedLabel) {
+      setLabelMatches(null);
+      return;
+    }
+    let alive = true;
+    setLabelMatchesLoading(true);
+    getPredictionLabelMatches({ label: selectedLabel, days: 30 })
+      .then((d) => { if (alive) setLabelMatches(d); })
+      .catch(() => { if (alive) setLabelMatches(null); })
+      .finally(() => { if (alive) setLabelMatchesLoading(false); });
+    return () => { alive = false; };
+  }, [selectedLabel]);
 
   useEffect(() => {
     let alive = true;
@@ -357,7 +377,7 @@ export default function ValueAnalysis() {
   }, [sortedMatches]);
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-6">
+    <div className="max-w-6xl mx-auto px-6 py-6">
       <div className="flex items-center justify-between mb-4">
         <div>
           <h1 className="text-xl font-bold font-heading text-ink">价值分析</h1>
@@ -400,8 +420,9 @@ export default function ValueAnalysis() {
       </div>
 
       {tab === "day" && (
-        <>
-          {data && (
+        <div className="flex gap-6 items-start">
+          <div className="flex-1 min-w-0">
+            {data && (
             <div className="flex gap-4 mb-5 text-sm">
               <div className="bg-white border border-border rounded-lg px-4 py-2">
                 <span className="text-ink-muted">总场次 </span>
@@ -432,18 +453,19 @@ export default function ValueAnalysis() {
               </div>
               <div className="flex flex-wrap gap-2">
                 {labelStats.labels.map((s) => {
-                  const rateColor = s.rate == null
-                    ? "text-ink-muted"
-                    : s.rate >= 0.7 ? "text-emerald-600" : s.rate < 0.5 ? "text-red-500" : "text-ink-muted";
+                  const isSelected = selectedLabel === s.label;
                   return (
-                    <div
+                    <button
                       key={s.label}
-                      className={`inline-flex items-center gap-1.5 px-2 py-1 rounded border text-xs ${s.n === 0 ? "border-border opacity-50" : "border-moss/20"}`}
+                      onClick={() => setSelectedLabel(isSelected ? null : s.label)}
+                      className={`inline-flex items-center gap-1.5 px-2 py-1 rounded border text-xs transition-colors ${
+                        s.n === 0 ? "border-border opacity-50" : "border-moss/20"
+                      } ${isSelected ? "bg-moss border-moss" : "bg-white hover:bg-highlight/30"}`}
                     >
-                      <span className="font-medium text-ink">{s.label}</span>
-                      <span className="text-ink-muted">{s.hit}/{s.n}</span>
-                      <span className={`font-semibold ${rateColor}`}>{fmtPct(s.rate)}</span>
-                    </div>
+                      <span className={`font-medium ${isSelected ? "text-white" : "text-ink"}`}>{s.label}</span>
+                      <span className={isSelected ? "text-white/80" : "text-ink-muted"}>{s.hit}/{s.n}</span>
+                      <span className={`font-semibold ${isSelected ? "text-white" : rateColor(s.rate)}`}>{fmtPct(s.rate)}</span>
+                    </button>
                   );
                 })}
               </div>
@@ -493,7 +515,56 @@ export default function ValueAnalysis() {
               ))}
             </div>
           )}
-        </>
+          </div>
+          {selectedLabel && (
+            <aside className="w-80 shrink-0 sticky top-6 bg-white border border-border rounded-lg p-4 max-h-[calc(100vh-3rem)] overflow-y-auto">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <h3 className="text-sm font-semibold text-ink break-all">{selectedLabel}</h3>
+                <button onClick={() => setSelectedLabel(null)} className="text-xs text-ink-muted hover:text-ink shrink-0">关闭 ✕</button>
+              </div>
+              {labelMatchesLoading && <p className="text-xs text-ink-muted">加载中…</p>}
+              {!labelMatchesLoading && labelMatches && (
+                <>
+                  <div className="text-xs text-ink-muted mb-3">
+                    近 {labelMatches.days} 天 · {labelMatches.hit}/{labelMatches.n}（{fmtPct(labelMatches.rate)}）
+                  </div>
+                  {labelMatches.matches.length === 0 ? (
+                    <p className="text-xs text-ink-muted">该规则近30天无已结算场次。</p>
+                  ) : (
+                    <ul className="space-y-2.5">
+                      {labelMatches.matches.map((mm, i) => (
+                        <li key={i} className="text-xs border-b border-border pb-2.5 last:border-0 last:pb-0">
+                          <div className="flex items-center gap-1 flex-wrap text-ink-muted">
+                            <span>{mm.matchday.slice(5)}</span>
+                            <span>{mm.match_num ?? ""}</span>
+                            <span className="text-moss">{mm.league ?? ""}</span>
+                          </div>
+                          <div className="font-medium text-ink mt-0.5">
+                            {mm.home} vs {mm.away}
+                            {mm.kickoff && <span className="text-ink-muted font-normal"> {mm.kickoff}</span>}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            <span className="font-semibold text-ink">{mm.score}</span>
+                            <span className={mm.prediction_hit ? "text-emerald-600 font-medium" : "text-red-500 font-medium"}>
+                              {mm.prediction_hit ? "命中" : "未中"}
+                            </span>
+                            <span className="text-ink-muted">{mm.picks}</span>
+                          </div>
+                          <div className="text-ink-muted mt-0.5">
+                            实际：{SIDE_ZH[mm.actual]}{mm.hhad ? ` / ${HHAD_ZH[mm.hhad]}` : ""}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </>
+              )}
+              {!labelMatchesLoading && !labelMatches && (
+                <p className="text-xs text-ink-muted">加载失败。</p>
+              )}
+            </aside>
+          )}
+        </div>
       )}
 
       {tab === "history" && <ValueHistory />}

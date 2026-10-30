@@ -61,22 +61,25 @@ DRAW_AWAY_DECISIVE_HI = 2.30
 # 预测提取规则标签（固定顺序，用于命中率统计与前端展示）。
 # 顺序：方向类（正路/冷门）在前，平类（均衡盘/深盘）在后。
 PREDICTION_LABEL_ORDER = [
-    "胜",
-    "胜 + 平",
-    "平 + 负",
-    "负",
-    "让胜",
-    "让平 + 负",
-    "让平 + 平",
-    "让负",
-    "平",
-    "平 + 让平",
-    "让胜 + 平",
-    "让胜 + 负",
-    "胜 + 负",
-    "负 + 让胜",
-    "胜 + 让负",
-    "让球方负 + 让球方平",
+    "主让-胜",
+    "主让2.0~2.3-胜",
+    "主让≥2.6-胜",
+    "客让-胜",
+    "客让-负",
+    "主让-负",
+    "主让1.4~1.6-负",
+    "主让1.6~1.8-负",
+    "主让≥2.0-负",
+    "深盘-平",
+    "主让1.5~1.6-平",
+    "客让1.6~1.8-平",
+    "主让1.8~2.0-平",
+    "客让1.8~2.0-平",
+    "客让2.0~2.3-平",
+    "均衡盘-平",
+    "无盘-胜",
+    "无盘-平",
+    "无盘-负",
 ]
 
 
@@ -475,11 +478,12 @@ def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True) -> Optional[
     if not has_hhad:
         # 无让球盘数据 → 仅胜平负
         side_label = {"home": "胜", "draw": "平", "away": "负"}[best_side]
+        rule_label = {"home": "无盘-胜", "draw": "无盘-平", "away": "无盘-负"}[best_side]
         return {
             "side": best_side,
             "mode": "had_only",
             "fav": None,
-            "label": side_label,
+            "label": rule_label,
             "picks": [_pick("had", best_side, side_label)],
         }
 
@@ -493,7 +497,7 @@ def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True) -> Optional[
                         "side": "draw",
                         "mode": "decisive_draw_home",
                         "fav": fav,
-                        "label": "负 + 让胜",
+                        "label": "主让1.8~2.0-平",
                         "picks": [
                             _pick("had", "away", "负"),
                             _pick("hhad", "home", "让胜"),
@@ -504,7 +508,7 @@ def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True) -> Optional[
                     "side": "draw",
                     "mode": "decisive_draw_away",
                     "fav": fav,
-                    "label": "胜 + 让负",
+                    "label": "客让1.8~2.0-平",
                     "picks": [
                         _pick("had", "home", "胜"),
                         _pick("hhad", "away", "让负"),
@@ -516,7 +520,7 @@ def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True) -> Optional[
                     "side": "draw",
                     "mode": "draw_home_fav_win",
                     "fav": fav,
-                    "label": "让胜 + 平",
+                    "label": "主让1.5~1.6-平",
                     "picks": [
                         _pick("hhad", "home", "让胜"),
                         _pick("had", "draw", "平"),
@@ -528,7 +532,7 @@ def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True) -> Optional[
                     "side": "draw",
                     "mode": "draw_away_fav_push",
                     "fav": fav,
-                    "label": "让胜 + 负",
+                    "label": "客让1.6~1.8-平",
                     "picks": [
                         _pick("hhad", "home", "让胜"),
                         _pick("had", "away", "负"),
@@ -540,7 +544,7 @@ def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True) -> Optional[
                     "side": "draw",
                     "mode": "draw_away_fav_decisive",
                     "fav": fav,
-                    "label": "胜 + 负",
+                    "label": "客让2.0~2.3-平",
                     "picks": [
                         _pick("had", "home", "胜"),
                         _pick("had", "away", "负"),
@@ -551,7 +555,7 @@ def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True) -> Optional[
                 "side": "draw",
                 "mode": "balanced_draw",
                 "fav": fav,
-                "label": "平 + 让平",
+                "label": "均衡盘-平",
                 "picks": [
                     _pick("had", "draw", "平"),
                     _pick("hhad", "draw", "让平"),
@@ -563,7 +567,7 @@ def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True) -> Optional[
             "side": "draw",
             "mode": "deep_draw",
             "fav": fav,
-            "label": "让球方负 + 让球方平",
+            "label": "深盘-平",
             "picks": [
                 _pick("hhad", loss_outcome, loss_label),
                 _pick("hhad", "draw", "让平"),
@@ -577,7 +581,7 @@ def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True) -> Optional[
                 "side": "home",
                 "mode": "upset_win",
                 "fav": fav,
-                "label": "让胜",
+                "label": "客让-胜",
                 "picks": [_pick("hhad", "home", "让胜")],
             }
         # 主队锐利盘胜赔 2.0~2.3 → 胜 + 平（主队不败）
@@ -586,7 +590,7 @@ def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True) -> Optional[
                 "side": "home",
                 "mode": "fav_win_draw",
                 "fav": fav,
-                "label": "胜 + 平",
+                "label": "主让2.0~2.3-胜",
                 "picks": [
                     _pick("had", "home", "胜"),
                     _pick("had", "draw", "平"),
@@ -600,7 +604,7 @@ def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True) -> Optional[
                     "side": "home",
                     "mode": "fav_no_win_draw_loss",
                     "fav": fav,
-                    "label": "平 + 负",
+                    "label": "主让≥2.6-胜",
                     "picks": [
                         _pick("had", "draw", "平"),
                         _pick("had", "away", "负"),
@@ -611,7 +615,7 @@ def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True) -> Optional[
                 "side": "home",
                 "mode": "fav_no_win_loss",
                 "fav": fav,
-                "label": "负",
+                "label": "主让≥2.6-胜",
                 "picks": [_pick("had", "away", "负")],
             }
         # 正路的胜（让球方=主队，或平手盘）
@@ -619,7 +623,7 @@ def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True) -> Optional[
             "side": "home",
             "mode": "favorite_win",
             "fav": fav,
-            "label": "胜",
+            "label": "主让-胜",
             "picks": [_pick("had", "home", "胜")],
         }
 
@@ -631,7 +635,7 @@ def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True) -> Optional[
                 "side": "away",
                 "mode": "fav_cover",
                 "fav": fav,
-                "label": "让胜",
+                "label": "主让1.4~1.6-负",
                 "picks": [_pick("hhad", "home", "让胜")],
             }
         # 主队中等热门(锐利盘胜赔 1.6~1.8)时，主队赢球多为净胜1(让平)、否则客胜(负) → 让平 + 负
@@ -640,7 +644,7 @@ def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True) -> Optional[
                 "side": "away",
                 "mode": "fav_push_loss",
                 "fav": fav,
-                "label": "让平 + 负",
+                "label": "主让1.6~1.8-负",
                 "picks": [
                     _pick("hhad", "draw", "让平"),
                     _pick("had", "away", "负"),
@@ -652,7 +656,7 @@ def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True) -> Optional[
                 "side": "away",
                 "mode": "fav_push_draw",
                 "fav": fav,
-                "label": "让平 + 平",
+                "label": "主让≥2.0-负",
                 "picks": [
                     _pick("hhad", "draw", "让平"),
                     _pick("had", "draw", "平"),
@@ -663,7 +667,7 @@ def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True) -> Optional[
             "side": "away",
             "mode": "upset_loss",
             "fav": fav,
-            "label": "让负",
+            "label": "主让-负",
             "picks": [_pick("hhad", "away", "让负")],
         }
     # 正路的负（让球方=客队，或平手盘）
@@ -671,7 +675,7 @@ def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True) -> Optional[
         "side": "away",
         "mode": "favorite_loss",
         "fav": fav,
-        "label": "负",
+        "label": "客让-负",
         "picks": [_pick("had", "away", "负")],
     }
 

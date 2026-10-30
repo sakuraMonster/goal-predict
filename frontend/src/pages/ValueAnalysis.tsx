@@ -208,7 +208,7 @@ function MatchCard({ item }: { item: ValueAnalysisItem }) {
           {oneX2 && <VerdictBadge verdict={oneX2.value.verdict} />}
           {a?.prediction && (
             <span className="text-xs font-semibold px-2 py-0.5 rounded bg-moss/10 text-moss border border-moss/20 whitespace-nowrap">
-              预测：{a.prediction.label}
+              规则：{a.prediction.label}
             </span>
           )}
         </div>

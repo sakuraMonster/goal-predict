@@ -57,6 +57,13 @@ DRAW_AWAY_PUSH_HI = 1.80
 # 实际分出胜负(胜/负)概率高 → 提取「胜 + 负」。
 DRAW_AWAY_DECISIVE_LO = 2.00
 DRAW_AWAY_DECISIVE_HI = 2.30
+# 冷门胜(客让)场景细分1：客队锐利盘胜赔 < UPSET_WIN_DEEP_ODDS 时强客直接赢球，
+# 主队受让也输盘 → 提取「让平 + 让负」。
+UPSET_WIN_DEEP_ODDS = 1.50
+# 冷门胜(客让)场景细分2：客队锐利盘胜赔落在 [UPSET_WIN_DRAW_LOSS_LO, UPSET_WIN_DRAW_LOSS_HI) 时，
+# 主队不胜(平/负)概率高 → 提取「平 + 负」。
+UPSET_WIN_DRAW_LOSS_LO = 2.00
+UPSET_WIN_DRAW_LOSS_HI = 2.30
 
 # 预测提取规则标签（固定顺序，用于命中率统计与前端展示）。
 # 顺序：方向类（正路/冷门）在前，平类（均衡盘/深盘）在后。
@@ -64,6 +71,8 @@ PREDICTION_LABEL_ORDER = [
     "主让-胜",
     "主让2.0~2.3-胜",
     "主让≥2.6-胜",
+    "客让<1.5-胜",
+    "客让2.0~2.3-胜",
     "客让-胜",
     "客让-负",
     "主让-负",
@@ -576,6 +585,30 @@ def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True) -> Optional[
 
     if best_side == "home":
         if fav == "away":
+            # 冷门胜(客让)细分1：客让 <1.5 强客直接赢球，主队受让也输盘 → 让平 + 让负
+            if fav_odds is not None and fav_odds < UPSET_WIN_DEEP_ODDS:
+                return {
+                    "side": "home",
+                    "mode": "upset_win_deep",
+                    "fav": fav,
+                    "label": "客让<1.5-胜",
+                    "picks": [
+                        _pick("hhad", "draw", "让平"),
+                        _pick("hhad", "away", "让负"),
+                    ],
+                }
+            # 冷门胜(客让)细分2：客让 2.0~2.3 主队不胜(平/负) → 平 + 负
+            if fav_odds is not None and UPSET_WIN_DRAW_LOSS_LO <= fav_odds < UPSET_WIN_DRAW_LOSS_HI:
+                return {
+                    "side": "home",
+                    "mode": "upset_win_draw_loss",
+                    "fav": fav,
+                    "label": "客让2.0~2.3-胜",
+                    "picks": [
+                        _pick("had", "draw", "平"),
+                        _pick("had", "away", "负"),
+                    ],
+                }
             # 冷门的胜：主队受让（客队让球）→ 让胜
             return {
                 "side": "home",

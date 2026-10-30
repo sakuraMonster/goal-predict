@@ -64,6 +64,10 @@ UPSET_WIN_DEEP_ODDS = 1.50
 # 主队不胜(平/负)概率高 → 提取「平 + 负」。
 UPSET_WIN_DRAW_LOSS_LO = 2.00
 UPSET_WIN_DRAW_LOSS_HI = 2.30
+# 冷门胜(客让)兜底细分：客让 2.3~2.6 与 >=2.6 的上界，以及平赔分界。
+UPSET_WIN_MID_HI = 2.60
+UPSET_WIN_LOW_DRAW = 3.50
+UPSET_WIN_HIGH_DRAW = 4.00
 # 冷门负(主让)细分1：主让 <1.4 深盘 → 让胜 + 让负（主队要么大胜赢盘，要么输盘）
 UPSET_LOSS_DEEP_ODDS = 1.40
 # 冷门负(主让)细分2：主让 [1.8, 2.0) → 胜 + 平（主队不败）
@@ -87,7 +91,11 @@ PREDICTION_LABEL_ORDER = [
     "主让≥2.6-胜",
     "客让<1.5-胜",
     "客让2.0~2.3-胜",
-    "客让-胜",
+    "客让1.5~2.0平赔≥4.0-胜",
+    "客让1.5~2.0平赔3.5~4.0-胜",
+    "客让2.3~2.6平赔<3.5-胜",
+    "客让2.3~2.6平赔3.5~4.0-胜",
+    "客让≥2.6-胜",
     "客让<1.5-负",
     "客让2.3~2.6-负",
     "客让-负",
@@ -665,13 +673,64 @@ def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True) -> Optional[
                         _pick("had", "away", "负"),
                     ],
                 }
-            # 冷门的胜：主队受让（客队让球）→ 让胜
+            # 冷门胜(客让)兜底细分：按客让赔率 × 平赔
+            if fav_odds is not None and fav_odds < UPSET_WIN_DRAW_LOSS_LO:
+                # 客让 1.5~2.0
+                if draw_odds is not None and draw_odds >= UPSET_WIN_HIGH_DRAW:
+                    # 平赔>=4.0 → 让胜
+                    return {
+                        "side": "home",
+                        "mode": "upset_win_mid_highdraw",
+                        "fav": fav,
+                        "label": "客让1.5~2.0平赔≥4.0-胜",
+                        "picks": [_pick("hhad", "home", "让胜")],
+                    }
+                # 平赔 3.5~4.0 → 让负 + 平
+                return {
+                    "side": "home",
+                    "mode": "upset_win_mid_lowdraw",
+                    "fav": fav,
+                    "label": "客让1.5~2.0平赔3.5~4.0-胜",
+                    "picks": [
+                        _pick("hhad", "away", "让负"),
+                        _pick("had", "draw", "平"),
+                    ],
+                }
+            if fav_odds is not None and fav_odds < UPSET_WIN_MID_HI:
+                # 客让 2.3~2.6
+                if draw_odds is not None and draw_odds < UPSET_WIN_LOW_DRAW:
+                    # 平赔<3.5 → 平 + 负
+                    return {
+                        "side": "home",
+                        "mode": "upset_win_mid_low",
+                        "fav": fav,
+                        "label": "客让2.3~2.6平赔<3.5-胜",
+                        "picks": [
+                            _pick("had", "draw", "平"),
+                            _pick("had", "away", "负"),
+                        ],
+                    }
+                # 平赔 3.5~4.0 → 平 + 让平
+                return {
+                    "side": "home",
+                    "mode": "upset_win_mid_push",
+                    "fav": fav,
+                    "label": "客让2.3~2.6平赔3.5~4.0-胜",
+                    "picks": [
+                        _pick("had", "draw", "平"),
+                        _pick("hhad", "draw", "让平"),
+                    ],
+                }
+            # 客让 >=2.6 → 平 + 负（主胜概率极低，实际赛果均为平或负）
             return {
                 "side": "home",
-                "mode": "upset_win",
+                "mode": "upset_win_high_draw",
                 "fav": fav,
-                "label": "客让-胜",
-                "picks": [_pick("hhad", "home", "让胜")],
+                "label": "客让≥2.6-胜",
+                "picks": [
+                    _pick("had", "draw", "平"),
+                    _pick("had", "away", "负"),
+                ],
             }
         # 主队锐利盘胜赔 2.0~2.3 → 胜 + 平（主队不败）
         if fav_odds is not None and FAV_WIN_DRAW_LO <= fav_odds < FAV_WIN_DRAW_HI:

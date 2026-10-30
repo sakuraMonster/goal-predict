@@ -79,7 +79,8 @@ PREDICTION_LABEL_ORDER = [
     "主让1.4~1.6-负",
     "主让1.6~1.8-负",
     "主让≥2.0-负",
-    "深盘-平",
+    "主让<1.5-平",
+    "客让<1.5-平",
     "主让1.5~1.6-平",
     "客让1.6~1.8-平",
     "主让1.8~2.0-平",
@@ -570,15 +571,25 @@ def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True) -> Optional[
                     _pick("hhad", "draw", "让平"),
                 ],
             }
-        # 深盘：让球方负 + 让球方平（映射到主队视角让球胜平负标签）
-        loss_outcome, loss_label = ("away", "让负") if fav == "home" else ("home", "让胜")
+        # 深盘：主让 → 让胜 + 让平；客让 → 让负 + 让平（强热门不输盘）
+        if fav == "home":
+            return {
+                "side": "draw",
+                "mode": "deep_draw_home",
+                "fav": fav,
+                "label": "主让<1.5-平",
+                "picks": [
+                    _pick("hhad", "home", "让胜"),
+                    _pick("hhad", "draw", "让平"),
+                ],
+            }
         return {
             "side": "draw",
-            "mode": "deep_draw",
+            "mode": "deep_draw_away",
             "fav": fav,
-            "label": "深盘-平",
+            "label": "客让<1.5-平",
             "picks": [
-                _pick("hhad", loss_outcome, loss_label),
+                _pick("hhad", "away", "让负"),
                 _pick("hhad", "draw", "让平"),
             ],
         }

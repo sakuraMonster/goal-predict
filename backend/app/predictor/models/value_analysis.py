@@ -74,6 +74,10 @@ FAVORITE_LOSS_DEEP_ODDS = 1.50
 # 正路负(客让)细分2：客让 [2.3, 2.6) → 胜 + 平（客队高赔赢不了，主队不败）
 FAVORITE_LOSS_DRAW_HOME_LO = 2.30
 FAVORITE_LOSS_DRAW_HOME_HI = 2.60
+# 均衡盘(平)主让平赔细分：主让且平赔 <3.5 → 让胜+平（低平赔主队净胜2+）；
+# 平赔 3.5~4.0 → 平+让平（保持）；平赔 >=4.0 → 让胜+让平。
+BALANCED_DRAW_LOW_DRAW = 3.50
+BALANCED_DRAW_HIGH_DRAW = 4.00
 
 # 预测提取规则标签（固定顺序，用于命中率统计与前端展示）。
 # 顺序：方向类（正路/冷门）在前，平类（均衡盘/深盘）在后。
@@ -100,6 +104,8 @@ PREDICTION_LABEL_ORDER = [
     "主让1.8~2.0-平",
     "客让1.8~2.0-平",
     "客让2.0~2.3-平",
+    "主让平赔<3.5-平",
+    "主让平赔>=4.0-平",
     "均衡盘-平",
     "无盘-胜",
     "无盘-平",
@@ -574,7 +580,32 @@ def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True) -> Optional[
                         _pick("had", "away", "负"),
                     ],
                 }
-            # 其余均衡盘：平 + 让平
+            # 其余均衡盘：主让按平赔细分，客让/无让球方保持平+让平
+            if fav == "home" and draw_odds is not None and draw_odds < BALANCED_DRAW_LOW_DRAW:
+                # 平赔 <3.5 → 让胜 + 平（低平赔主队净胜2+）
+                return {
+                    "side": "draw",
+                    "mode": "balanced_draw_home_low",
+                    "fav": fav,
+                    "label": "主让平赔<3.5-平",
+                    "picks": [
+                        _pick("hhad", "home", "让胜"),
+                        _pick("had", "draw", "平"),
+                    ],
+                }
+            if fav == "home" and draw_odds is not None and draw_odds >= BALANCED_DRAW_HIGH_DRAW:
+                # 平赔 >=4.0 → 让胜 + 让平
+                return {
+                    "side": "draw",
+                    "mode": "balanced_draw_home_high",
+                    "fav": fav,
+                    "label": "主让平赔>=4.0-平",
+                    "picks": [
+                        _pick("hhad", "home", "让胜"),
+                        _pick("hhad", "draw", "让平"),
+                    ],
+                }
+            # 主让平赔 3.5~4.0 / 客让 / 无让球方 → 平 + 让平
             return {
                 "side": "draw",
                 "mode": "balanced_draw",

@@ -9,6 +9,7 @@ import {
   ValueRiskFlag,
   MarketValue,
   PredictionLabelStatsResponse,
+  PredictionLabelStat,
 } from "../api/client";
 import ValueHistory from "./ValueHistory";
 
@@ -65,6 +66,8 @@ function beijingToday(): string {
 }
 
 const fmtPct = (p: number | null | undefined) => (p == null ? "—" : `${(p * 100).toFixed(1)}%`);
+const rateColor = (rate: number | null | undefined) =>
+  rate == null ? "text-ink-muted" : rate >= 0.7 ? "text-emerald-600" : rate < 0.5 ? "text-red-500" : "text-ink-muted";
 const fmtEv = (ev: number | null | undefined) => (ev == null ? "—" : `${ev >= 0 ? "+" : ""}${(ev * 100).toFixed(1)}%`);
 const fmtPp = (pp: number | null | undefined) => (pp == null ? "—" : `${pp >= 0 ? "+" : ""}${(pp * 100).toFixed(1)}pp`);
 
@@ -185,7 +188,7 @@ function RiskFlags({ flags }: { flags: ValueRiskFlag[] }) {
   );
 }
 
-function MatchCard({ item }: { item: ValueAnalysisItem }) {
+function MatchCard({ item, labelStat }: { item: ValueAnalysisItem; labelStat?: PredictionLabelStat | null }) {
   const [open, setOpen] = useState(false);
   const a = item.analysis;
   const kickoff = item.kickoff ? item.kickoff.slice(11, 16) : "";
@@ -209,6 +212,12 @@ function MatchCard({ item }: { item: ValueAnalysisItem }) {
           {a?.prediction && (
             <span className="text-xs font-semibold px-2 py-0.5 rounded bg-moss/10 text-moss border border-moss/20 whitespace-nowrap">
               规则：{a.prediction.label}
+            </span>
+          )}
+          {a?.prediction && labelStat && (
+            <span className="text-xs font-medium px-2 py-0.5 rounded bg-white border border-border whitespace-nowrap">
+              命中 {labelStat.hit}/{labelStat.n}{" "}
+              <span className={rateColor(labelStat.rate)}>{fmtPct(labelStat.rate)}</span>
             </span>
           )}
         </div>
@@ -281,6 +290,7 @@ export default function ValueAnalysis() {
   const [error, setError] = useState<string | null>(null);
   const [computing, setComputing] = useState(false);
   const [labelStats, setLabelStats] = useState<PredictionLabelStatsResponse | null>(null);
+  const [sortMode, setSortMode] = useState<"default" | "hitrate">("default");
 
   useEffect(() => {
     let alive = true;
@@ -315,16 +325,36 @@ export default function ValueAnalysis() {
     }
   };
 
-  // 按比赛周期分组（保持接口返回的 kickoff 顺序）
+  // 规则标签 → 命中率统计
+  const labelRateMap = useMemo(() => {
+    const map = new Map<string, PredictionLabelStat>();
+    (labelStats?.labels ?? []).forEach((s) => map.set(s.label, s));
+    return map;
+  }, [labelStats]);
+
+  // 排序后的比赛列表（default：保持接口 kickoff 顺序；hitrate：按规则命中率降序，无预测置底）
+  const sortedMatches = useMemo(() => {
+    const list = [...(data?.matches ?? [])];
+    if (sortMode === "hitrate") {
+      const rateOf = (m: ValueAnalysisItem): number | null => {
+        const label = m.analysis?.prediction?.label;
+        return label ? (labelRateMap.get(label)?.rate ?? null) : null;
+      };
+      list.sort((a, b) => (rateOf(b) ?? -1) - (rateOf(a) ?? -1));
+    }
+    return list;
+  }, [data, sortMode, labelRateMap]);
+
+  // 按比赛周期分组（保持排序后的顺序）
   const groups = useMemo(() => {
     const map = new Map<string, ValueAnalysisItem[]>();
-    (data?.matches ?? []).forEach((m) => {
+    sortedMatches.forEach((m) => {
       const day = matchday(m);
       if (!map.has(day)) map.set(day, []);
       map.get(day)!.push(m);
     });
     return Array.from(map.entries());
-  }, [data]);
+  }, [sortedMatches]);
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-6">
@@ -425,6 +455,24 @@ export default function ValueAnalysis() {
 
           {data && !loading && (
             <div className="space-y-5">
+              {data.matches.length > 0 && (
+                <div className="flex items-center justify-end">
+                  <div className="inline-flex rounded border border-border overflow-hidden text-xs">
+                    <button
+                      onClick={() => setSortMode("default")}
+                      className={`px-3 py-1 ${sortMode === "default" ? "bg-moss text-white" : "bg-white text-ink-muted hover:bg-highlight/30"}`}
+                    >
+                      默认排序
+                    </button>
+                    <button
+                      onClick={() => setSortMode("hitrate")}
+                      className={`px-3 py-1 ${sortMode === "hitrate" ? "bg-moss text-white" : "bg-white text-ink-muted hover:bg-highlight/30"}`}
+                    >
+                      按命中率排序
+                    </button>
+                  </div>
+                </div>
+              )}
               {data.matches.length === 0 && <p className="text-sm text-ink-muted">该日期无比赛。</p>}
               {groups.map(([day, matches]) => (
                 <div key={day}>
@@ -434,7 +482,11 @@ export default function ValueAnalysis() {
                   </div>
                   <div className="space-y-2">
                     {matches.map((m) => (
-                      <MatchCard key={m.match_id} item={m} />
+                      <MatchCard
+                        key={m.match_id}
+                        item={m}
+                        labelStat={m.analysis?.prediction?.label ? labelRateMap.get(m.analysis.prediction.label) : null}
+                      />
                     ))}
                   </div>
                 </div>

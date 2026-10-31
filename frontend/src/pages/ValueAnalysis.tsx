@@ -554,9 +554,19 @@ export default function ValueAnalysis() {
           </div>
           {selectedLabel && (
             <aside className="w-80 shrink-0 sticky top-6 bg-white border border-border rounded-lg p-4 max-h-[calc(100vh-3rem)] overflow-y-auto">
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <h3 className="text-sm font-semibold text-ink break-all">{selectedLabel}</h3>
-                <button onClick={() => setSelectedLabel(null)} className="text-xs text-ink-muted hover:text-ink shrink-0">关闭 ✕</button>
+              <div className="flex items-center gap-2 mb-2">
+                <select
+                  value={selectedLabel}
+                  onChange={(e) => setSelectedLabel(e.target.value)}
+                  className="flex-1 min-w-0 border border-border rounded px-2 py-1.5 text-xs text-ink bg-white"
+                >
+                  {(labelStats?.labels ?? []).map((s) => (
+                    <option key={s.label} value={s.label}>
+                      {s.label}（{s.hit}/{s.n}）
+                    </option>
+                  ))}
+                </select>
+                <button onClick={() => setSelectedLabel(null)} className="text-xs text-ink-muted hover:text-ink shrink-0">✕</button>
               </div>
               {labelMatchesLoading && <p className="text-xs text-ink-muted">加载中…</p>}
               {!labelMatchesLoading && labelMatches && (

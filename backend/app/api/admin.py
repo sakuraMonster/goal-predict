@@ -256,12 +256,12 @@ async def trigger_sync_market_flow_odds(
     return await sync_market_flow_odds(db, date)
 
 
-# SportMonks O/U（大小球）market_id 常量 + 博彩公司名映射（与 tools/_backfill_sm_ou.py 一致）
+# SportMonks O/U（大小球）market_id 常量 + 博彩公司名映射（以官方 API 返回为准）
 _SM_OU_MID = 80
 _SM_BOOKMAKER_NAMES = {
-    1: "Pinnacle", 2: "SportPesa", 3: "SBK", 5: "Bet365",
-    9: "Marathonbet", 12: "Betfair", 16: "1xBet", 20: "Betclic",
-    23: "10Bet", 34: "BetVictor", 35: "Betting Exchange",
+    1: "10Bet", 2: "bet365", 3: "SBK", 5: "888Sport",
+    9: "Betfair", 12: "BetVictor", 16: "Marathonbet", 20: "Pinnacle",
+    23: "Unibet", 34: "Sbo", 35: "1xbet",
 }
 
 
@@ -299,9 +299,11 @@ def _parse_sm_ou_odds(odds: list) -> tuple[dict, dict]:
         if val is None or val <= 1.0:
             continue
         bm_id = o.get("bookmaker_id")
-        bm_name = _SM_BOOKMAKER_NAMES.get(bm_id)
-        if not bm_name and isinstance(o.get("bookmaker"), dict):
-            bm_name = o.get("bookmaker", {}).get("name")
+        bm_name = ""
+        if isinstance(o.get("bookmaker"), dict):
+            bm_name = o.get("bookmaker", {}).get("name") or ""
+        if not bm_name:
+            bm_name = _SM_BOOKMAKER_NAMES.get(bm_id)
         bm_name = bm_name or str(bm_id)
         bm_names[bm_id] = bm_name
         ou_rows.setdefault((bm_id, round(line, 2)), {})[lab] = val

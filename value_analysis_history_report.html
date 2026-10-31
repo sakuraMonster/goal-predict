@@ -1,0 +1,490 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>价值分析历史命中率报告</title>
+<style>
+  body { font-family: -apple-system, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif; margin: 0; background: #f7f8fa; color: #1f2937; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 32px 24px 64px; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: #6b7280; font-size: 13px; margin-bottom: 24px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 24px; }
+  .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px 18px; }
+  .card .label { font-size: 12px; color: #6b7280; margin-bottom: 6px; }
+  .card .value { font-size: 22px; font-weight: 700; }
+  .card .note { font-size: 12px; color: #9ca3af; margin-top: 4px; }
+  .pos { color: #059669; } .neg { color: #dc2626; } .warn { color: #d97706; }
+  h2 { font-size: 16px; margin: 28px 0 12px; border-left: 3px solid #10b981; padding-left: 10px; }
+  table { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; font-size: 13px; }
+  th, td { padding: 7px 10px; text-align: left; border-bottom: 1px solid #f1f2f4; }
+  th { background: #f9fafb; color: #4b5563; font-weight: 600; font-size: 12px; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .concl { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 18px 20px; line-height: 1.8; font-size: 14px; }
+  .concl b { color: #059669; } .concl .bad { color: #dc2626; font-weight: 600; }
+  .foot { margin-top: 24px; color: #9ca3af; font-size: 12px; line-height: 1.7; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>价值分析历史命中率报告</h1>
+  <div class="sub">口径 = 生产 /api/value-analysis · 比赛日 2025-01-04 ~ 2026-10-22 · 每场取最新快照（已结算）</div>
+
+  <div class="cards">
+    <div class="card"><div class="label">已结算且有竞彩 HAD 盘口</div><div class="value">7976</div><div class="note">其中有锐利盘 1X2 基准 2561（32.1%）</div></div>
+    <div class="card"><div class="label">1X2 全样本方向命中率</div><div class="value">31.2%</div><div class="note">有锐利盘基准的 2561 场</div></div>
+    <div class="card"><div class="label">有价值信号命中率</div><div class="value pos">26.4%</div><div class="note">246 个信号 · 平均真实概率 26.9%</div></div>
+    <div class="card"><div class="label">价值信号校准偏差</div><div class="value">-0.5pp</div><div class="note">命中率 − 平均真实概率</div></div>
+    <div class="card"><div class="label">大小球错价方向命中率</div><div class="value warn">44.8%</div><div class="note">799 个错价信号（仅方向参考）</div></div>
+  </div>
+
+  <h2>胜平负（1X2）方向命中率 · 按价值判定分桶</h2>
+  <table>
+    <thead><tr><th>判定</th><th class="num">场次</th><th class="num">命中</th><th class="num">命中率</th><th class="num">平均真实概率</th><th class="num">平均 EV</th></tr></thead>
+    <tbody>
+      <tr><td><b>有价值</b>（best_ev ≥ +2%）</td><td class="num">246</td><td class="num">65</td><td class="num pos">26.4%</td><td class="num">26.9%</td><td class="num pos">+9.2%</td></tr>
+      <tr><td>中性</td><td class="num">285</td><td class="num">73</td><td class="num">25.6%</td><td class="num">26.5%</td><td class="num">-0.2%</td></tr>
+      <tr><td>无价值（best_ev ≤ -2%）</td><td class="num">2030</td><td class="num">661</td><td class="num">32.6%</td><td class="num">32.8%</td><td class="num neg">-7.0%</td></tr>
+    </tbody>
+  </table>
+
+  <h2>每日明细（有价值信号命中 · 绿色=当日价值信号全中）</h2>
+  <table>
+    <thead><tr><th>比赛日</th><th class="num">总场次</th><th class="num">价值信号</th><th class="num">命中</th><th class="num">价值命中率</th><th class="num">价值平均真实概率</th><th class="num">校准偏差</th><th class="num">全方向命中率</th></tr></thead>
+    <tbody>
+<tr><td>2025-01-04</td><td class='num'>9</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>44.4%</td></tr>
+<tr><td>2025-01-05</td><td class='num'>3</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>33.3%</td></tr>
+<tr><td>2025-01-06</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>100.0%</td></tr>
+<tr style="background:#f0fdf4"><td>2025-01-10</td><td class='num'>4</td><td class='num'>1</td><td class='num'>1</td><td class='num'>100.0%</td><td class='num'>49.5%</td><td class='num'>+50.5pp</td><td class='num'>25.0%</td></tr>
+<tr><td>2025-01-11</td><td class='num'>5</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>20.0%</td></tr>
+<tr><td>2025-01-12</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>100.0%</td></tr>
+<tr><td>2025-01-13</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>100.0%</td></tr>
+<tr><td>2025-01-14</td><td class='num'>4</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>25.0%</td></tr>
+<tr style="background:#f0fdf4"><td>2025-01-15</td><td class='num'>5</td><td class='num'>1</td><td class='num'>1</td><td class='num'>100.0%</td><td class='num'>26.6%</td><td class='num'>+73.4pp</td><td class='num'>60.0%</td></tr>
+<tr><td>2025-01-16</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>100.0%</td></tr>
+<tr><td>2025-01-17</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>50.0%</td></tr>
+<tr><td>2025-01-18</td><td class='num'>7</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>42.9%</td></tr>
+<tr><td>2025-01-19</td><td class='num'>7</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>85.7%</td></tr>
+<tr><td>2025-01-21</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-01-22</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-01-24</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-01-25</td><td class='num'>8</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>25.0%</td></tr>
+<tr><td>2025-01-26</td><td class='num'>6</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>33.3%</td></tr>
+<tr><td>2025-02-07</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-02-08</td><td class='num'>5</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>20.0%</td></tr>
+<tr><td>2025-02-09</td><td class='num'>5</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>40.0%</td></tr>
+<tr><td>2025-02-13</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-02-14</td><td class='num'>3</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>33.3%</td></tr>
+<tr><td>2025-02-15</td><td class='num'>5</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>41.0%</td><td class='num'>-41.0pp</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-02-16</td><td class='num'>4</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>75.0%</td></tr>
+<tr><td>2025-02-21</td><td class='num'>4</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>25.0%</td></tr>
+<tr><td>2025-02-22</td><td class='num'>5</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>33.4%</td><td class='num'>-33.4pp</td><td class='num'>20.0%</td></tr>
+<tr><td>2025-02-23</td><td class='num'>6</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>66.7%</td></tr>
+<tr><td>2025-02-24</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>50.0%</td></tr>
+<tr style="background:#f0fdf4"><td>2025-02-25</td><td class='num'>3</td><td class='num'>2</td><td class='num'>1</td><td class='num'>50.0%</td><td class='num'>41.9%</td><td class='num'>+8.1pp</td><td class='num'>33.3%</td></tr>
+<tr><td>2025-02-26</td><td class='num'>6</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>29.9%</td><td class='num'>-29.9pp</td><td class='num'>33.3%</td></tr>
+<tr><td>2025-02-27</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-02-28</td><td class='num'>4</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>25.0%</td></tr>
+<tr><td>2025-03-01</td><td class='num'>7</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>42.9%</td></tr>
+<tr><td>2025-03-02</td><td class='num'>5</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>44.1%</td><td class='num'>-44.1pp</td><td class='num'>20.0%</td></tr>
+<tr><td>2025-03-07</td><td class='num'>3</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>66.7%</td></tr>
+<tr style="background:#f0fdf4"><td>2025-03-08</td><td class='num'>8</td><td class='num'>1</td><td class='num'>1</td><td class='num'>100.0%</td><td class='num'>25.8%</td><td class='num'>+74.2pp</td><td class='num'>25.0%</td></tr>
+<tr><td>2025-03-09</td><td class='num'>6</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>66.7%</td></tr>
+<tr><td>2025-03-10</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>100.0%</td></tr>
+<tr><td>2025-03-15</td><td class='num'>10</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>10.0%</td></tr>
+<tr><td>2025-03-16</td><td class='num'>13</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>23.1%</td></tr>
+<tr><td>2025-03-22</td><td class='num'>1</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>17.2%</td><td class='num'>-17.2pp</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-03-23</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>100.0%</td></tr>
+<tr><td>2025-03-27</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>100.0%</td></tr>
+<tr><td>2025-03-28</td><td class='num'>4</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-03-29</td><td class='num'>14</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>14.3%</td></tr>
+<tr><td>2025-03-30</td><td class='num'>9</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>12.2%</td><td class='num'>-12.2pp</td><td class='num'>22.2%</td></tr>
+<tr><td>2025-03-31</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-04-01</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-04-02</td><td class='num'>3</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-04-04</td><td class='num'>6</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>16.7%</td></tr>
+<tr style="background:#f0fdf4"><td>2025-04-05</td><td class='num'>24</td><td class='num'>2</td><td class='num'>1</td><td class='num'>50.0%</td><td class='num'>24.8%</td><td class='num'>+25.2pp</td><td class='num'>25.0%</td></tr>
+<tr><td>2025-04-06</td><td class='num'>13</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>30.8%</td></tr>
+<tr><td>2025-04-07</td><td class='num'>2</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>20.6%</td><td class='num'>-20.6pp</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-04-08</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-04-09</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-04-10</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>100.0%</td></tr>
+<tr><td>2025-04-11</td><td class='num'>3</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>22.4%</td><td class='num'>-22.4pp</td><td class='num'>33.3%</td></tr>
+<tr><td>2025-04-12</td><td class='num'>10</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>10.0%</td></tr>
+<tr><td>2025-04-13</td><td class='num'>7</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>28.6%</td></tr>
+<tr><td>2025-04-14</td><td class='num'>3</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-04-15</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>100.0%</td></tr>
+<tr><td>2025-04-16</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-04-18</td><td class='num'>3</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>16.4%</td><td class='num'>-16.4pp</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-04-19</td><td class='num'>10</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>30.0%</td></tr>
+<tr><td>2025-04-20</td><td class='num'>7</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>57.1%</td></tr>
+<tr><td>2025-04-21</td><td class='num'>3</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-04-22</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr style="background:#f0fdf4"><td>2025-04-23</td><td class='num'>5</td><td class='num'>1</td><td class='num'>1</td><td class='num'>100.0%</td><td class='num'>40.1%</td><td class='num'>+59.9pp</td><td class='num'>60.0%</td></tr>
+<tr><td>2025-04-24</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>100.0%</td></tr>
+<tr><td>2025-04-25</td><td class='num'>3</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>66.7%</td></tr>
+<tr><td>2025-04-26</td><td class='num'>8</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>50.0%</td></tr>
+<tr><td>2025-04-27</td><td class='num'>6</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>15.0%</td><td class='num'>-15.0pp</td><td class='num'>50.0%</td></tr>
+<tr><td>2025-04-28</td><td class='num'>2</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>33.4%</td><td class='num'>-33.4pp</td><td class='num'>0.0%</td></tr>
+<tr style="background:#f0fdf4"><td>2025-04-29</td><td class='num'>1</td><td class='num'>1</td><td class='num'>1</td><td class='num'>100.0%</td><td class='num'>31.1%</td><td class='num'>+68.9pp</td><td class='num'>100.0%</td></tr>
+<tr><td>2025-05-01</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>100.0%</td></tr>
+<tr><td>2025-05-02</td><td class='num'>6</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>33.3%</td></tr>
+<tr style="background:#f0fdf4"><td>2025-05-03</td><td class='num'>9</td><td class='num'>1</td><td class='num'>1</td><td class='num'>100.0%</td><td class='num'>31.7%</td><td class='num'>+68.3pp</td><td class='num'>22.2%</td></tr>
+<tr><td>2025-05-04</td><td class='num'>17</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>38.0%</td><td class='num'>-38.0pp</td><td class='num'>35.3%</td></tr>
+<tr><td>2025-05-05</td><td class='num'>3</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-05-09</td><td class='num'>3</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>66.7%</td></tr>
+<tr><td>2025-05-10</td><td class='num'>8</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-05-11</td><td class='num'>11</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>27.3%</td></tr>
+<tr><td>2025-05-12</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>50.0%</td></tr>
+<tr><td>2025-05-13</td><td class='num'>3</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr style="background:#f0fdf4"><td>2025-05-14</td><td class='num'>5</td><td class='num'>2</td><td class='num'>1</td><td class='num'>50.0%</td><td class='num'>37.7%</td><td class='num'>+12.3pp</td><td class='num'>40.0%</td></tr>
+<tr><td>2025-05-15</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-05-16</td><td class='num'>7</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>42.9%</td></tr>
+<tr style="background:#f0fdf4"><td>2025-05-17</td><td class='num'>9</td><td class='num'>2</td><td class='num'>2</td><td class='num'>100.0%</td><td class='num'>34.8%</td><td class='num'>+65.2pp</td><td class='num'>66.7%</td></tr>
+<tr><td>2025-05-18</td><td class='num'>14</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>28.6%</td></tr>
+<tr><td>2025-05-19</td><td class='num'>3</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>66.7%</td></tr>
+<tr><td>2025-05-20</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>100.0%</td></tr>
+<tr><td>2025-05-22</td><td class='num'>3</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-05-23</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>50.0%</td></tr>
+<tr><td>2025-05-24</td><td class='num'>5</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>40.0%</td></tr>
+<tr><td>2025-05-25</td><td class='num'>9</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>33.3%</td></tr>
+<tr><td>2025-05-26</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>50.0%</td></tr>
+<tr><td>2025-05-27</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>100.0%</td></tr>
+<tr><td>2025-05-28</td><td class='num'>7</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>29.3%</td><td class='num'>-29.3pp</td><td class='num'>42.9%</td></tr>
+<tr><td>2025-05-29</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-05-30</td><td class='num'>5</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr style="background:#f0fdf4"><td>2025-05-31</td><td class='num'>11</td><td class='num'>2</td><td class='num'>1</td><td class='num'>50.0%</td><td class='num'>49.4%</td><td class='num'>+0.6pp</td><td class='num'>36.4%</td></tr>
+<tr><td>2025-06-01</td><td class='num'>4</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>25.0%</td></tr>
+<tr><td>2025-06-07</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>50.0%</td></tr>
+<tr><td>2025-06-08</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-06-12</td><td class='num'>1</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>26.0%</td><td class='num'>-26.0pp</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-06-13</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr style="background:#f0fdf4"><td>2025-06-14</td><td class='num'>7</td><td class='num'>1</td><td class='num'>1</td><td class='num'>100.0%</td><td class='num'>30.4%</td><td class='num'>+69.6pp</td><td class='num'>28.6%</td></tr>
+<tr><td>2025-06-16</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-06-20</td><td class='num'>4</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>75.0%</td></tr>
+<tr><td>2025-06-21</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr style="background:#f0fdf4"><td>2025-06-22</td><td class='num'>3</td><td class='num'>1</td><td class='num'>1</td><td class='num'>100.0%</td><td class='num'>29.2%</td><td class='num'>+70.8pp</td><td class='num'>33.3%</td></tr>
+<tr><td>2025-06-25</td><td class='num'>5</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>40.0%</td></tr>
+<tr><td>2025-06-26</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-06-27</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>50.0%</td></tr>
+<tr><td>2025-06-28</td><td class='num'>7</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>14.3%</td></tr>
+<tr><td>2025-06-29</td><td class='num'>6</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>16.7%</td></tr>
+<tr><td>2025-06-30</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-07-01</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>100.0%</td></tr>
+<tr style="background:#f0fdf4"><td>2025-07-02</td><td class='num'>1</td><td class='num'>1</td><td class='num'>1</td><td class='num'>100.0%</td><td class='num'>10.7%</td><td class='num'>+89.3pp</td><td class='num'>100.0%</td></tr>
+<tr><td>2025-07-04</td><td class='num'>3</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>33.3%</td></tr>
+<tr><td>2025-07-05</td><td class='num'>10</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>20.0%</td></tr>
+<tr><td>2025-07-06</td><td class='num'>3</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>33.3%</td></tr>
+<tr><td>2025-07-12</td><td class='num'>7</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>19.1%</td><td class='num'>-19.1pp</td><td class='num'>28.6%</td></tr>
+<tr style="background:#f0fdf4"><td>2025-07-13</td><td class='num'>4</td><td class='num'>1</td><td class='num'>1</td><td class='num'>100.0%</td><td class='num'>43.5%</td><td class='num'>+56.5pp</td><td class='num'>50.0%</td></tr>
+<tr><td>2025-07-14</td><td class='num'>1</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>36.2%</td><td class='num'>-36.2pp</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-07-16</td><td class='num'>8</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>19.8%</td><td class='num'>-19.8pp</td><td class='num'>12.5%</td></tr>
+<tr><td>2025-07-18</td><td class='num'>1</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>35.7%</td><td class='num'>-35.7pp</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-07-19</td><td class='num'>16</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>14.6%</td><td class='num'>-14.6pp</td><td class='num'>31.2%</td></tr>
+<tr><td>2025-07-20</td><td class='num'>5</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>20.0%</td></tr>
+<tr><td>2025-07-21</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-07-22</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>100.0%</td></tr>
+<tr><td>2025-07-25</td><td class='num'>4</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>29.4%</td><td class='num'>-29.4pp</td><td class='num'>25.0%</td></tr>
+<tr><td>2025-07-26</td><td class='num'>7</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>28.6%</td></tr>
+<tr><td>2025-07-27</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-07-28</td><td class='num'>1</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>33.1%</td><td class='num'>-33.1pp</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-08-01</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-08-02</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>100.0%</td></tr>
+<tr><td>2025-08-03</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>50.0%</td></tr>
+<tr><td>2025-08-04</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-08-08</td><td class='num'>2</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>11.5%</td><td class='num'>-11.5pp</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-08-09</td><td class='num'>5</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>60.0%</td></tr>
+<tr><td>2025-08-10</td><td class='num'>5</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>26.2%</td><td class='num'>-26.2pp</td><td class='num'>20.0%</td></tr>
+<tr><td>2025-08-11</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-08-14</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-08-15</td><td class='num'>4</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-08-16</td><td class='num'>8</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>25.0%</td></tr>
+<tr><td>2025-08-17</td><td class='num'>16</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>25.0%</td></tr>
+<tr><td>2025-08-18</td><td class='num'>3</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-08-19</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-08-22</td><td class='num'>4</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>27.7%</td><td class='num'>-27.7pp</td><td class='num'>75.0%</td></tr>
+<tr style="background:#f0fdf4"><td>2025-08-23</td><td class='num'>16</td><td class='num'>2</td><td class='num'>1</td><td class='num'>50.0%</td><td class='num'>22.8%</td><td class='num'>+27.2pp</td><td class='num'>43.8%</td></tr>
+<tr><td>2025-08-24</td><td class='num'>15</td><td class='num'>3</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>24.0%</td><td class='num'>-24.0pp</td><td class='num'>26.7%</td></tr>
+<tr><td>2025-08-25</td><td class='num'>6</td><td class='num'>3</td><td class='num'>1</td><td class='num'>33.3%</td><td class='num'>24.5%</td><td class='num'>+8.9pp</td><td class='num'>33.3%</td></tr>
+<tr><td>2025-08-27</td><td class='num'>1</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>31.7%</td><td class='num'>-31.7pp</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-08-29</td><td class='num'>8</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>48.1%</td><td class='num'>-48.2pp</td><td class='num'>25.0%</td></tr>
+<tr><td>2025-08-30</td><td class='num'>17</td><td class='num'>5</td><td class='num'>1</td><td class='num'>20.0%</td><td class='num'>27.2%</td><td class='num'>-7.2pp</td><td class='num'>29.4%</td></tr>
+<tr><td>2025-08-31</td><td class='num'>17</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>28.1%</td><td class='num'>-28.1pp</td><td class='num'>23.5%</td></tr>
+<tr><td>2025-09-06</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>100.0%</td></tr>
+<tr><td>2025-09-11</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-09-12</td><td class='num'>5</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>33.2%</td><td class='num'>-33.2pp</td><td class='num'>40.0%</td></tr>
+<tr><td>2025-09-13</td><td class='num'>8</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>25.0%</td></tr>
+<tr><td>2025-09-14</td><td class='num'>11</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>17.0%</td><td class='num'>-17.0pp</td><td class='num'>27.3%</td></tr>
+<tr><td>2025-09-15</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-09-16</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-09-17</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>50.0%</td></tr>
+<tr><td>2025-09-19</td><td class='num'>10</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>24.7%</td><td class='num'>-24.7pp</td><td class='num'>10.0%</td></tr>
+<tr style="background:#f0fdf4"><td>2025-09-20</td><td class='num'>11</td><td class='num'>1</td><td class='num'>1</td><td class='num'>100.0%</td><td class='num'>29.8%</td><td class='num'>+70.2pp</td><td class='num'>18.2%</td></tr>
+<tr><td>2025-09-21</td><td class='num'>9</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>33.3%</td></tr>
+<tr><td>2025-09-22</td><td class='num'>5</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>34.1%</td><td class='num'>-34.1pp</td><td class='num'>20.0%</td></tr>
+<tr><td>2025-09-23</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-09-24</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-09-26</td><td class='num'>12</td><td class='num'>3</td><td class='num'>1</td><td class='num'>33.3%</td><td class='num'>35.1%</td><td class='num'>-1.8pp</td><td class='num'>33.3%</td></tr>
+<tr><td>2025-09-27</td><td class='num'>14</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>50.0%</td></tr>
+<tr><td>2025-09-28</td><td class='num'>15</td><td class='num'>3</td><td class='num'>1</td><td class='num'>33.3%</td><td class='num'>15.3%</td><td class='num'>+18.0pp</td><td class='num'>20.0%</td></tr>
+<tr><td>2025-09-29</td><td class='num'>5</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>33.7%</td><td class='num'>-33.7pp</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-09-30</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-10-04</td><td class='num'>3</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>24.6%</td><td class='num'>-24.6pp</td><td class='num'>33.3%</td></tr>
+<tr><td>2025-10-05</td><td class='num'>13</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>26.8%</td><td class='num'>-26.8pp</td><td class='num'>53.8%</td></tr>
+<tr><td>2025-10-08</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-10-11</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-10-16</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>50.0%</td></tr>
+<tr><td>2025-10-17</td><td class='num'>11</td><td class='num'>7</td><td class='num'>3</td><td class='num'>42.9%</td><td class='num'>32.1%</td><td class='num'>+10.8pp</td><td class='num'>27.3%</td></tr>
+<tr style="background:#f0fdf4"><td>2025-10-18</td><td class='num'>16</td><td class='num'>4</td><td class='num'>2</td><td class='num'>50.0%</td><td class='num'>28.9%</td><td class='num'>+21.1pp</td><td class='num'>50.0%</td></tr>
+<tr><td>2025-10-19</td><td class='num'>14</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>21.4%</td></tr>
+<tr><td>2025-10-20</td><td class='num'>5</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>60.0%</td></tr>
+<tr><td>2025-10-21</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>100.0%</td></tr>
+<tr><td>2025-10-22</td><td class='num'>2</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>46.0%</td><td class='num'>-46.0pp</td><td class='num'>50.0%</td></tr>
+<tr><td>2025-10-24</td><td class='num'>7</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>36.0%</td><td class='num'>-36.0pp</td><td class='num'>28.6%</td></tr>
+<tr style="background:#f0fdf4"><td>2025-10-25</td><td class='num'>11</td><td class='num'>2</td><td class='num'>1</td><td class='num'>50.0%</td><td class='num'>20.4%</td><td class='num'>+29.6pp</td><td class='num'>27.3%</td></tr>
+<tr><td>2025-10-26</td><td class='num'>6</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>40.5%</td><td class='num'>-40.5pp</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-10-27</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>50.0%</td></tr>
+<tr><td>2025-10-28</td><td class='num'>7</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>57.1%</td></tr>
+<tr><td>2025-10-29</td><td class='num'>8</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>9.0%</td><td class='num'>-9.0pp</td><td class='num'>12.5%</td></tr>
+<tr style="background:#f0fdf4"><td>2025-10-30</td><td class='num'>4</td><td class='num'>1</td><td class='num'>1</td><td class='num'>100.0%</td><td class='num'>32.5%</td><td class='num'>+67.5pp</td><td class='num'>25.0%</td></tr>
+<tr style="background:#f0fdf4"><td>2025-10-31</td><td class='num'>4</td><td class='num'>1</td><td class='num'>1</td><td class='num'>100.0%</td><td class='num'>30.6%</td><td class='num'>+69.4pp</td><td class='num'>75.0%</td></tr>
+<tr><td>2025-11-01</td><td class='num'>13</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>23.1%</td></tr>
+<tr><td>2025-11-02</td><td class='num'>15</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>18.3%</td><td class='num'>-18.3pp</td><td class='num'>46.7%</td></tr>
+<tr><td>2025-11-03</td><td class='num'>4</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>22.8%</td><td class='num'>-22.8pp</td><td class='num'>25.0%</td></tr>
+<tr><td>2025-11-07</td><td class='num'>5</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>40.0%</td></tr>
+<tr><td>2025-11-08</td><td class='num'>11</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>15.0%</td><td class='num'>-15.1pp</td><td class='num'>45.5%</td></tr>
+<tr><td>2025-11-09</td><td class='num'>13</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>38.5%</td></tr>
+<tr><td>2025-11-15</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>100.0%</td></tr>
+<tr><td>2025-11-21</td><td class='num'>9</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>33.3%</td></tr>
+<tr><td>2025-11-22</td><td class='num'>16</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>25.0%</td></tr>
+<tr><td>2025-11-23</td><td class='num'>6</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>50.0%</td></tr>
+<tr><td>2025-11-24</td><td class='num'>3</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>66.7%</td></tr>
+<tr><td>2025-11-25</td><td class='num'>3</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-11-26</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-11-28</td><td class='num'>5</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>40.0%</td></tr>
+<tr><td>2025-11-29</td><td class='num'>20</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>30.0%</td></tr>
+<tr><td>2025-11-30</td><td class='num'>17</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>35.3%</td></tr>
+<tr><td>2025-12-02</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-12-03</td><td class='num'>4</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>11.0%</td><td class='num'>-11.0pp</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-12-04</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>100.0%</td></tr>
+<tr><td>2025-12-05</td><td class='num'>5</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>17.6%</td><td class='num'>-17.6pp</td><td class='num'>20.0%</td></tr>
+<tr><td>2025-12-06</td><td class='num'>11</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>36.4%</td></tr>
+<tr><td>2025-12-07</td><td class='num'>6</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>33.3%</td></tr>
+<tr><td>2025-12-08</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-12-13</td><td class='num'>7</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>24.0%</td><td class='num'>-24.0pp</td><td class='num'>14.3%</td></tr>
+<tr><td>2025-12-14</td><td class='num'>8</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>12.5%</td></tr>
+<tr><td>2025-12-15</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr style="background:#f0fdf4"><td>2025-12-19</td><td class='num'>1</td><td class='num'>1</td><td class='num'>1</td><td class='num'>100.0%</td><td class='num'>19.4%</td><td class='num'>+80.6pp</td><td class='num'>100.0%</td></tr>
+<tr><td>2025-12-20</td><td class='num'>15</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>20.0%</td></tr>
+<tr><td>2025-12-21</td><td class='num'>7</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>57.1%</td></tr>
+<tr><td>2025-12-22</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>50.0%</td></tr>
+<tr><td>2025-12-23</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>100.0%</td></tr>
+<tr><td>2025-12-25</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2025-12-26</td><td class='num'>6</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>33.3%</td></tr>
+<tr><td>2025-12-27</td><td class='num'>3</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>13.5%</td><td class='num'>-13.5pp</td><td class='num'>33.3%</td></tr>
+<tr><td>2025-12-28</td><td class='num'>4</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>75.0%</td></tr>
+<tr><td>2025-12-29</td><td class='num'>3</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>33.3%</td></tr>
+<tr><td>2025-12-30</td><td class='num'>3</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>12.3%</td><td class='num'>-12.4pp</td><td class='num'>33.3%</td></tr>
+<tr><td>2026-01-01</td><td class='num'>3</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>33.3%</td></tr>
+<tr><td>2026-01-02</td><td class='num'>3</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2026-01-03</td><td class='num'>8</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>37.5%</td></tr>
+<tr><td>2026-01-04</td><td class='num'>7</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>42.9%</td></tr>
+<tr><td>2026-01-06</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2026-01-07</td><td class='num'>4</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>25.0%</td></tr>
+<tr><td>2026-01-08</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2026-01-09</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>100.0%</td></tr>
+<tr><td>2026-01-10</td><td class='num'>8</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>12.5%</td></tr>
+<tr><td>2026-01-11</td><td class='num'>4</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>25.0%</td></tr>
+<tr><td>2026-01-12</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>50.0%</td></tr>
+<tr><td>2026-01-13</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>100.0%</td></tr>
+<tr><td>2026-01-14</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2026-01-15</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2026-01-16</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>100.0%</td></tr>
+<tr><td>2026-01-17</td><td class='num'>10</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>30.0%</td></tr>
+<tr><td>2026-01-18</td><td class='num'>7</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>14.3%</td></tr>
+<tr><td>2026-01-19</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>100.0%</td></tr>
+<tr><td>2026-01-22</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>100.0%</td></tr>
+<tr><td>2026-01-23</td><td class='num'>5</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>10.7%</td><td class='num'>-10.8pp</td><td class='num'>60.0%</td></tr>
+<tr><td>2026-01-24</td><td class='num'>10</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>11.7%</td><td class='num'>-11.7pp</td><td class='num'>50.0%</td></tr>
+<tr><td>2026-01-25</td><td class='num'>14</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>42.9%</td></tr>
+<tr><td>2026-01-26</td><td class='num'>5</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>60.0%</td></tr>
+<tr><td>2026-01-27</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>100.0%</td></tr>
+<tr><td>2026-01-29</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>100.0%</td></tr>
+<tr><td>2026-01-30</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>50.0%</td></tr>
+<tr><td>2026-01-31</td><td class='num'>9</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>22.2%</td></tr>
+<tr><td>2026-02-01</td><td class='num'>10</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>40.0%</td></tr>
+<tr><td>2026-02-03</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2026-02-04</td><td class='num'>4</td><td class='num'>3</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>33.8%</td><td class='num'>-33.8pp</td><td class='num'>25.0%</td></tr>
+<tr><td>2026-02-05</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2026-02-06</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2026-02-07</td><td class='num'>11</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>45.5%</td></tr>
+<tr><td>2026-02-08</td><td class='num'>6</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2026-02-10</td><td class='num'>3</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>33.3%</td></tr>
+<tr><td>2026-02-11</td><td class='num'>6</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>19.9%</td><td class='num'>-19.9pp</td><td class='num'>33.3%</td></tr>
+<tr><td>2026-02-12</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2026-02-13</td><td class='num'>3</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2026-02-24</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2026-02-25</td><td class='num'>3</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2026-02-27</td><td class='num'>7</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>31.0%</td><td class='num'>-31.0pp</td><td class='num'>42.9%</td></tr>
+<tr><td>2026-02-28</td><td class='num'>10</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>30.0%</td></tr>
+<tr><td>2026-03-01</td><td class='num'>7</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>14.3%</td></tr>
+<tr><td>2026-03-02</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2026-03-03</td><td class='num'>4</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>25.0%</td></tr>
+<tr><td>2026-03-04</td><td class='num'>3</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>33.3%</td></tr>
+<tr><td>2026-03-05</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>100.0%</td></tr>
+<tr><td>2026-03-06</td><td class='num'>2</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>34.4%</td><td class='num'>-34.4pp</td><td class='num'>0.0%</td></tr>
+<tr><td>2026-03-07</td><td class='num'>6</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>16.7%</td></tr>
+<tr style="background:#f0fdf4"><td>2026-03-08</td><td class='num'>6</td><td class='num'>1</td><td class='num'>1</td><td class='num'>100.0%</td><td class='num'>17.5%</td><td class='num'>+82.5pp</td><td class='num'>33.3%</td></tr>
+<tr><td>2026-03-09</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>50.0%</td></tr>
+<tr><td>2026-03-14</td><td class='num'>7</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>14.3%</td></tr>
+<tr><td>2026-03-15</td><td class='num'>10</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>49.3%</td><td class='num'>-49.3pp</td><td class='num'>30.0%</td></tr>
+<tr><td>2026-03-16</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2026-03-17</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>100.0%</td></tr>
+<tr><td>2026-03-20</td><td class='num'>7</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>42.9%</td></tr>
+<tr><td>2026-03-21</td><td class='num'>11</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>16.3%</td><td class='num'>-16.3pp</td><td class='num'>27.3%</td></tr>
+<tr><td>2026-03-22</td><td class='num'>9</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>55.6%</td></tr>
+<tr><td>2026-03-27</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2026-03-28</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2026-04-03</td><td class='num'>2</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>18.3%</td><td class='num'>-18.4pp</td><td class='num'>50.0%</td></tr>
+<tr><td>2026-04-04</td><td class='num'>6</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2026-04-05</td><td class='num'>7</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>17.3%</td><td class='num'>-17.3pp</td><td class='num'>14.3%</td></tr>
+<tr><td>2026-04-06</td><td class='num'>4</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>25.0%</td></tr>
+<tr><td>2026-04-07</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2026-04-10</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2026-04-11</td><td class='num'>9</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>22.2%</td></tr>
+<tr><td>2026-04-12</td><td class='num'>10</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>40.0%</td></tr>
+<tr style="background:#f0fdf4"><td>2026-04-13</td><td class='num'>3</td><td class='num'>1</td><td class='num'>1</td><td class='num'>100.0%</td><td class='num'>36.2%</td><td class='num'>+63.8pp</td><td class='num'>100.0%</td></tr>
+<tr><td>2026-04-14</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>50.0%</td></tr>
+<tr><td>2026-04-17</td><td class='num'>3</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2026-04-18</td><td class='num'>11</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>31.3%</td><td class='num'>-31.3pp</td><td class='num'>18.2%</td></tr>
+<tr><td>2026-04-19</td><td class='num'>7</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>14.3%</td></tr>
+<tr><td>2026-04-20</td><td class='num'>4</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>100.0%</td></tr>
+<tr><td>2026-04-22</td><td class='num'>5</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>80.0%</td></tr>
+<tr><td>2026-04-23</td><td class='num'>3</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>44.1%</td><td class='num'>-44.1pp</td><td class='num'>33.3%</td></tr>
+<tr><td>2026-04-24</td><td class='num'>6</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>32.9%</td><td class='num'>-32.9pp</td><td class='num'>33.3%</td></tr>
+<tr><td>2026-04-25</td><td class='num'>10</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>22.1%</td><td class='num'>-22.1pp</td><td class='num'>20.0%</td></tr>
+<tr style="background:#f0fdf4"><td>2026-04-26</td><td class='num'>9</td><td class='num'>1</td><td class='num'>1</td><td class='num'>100.0%</td><td class='num'>34.6%</td><td class='num'>+65.4pp</td><td class='num'>11.1%</td></tr>
+<tr><td>2026-04-27</td><td class='num'>3</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>100.0%</td></tr>
+<tr><td>2026-04-28</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2026-04-29</td><td class='num'>2</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>33.5%</td><td class='num'>-33.5pp</td><td class='num'>50.0%</td></tr>
+<tr><td>2026-04-30</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2026-05-01</td><td class='num'>3</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2026-05-02</td><td class='num'>9</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>33.3%</td></tr>
+<tr><td>2026-05-03</td><td class='num'>8</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>25.0%</td></tr>
+<tr><td>2026-05-04</td><td class='num'>5</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>20.0%</td></tr>
+<tr><td>2026-05-08</td><td class='num'>6</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2026-05-09</td><td class='num'>10</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>20.0%</td></tr>
+<tr style="background:#f0fdf4"><td>2026-05-10</td><td class='num'>8</td><td class='num'>1</td><td class='num'>1</td><td class='num'>100.0%</td><td class='num'>29.1%</td><td class='num'>+70.9pp</td><td class='num'>50.0%</td></tr>
+<tr><td>2026-05-11</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>50.0%</td></tr>
+<tr><td>2026-05-12</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>50.0%</td></tr>
+<tr style="background:#f0fdf4"><td>2026-05-13</td><td class='num'>3</td><td class='num'>2</td><td class='num'>2</td><td class='num'>100.0%</td><td class='num'>54.4%</td><td class='num'>+45.6pp</td><td class='num'>100.0%</td></tr>
+<tr><td>2026-05-15</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>100.0%</td></tr>
+<tr><td>2026-05-16</td><td class='num'>5</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>40.0%</td></tr>
+<tr><td>2026-05-17</td><td class='num'>7</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>57.1%</td></tr>
+<tr><td>2026-05-18</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2026-05-19</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>50.0%</td></tr>
+<tr><td>2026-05-20</td><td class='num'>4</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>12.2%</td><td class='num'>-12.2pp</td><td class='num'>25.0%</td></tr>
+<tr><td>2026-05-21</td><td class='num'>3</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>45.1%</td><td class='num'>-45.1pp</td><td class='num'>33.3%</td></tr>
+<tr><td>2026-05-22</td><td class='num'>5</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>43.1%</td><td class='num'>-43.1pp</td><td class='num'>40.0%</td></tr>
+<tr><td>2026-05-23</td><td class='num'>12</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>39.9%</td><td class='num'>-39.9pp</td><td class='num'>33.3%</td></tr>
+<tr style="background:#f0fdf4"><td>2026-05-24</td><td class='num'>10</td><td class='num'>1</td><td class='num'>1</td><td class='num'>100.0%</td><td class='num'>15.1%</td><td class='num'>+84.9pp</td><td class='num'>20.0%</td></tr>
+<tr><td>2026-05-25</td><td class='num'>4</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>25.0%</td></tr>
+<tr><td>2026-05-29</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2026-05-30</td><td class='num'>5</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>20.0%</td></tr>
+<tr><td>2026-05-31</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2026-07-24</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>100.0%</td></tr>
+<tr><td>2026-07-25</td><td class='num'>6</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>83.3%</td></tr>
+<tr><td>2026-07-26</td><td class='num'>6</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>20.3%</td><td class='num'>-20.3pp</td><td class='num'>50.0%</td></tr>
+<tr><td>2026-07-29</td><td class='num'>4</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>31.8%</td><td class='num'>-31.8pp</td><td class='num'>0.0%</td></tr>
+<tr><td>2026-07-30</td><td class='num'>3</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2026-07-31</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr style="background:#f0fdf4"><td>2026-08-01</td><td class='num'>8</td><td class='num'>2</td><td class='num'>1</td><td class='num'>50.0%</td><td class='num'>34.2%</td><td class='num'>+15.8pp</td><td class='num'>25.0%</td></tr>
+<tr><td>2026-08-02</td><td class='num'>9</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>33.3%</td></tr>
+<tr><td>2026-08-03</td><td class='num'>3</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2026-08-04</td><td class='num'>3</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>33.5%</td><td class='num'>-33.5pp</td><td class='num'>33.3%</td></tr>
+<tr><td>2026-08-05</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>100.0%</td></tr>
+<tr><td>2026-08-06</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>50.0%</td></tr>
+<tr><td>2026-08-07</td><td class='num'>5</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>21.3%</td><td class='num'>-21.3pp</td><td class='num'>40.0%</td></tr>
+<tr style="background:#f0fdf4"><td>2026-08-08</td><td class='num'>20</td><td class='num'>2</td><td class='num'>1</td><td class='num'>50.0%</td><td class='num'>21.2%</td><td class='num'>+28.8pp</td><td class='num'>40.0%</td></tr>
+<tr><td>2026-08-09</td><td class='num'>20</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>23.3%</td><td class='num'>-23.3pp</td><td class='num'>20.0%</td></tr>
+<tr style="background:#f0fdf4"><td>2026-08-10</td><td class='num'>3</td><td class='num'>2</td><td class='num'>1</td><td class='num'>50.0%</td><td class='num'>20.9%</td><td class='num'>+29.1pp</td><td class='num'>33.3%</td></tr>
+<tr style="background:#f0fdf4"><td>2026-08-11</td><td class='num'>9</td><td class='num'>1</td><td class='num'>1</td><td class='num'>100.0%</td><td class='num'>41.0%</td><td class='num'>+59.0pp</td><td class='num'>33.3%</td></tr>
+<tr><td>2026-08-12</td><td class='num'>3</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>33.3%</td></tr>
+<tr><td>2026-08-13</td><td class='num'>8</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>87.5%</td></tr>
+<tr style="background:#f0fdf4"><td>2026-08-14</td><td class='num'>15</td><td class='num'>1</td><td class='num'>1</td><td class='num'>100.0%</td><td class='num'>36.9%</td><td class='num'>+63.1pp</td><td class='num'>33.3%</td></tr>
+<tr><td>2026-08-15</td><td class='num'>23</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>18.3%</td><td class='num'>-18.3pp</td><td class='num'>21.7%</td></tr>
+<tr><td>2026-08-16</td><td class='num'>27</td><td class='num'>4</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>22.6%</td><td class='num'>-22.6pp</td><td class='num'>25.9%</td></tr>
+<tr><td>2026-08-17</td><td class='num'>4</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2026-08-18</td><td class='num'>4</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>50.0%</td></tr>
+<tr><td>2026-08-19</td><td class='num'>7</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>13.5%</td><td class='num'>-13.5pp</td><td class='num'>42.9%</td></tr>
+<tr><td>2026-08-20</td><td class='num'>7</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>25.2%</td><td class='num'>-25.2pp</td><td class='num'>14.3%</td></tr>
+<tr><td>2026-08-21</td><td class='num'>10</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>40.0%</td></tr>
+<tr><td>2026-08-22</td><td class='num'>26</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>26.9%</td></tr>
+<tr><td>2026-08-23</td><td class='num'>21</td><td class='num'>4</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>20.0%</td><td class='num'>-20.0pp</td><td class='num'>38.1%</td></tr>
+<tr><td>2026-08-24</td><td class='num'>10</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>21.5%</td><td class='num'>-21.6pp</td><td class='num'>20.0%</td></tr>
+<tr><td>2026-08-25</td><td class='num'>9</td><td class='num'>3</td><td class='num'>1</td><td class='num'>33.3%</td><td class='num'>30.9%</td><td class='num'>+2.4pp</td><td class='num'>33.3%</td></tr>
+<tr><td>2026-08-26</td><td class='num'>10</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>10.0%</td><td class='num'>-10.0pp</td><td class='num'>60.0%</td></tr>
+<tr><td>2026-08-27</td><td class='num'>7</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>28.6%</td></tr>
+<tr style="background:#f0fdf4"><td>2026-08-28</td><td class='num'>14</td><td class='num'>2</td><td class='num'>1</td><td class='num'>50.0%</td><td class='num'>19.2%</td><td class='num'>+30.8pp</td><td class='num'>21.4%</td></tr>
+<tr><td>2026-08-29</td><td class='num'>27</td><td class='num'>3</td><td class='num'>1</td><td class='num'>33.3%</td><td class='num'>20.4%</td><td class='num'>+13.0pp</td><td class='num'>29.6%</td></tr>
+<tr><td>2026-08-30</td><td class='num'>23</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>22.5%</td><td class='num'>-22.5pp</td><td class='num'>47.8%</td></tr>
+<tr><td>2026-08-31</td><td class='num'>9</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>22.3%</td><td class='num'>-22.3pp</td><td class='num'>33.3%</td></tr>
+<tr><td>2026-09-01</td><td class='num'>7</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>28.6%</td></tr>
+<tr><td>2026-09-02</td><td class='num'>8</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>25.0%</td></tr>
+<tr><td>2026-09-03</td><td class='num'>6</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>28.6%</td><td class='num'>-28.6pp</td><td class='num'>16.7%</td></tr>
+<tr><td>2026-09-04</td><td class='num'>11</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>15.3%</td><td class='num'>-15.3pp</td><td class='num'>27.3%</td></tr>
+<tr style="background:#f0fdf4"><td>2026-09-05</td><td class='num'>23</td><td class='num'>1</td><td class='num'>1</td><td class='num'>100.0%</td><td class='num'>16.2%</td><td class='num'>+83.8pp</td><td class='num'>17.4%</td></tr>
+<tr style="background:#f0fdf4"><td>2026-09-06</td><td class='num'>24</td><td class='num'>1</td><td class='num'>1</td><td class='num'>100.0%</td><td class='num'>27.0%</td><td class='num'>+73.1pp</td><td class='num'>33.3%</td></tr>
+<tr><td>2026-09-07</td><td class='num'>8</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>26.1%</td><td class='num'>-26.1pp</td><td class='num'>25.0%</td></tr>
+<tr><td>2026-09-08</td><td class='num'>11</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>25.9%</td><td class='num'>-25.9pp</td><td class='num'>9.1%</td></tr>
+<tr><td>2026-09-09</td><td class='num'>9</td><td class='num'>4</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>31.2%</td><td class='num'>-31.2pp</td><td class='num'>11.1%</td></tr>
+<tr><td>2026-09-10</td><td class='num'>4</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2026-09-11</td><td class='num'>11</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>29.0%</td><td class='num'>-29.0pp</td><td class='num'>18.2%</td></tr>
+<tr><td>2026-09-12</td><td class='num'>29</td><td class='num'>3</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>12.5%</td><td class='num'>-12.5pp</td><td class='num'>34.5%</td></tr>
+<tr><td>2026-09-13</td><td class='num'>19</td><td class='num'>4</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>16.7%</td><td class='num'>-16.7pp</td><td class='num'>21.0%</td></tr>
+<tr><td>2026-09-14</td><td class='num'>8</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>20.7%</td><td class='num'>-20.7pp</td><td class='num'>0.0%</td></tr>
+<tr style="background:#f0fdf4"><td>2026-09-15</td><td class='num'>6</td><td class='num'>2</td><td class='num'>1</td><td class='num'>50.0%</td><td class='num'>38.1%</td><td class='num'>+11.9pp</td><td class='num'>16.7%</td></tr>
+<tr><td>2026-09-16</td><td class='num'>10</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>33.1%</td><td class='num'>-33.1pp</td><td class='num'>0.0%</td></tr>
+<tr><td>2026-09-17</td><td class='num'>8</td><td class='num'>4</td><td class='num'>1</td><td class='num'>25.0%</td><td class='num'>12.1%</td><td class='num'>+12.9pp</td><td class='num'>50.0%</td></tr>
+<tr><td>2026-09-18</td><td class='num'>8</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>28.8%</td><td class='num'>-28.8pp</td><td class='num'>25.0%</td></tr>
+<tr><td>2026-09-19</td><td class='num'>24</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>19.8%</td><td class='num'>-19.8pp</td><td class='num'>33.3%</td></tr>
+<tr style="background:#f0fdf4"><td>2026-09-20</td><td class='num'>28</td><td class='num'>1</td><td class='num'>1</td><td class='num'>100.0%</td><td class='num'>24.3%</td><td class='num'>+75.7pp</td><td class='num'>35.7%</td></tr>
+<tr><td>2026-09-23</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr style="background:#f0fdf4"><td>2026-09-26</td><td class='num'>11</td><td class='num'>1</td><td class='num'>1</td><td class='num'>100.0%</td><td class='num'>44.0%</td><td class='num'>+56.0pp</td><td class='num'>36.4%</td></tr>
+<tr><td>2026-09-27</td><td class='num'>2</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>29.1%</td><td class='num'>-29.1pp</td><td class='num'>0.0%</td></tr>
+<tr><td>2026-10-06</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>0.0%</td></tr>
+<tr><td>2026-10-07</td><td class='num'>4</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>25.0%</td></tr>
+<tr><td>2026-10-08</td><td class='num'>6</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>16.7%</td></tr>
+<tr><td>2026-10-09</td><td class='num'>9</td><td class='num'>2</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>24.2%</td><td class='num'>-24.2pp</td><td class='num'>22.2%</td></tr>
+<tr><td>2026-10-10</td><td class='num'>25</td><td class='num'>5</td><td class='num'>1</td><td class='num'>20.0%</td><td class='num'>30.9%</td><td class='num'>-10.9pp</td><td class='num'>36.0%</td></tr>
+<tr style="background:#f0fdf4"><td>2026-10-11</td><td class='num'>27</td><td class='num'>2</td><td class='num'>1</td><td class='num'>50.0%</td><td class='num'>20.7%</td><td class='num'>+29.3pp</td><td class='num'>22.2%</td></tr>
+<tr><td>2026-10-12</td><td class='num'>8</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>22.9%</td><td class='num'>-22.9pp</td><td class='num'>37.5%</td></tr>
+<tr><td>2026-10-13</td><td class='num'>8</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>12.5%</td></tr>
+<tr><td>2026-10-14</td><td class='num'>10</td><td class='num'>1</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>36.0%</td><td class='num'>-36.0pp</td><td class='num'>30.0%</td></tr>
+<tr><td>2026-10-15</td><td class='num'>9</td><td class='num'>3</td><td class='num'>1</td><td class='num'>33.3%</td><td class='num'>27.2%</td><td class='num'>+6.2pp</td><td class='num'>33.3%</td></tr>
+<tr><td>2026-10-16</td><td class='num'>10</td><td class='num'>0</td><td class='num'>0</td><td class='num'>—</td><td class='num'>—</td><td class='num'>—</td><td class='num'>30.0%</td></tr>
+<tr><td>2026-10-17</td><td class='num'>22</td><td class='num'>5</td><td class='num'>2</td><td class='num'>40.0%</td><td class='num'>39.6%</td><td class='num'>+0.4pp</td><td class='num'>31.8%</td></tr>
+<tr><td>2026-10-18</td><td class='num'>24</td><td class='num'>3</td><td class='num'>1</td><td class='num'>33.3%</td><td class='num'>40.1%</td><td class='num'>-6.7pp</td><td class='num'>33.3%</td></tr>
+<tr style="background:#f0fdf4"><td>2026-10-19</td><td class='num'>8</td><td class='num'>2</td><td class='num'>1</td><td class='num'>50.0%</td><td class='num'>17.9%</td><td class='num'>+32.1pp</td><td class='num'>25.0%</td></tr>
+<tr><td>2026-10-20</td><td class='num'>8</td><td class='num'>3</td><td class='num'>0</td><td class='num'>0.0%</td><td class='num'>20.0%</td><td class='num'>-20.0pp</td><td class='num'>25.0%</td></tr>
+<tr style="background:#f0fdf4"><td>2026-10-21</td><td class='num'>12</td><td class='num'>4</td><td class='num'>3</td><td class='num'>75.0%</td><td class='num'>24.6%</td><td class='num'>+50.4pp</td><td class='num'>50.0%</td></tr>
+<tr style="background:#f0fdf4"><td>2026-10-22</td><td class='num'>9</td><td class='num'>5</td><td class='num'>3</td><td class='num'>60.0%</td><td class='num'>26.1%</td><td class='num'>+33.9pp</td><td class='num'>55.6%</td></tr>
+
+    </tbody>
+  </table>
+
+  <h2>结论</h2>
+  <div class="concl">
+    1. <b>「有价值」信号是校准的，不是假价值</b>：246 个有价值信号，命中率 26.4% ≈ 平均真实概率 26.9%（偏差仅 -0.4pp）。命中率与其隐含概率一致，说明基础去水（fair_prob）对锐利盘 1X2 的估计是准的，冷门端没有被系统性高估。<br>
+    2. <b>但有价值是「冷门长尾」策略</b>：平均真实概率 26.9%、平均 EV +9.2%，意味着平均赔率 ~4 倍、约 3/4 会输，靠偶尔的高赔命中覆盖。246 个信号横跨约 22 个月（日均 0.4 个），样本偏小、方差大，+9.2% EV 需更大样本才能确认。<br>
+    3. <b>无价值/中性同样校准</b>：无价值 32.6%≈32.8%、中性 25.6%≈26.5%，三条桶的实际命中率都贴着各自真实概率，进一步佐证 fair_prob 整体可信。<br>
+    4. <span class="bad">大小球错价方向基本无效</span>：799 个「大球偏贵/小球偏贵」错价信号，cheap_side 方向命中仅 44.8%（低于 50%），与价值分析自身「TTG 抽水 ~25%、错价不足以覆盖、仅方向参考」的判断一致，不可作为下注依据。
+  </div>
+
+  <div class="foot">
+    说明：命中定义 = 1X2 最大 EV 方向（best_side）== 实际胜平负；大小球 = cheap_side 方向（小球→总进球≤2 / 大球→总进球≥3）== 实际方向。<br>
+    数据源：竞彩 JczqPlayOddsSnapshot（HAD/TTG）+ SportMonks OddsSnapshot（Pinnacle/bet365 1X2、O/U）。生成脚本 backend/tools/_bt_value_analysis.py。
+  </div>
+</div>
+</body>
+</html>

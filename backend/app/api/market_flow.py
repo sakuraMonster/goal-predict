@@ -3652,15 +3652,10 @@ async def market_flow_model_versions(db: AsyncSession = Depends(get_db)):
 
 
 # ============================================================================
-# 方案E（MarketFlow V2 串关推荐新增）：每日进球双选建议 + 人工确认 + 与方案D方向腿组 2串1
-# 说明：不修改方案A/D/C 的组合逻辑；方向腿为对方案D当日输出(dir 腿)的“引用快照”，
-#       由前端在确认时随方案D数据一并提交，后端落库。
-# 规则（与回测口径一致）：
-#   - 23 腿候选排除联赛：葡超、法乙
-#   - 34 腿候选额外排除：美职联、芬超、瑞典超（无 34 候选时降级为另一场 23）
+# 方案E（MarketFlow V2 串关推荐）：每日单关进球数双选建议 + 人工确认
+# 说明：单关 = 竞彩总进球双选复式（从 {1,2,3,4} 取市场隐含概率最高的 2 档）。
+#       每日按双选隐含概率挑 2 场；默认选第一场，可人工改指当日任意其他场次。
 # ============================================================================
-_E_EX23 = {"葡超", "法乙"}
-_E_EX34 = {"美职联", "芬超", "瑞典超"}
 
 
 def _parlay_e_parse_ttg(raw):
@@ -3698,12 +3693,12 @@ def _parlay_e_implied(ttg_odds):
 
 
 def _parlay_e_match_entry(it, t, ip):
-    """把单个 market-flow item 变成方案E 场次条目（含 23/34 市场信息）"""
-    nums = {2, 3, 4}
-    pick23 = _parlay_e_pick_odds(t, [2, 3])
-    pick34 = _parlay_e_pick_odds(t, [3, 4])
-    p23 = (ip.get(2, 0) + ip.get(3, 0)) if ip else 0.0
-    p34 = (ip.get(3, 0) + ip.get(4, 0)) if ip else 0.0
+    """把单个 market-flow item 变成方案E 场次条目（动态双选：从{1,2,3,4}取隐含概率最高的2档）"""
+    sub = {k: ip.get(k, 0.0) for k in (1, 2, 3, 4)}
+    top2 = sorted(sub, key=lambda k: sub[k], reverse=True)[:2]
+    nums = sorted(top2)
+    leg_type = "".join(str(n) for n in nums)  # "12"/"23"/"34"（罕见"13"/"24"）
+    p_hat = sub[top2[0]] + sub[top2[1]]
     return {
         "match_id": it.get("match_id"),
         "match_num": it.get("match_num"),
@@ -3711,34 +3706,23 @@ def _parlay_e_match_entry(it, t, ip):
         "home_team": it.get("home_team"),
         "away_team": it.get("away_team"),
         "kickoff_time": it.get("kickoff_time"),
-        "p23": round(p23, 4),
-        "p34": round(p34, 4),
-        "pick_odds23": pick23,          # 有货才有 23 复式
-        "pick_odds34": pick34,          # 有货才有 34 复式
-        "excl23": it.get("league_name") in _E_EX23,
-        "excl34": it.get("league_name") in _E_EX34,
+        "leg_type": leg_type,
+        "pick_nums": nums,
+        "p_hat": round(p_hat, 4),
+        "pick_odds": _parlay_e_pick_odds(t, nums),
     }
 
 
-def _parlay_e_suggestion(m, leg_type, downgraded=False):
-    base = {k: m[k] for k in ("match_id", "match_num", "league_name", "home_team",
-                              "away_team", "kickoff_time", "p23", "p34")}
-    base["leg_type"] = leg_type
-    base["downgraded"] = bool(downgraded)
-    if leg_type == "23":
-        base["pick_odds"] = m.get("pick_odds23")
-        base["p_hat"] = m.get("p23")
-        base["pick_nums"] = [2, 3]
-    else:
-        base["pick_odds"] = m.get("pick_odds34")
-        base["p_hat"] = m.get("p34")
-        base["pick_nums"] = [3, 4]
-    return base
+def _parlay_e_suggestion(m):
+    return {k: m[k] for k in ("match_id", "match_num", "league_name", "home_team",
+                              "away_team", "kickoff_time", "leg_type", "pick_nums",
+                              "p_hat", "pick_odds")}
 
 
 def _parlay_e_confirm_dict(row):
     if row is None:
         return None
+    nums = [int(c) for c in row.leg_type]
     return {
         "pick_date": row.pick_date.isoformat(),
         "match_id": row.match_id,
@@ -3748,57 +3732,11 @@ def _parlay_e_confirm_dict(row):
         "away_team": row.away_team,
         "kickoff_time": row.kickoff_time.isoformat() if row.kickoff_time else None,
         "leg_type": row.leg_type,
+        "pick_nums": nums,
         "goal_pick_odds": row.goal_pick_odds,
         "goal_p_hat": row.goal_p_hat,
-        "has_dir": row.dir_match_id is not None,
-        "dir": None if row.dir_match_id is None else {
-            "match_id": row.dir_match_id,
-            "match_num": row.dir_match_num,
-            "league_name": row.dir_league_name,
-            "home_team": row.dir_home_team,
-            "away_team": row.dir_away_team,
-            "kickoff_time": row.dir_kickoff_time.isoformat() if row.dir_kickoff_time else None,
-            "pick": row.dir_pick,
-            "odds": row.dir_odds,
-            "p_hat": row.dir_p_hat,
-            "source": row.dir_source,
-        },
-        "parlay_odds_max": row.parlay_odds_max,
         "updated_at": row.updated_at.isoformat() if row.updated_at else None,
     }
-
-
-def _parlay_e_dir_snap(it: dict, opt: dict) -> dict:
-    """把 parlay-final 方向腿候选档转成方案E 方向腿快照（match_id 由后端权威解析，前端传 0）"""
-    return {
-        "match_id": 0,
-        "match_num": it.get("match_num"),
-        "league_name": it.get("league_name"),
-        "home_team": it.get("home_team"),
-        "away_team": it.get("away_team"),
-        "kickoff_time": it.get("kickoff_time"),
-        "pick": opt.get("pick") or opt.get("key") or "",
-        "odds": opt.get("odds"),
-        "p_hat": opt.get("p_hat"),
-        "source": opt.get("source"),
-    }
-
-
-def _parlay_e_dir_options(items: list, date: str) -> list:
-    """当日可作「方案D方向腿」人工指定候选的场次列表（玩法池与方案D一致：
-    模糊池 HAD fav≥1.8（ambiguous_had）/ 正路池半全场胜胜·负负≥1.8（favorite_hafu））。
-    每场只给该场系统默认档，按 p_hat 高置信降序；由前端按当前方向腿 source 过滤并排除与进球腿同场。"""
-    out = []
-    for it in items:
-        md = _matchday_date(it.get("kickoff_time"), match_num=it.get("match_num"))
-        if md != date:
-            continue
-        for _b in (_final_dir_ambig_pair, _final_dir_favhafu_pair):
-            pr, _dk = _b(it)
-            if pr:
-                out.append(_parlay_e_dir_snap(it, pr[0]))
-                break
-    return sorted(out, key=lambda o: o.get("p_hat") or 0.0, reverse=True)
 
 
 @router.get("/predictions/parlay-e")
@@ -3806,9 +3744,10 @@ async def market_flow_parlay_e_suggest(
     date: str,
     db: AsyncSession = Depends(get_db),
 ):
-    """方案E：指定比赛日的进球双选建议（23腿 / 34腿，34 缺货降级为另一场 23）+ 当日场次列表 + 已确认快照（只读）。
+    """方案E：指定比赛日的单关进球数建议（每日按双选隐含概率挑 2 场）+ 当日场次列表 + 已确认快照（只读）。
 
-    进球注=竞彩总进球复式：23 = 买 {2,3}；34 = 买 {3,4}。
+    单关 = 竞彩总进球双选复式：从 {1,2,3,4} 取市场隐含概率最高的 2 档（动态 12/23/34）。
+    默认选「第一场」（双选概率最高），可人工改指当日任意其他场次。
     """
     try:
         d0 = datetime.fromisoformat(date)
@@ -3827,41 +3766,19 @@ async def market_flow_parlay_e_suggest(
         if md != date:
             continue
         t = _parlay_e_parse_ttg(it.get("ttg_odds"))
-        if not t or len(_parlay_e_pick_odds(t, [2, 3])) < 2:
-            continue  # 无完整 23 复式赔率，不可作为候选
+        if not t:
+            continue
         ip = _parlay_e_implied(t)
         if not ip:
             continue
-        entries.append(_parlay_e_match_entry(it, t, ip))
+        e = _parlay_e_match_entry(it, t, ip)
+        if len(e["pick_odds"]) < 2:
+            continue  # 双选两档赔率不完整，不可下注
+        entries.append(e)
 
-    entries.sort(key=lambda m: (m["kickoff_time"] or ""))
-    # —— 建议1：23腿（当日 P23 最高，排除葡超/法乙） ——
-    pool23 = [m for m in entries if not m["excl23"]]
-    s23 = max(pool23, key=lambda m: m["p23"]) if pool23 else None
-    # —— 建议2：34腿（排除葡超/法乙 + 美职联/芬超/瑞典超，且与建议1不同场）；缺货降级为第二 23 ——
-    s34 = None
-    reason2 = None
-    if s23 is not None:
-        pool34 = [m for m in entries if not m["excl23"] and not m["excl34"]
-                  and m["match_id"] != s23["match_id"]]
-        if pool34:
-            s34 = max(pool34, key=lambda m: m["p34"])
-            s34 = _parlay_e_suggestion(s34, "34")
-        else:
-            pool23b = [m for m in entries if not m["excl23"] and m["match_id"] != s23["match_id"]]
-            if pool23b:
-                s34 = max(pool23b, key=lambda m: m["p23"])
-                s34 = _parlay_e_suggestion(s34, "23", downgraded=True)
-            else:
-                reason2 = "当日无合格的第二场候选（排除规则后不足 2 场）"
-    else:
-        reason2 = "当日无可用的 23 球候选场次（排除葡超/法乙后为 0，或赔率缺失）"
-
-    suggestions = []
-    if s23 is not None:
-        suggestions.append(_parlay_e_suggestion(s23, "23"))
-    if s34 is not None:
-        suggestions.append(s34)
+    # —— 按双选隐含概率降序，取前 2 场为建议 ——
+    entries.sort(key=lambda m: m["p_hat"], reverse=True)
+    suggestions = [_parlay_e_suggestion(m) for m in entries[:2]]
 
     # —— 已确认快照 ——
     row = (await db.execute(
@@ -3871,9 +3788,8 @@ async def market_flow_parlay_e_suggest(
     return {
         "date": date,
         "suggestions": suggestions,
-        "suggestion_reason": None if len(suggestions) >= 2 else (reason2 or "当日场次不足"),
+        "suggestion_reason": None if len(suggestions) >= 2 else "当日候选场次不足 2 场",
         "day_matches": entries,
-        "dir_options": _parlay_e_dir_options(items, date),
         "confirm": _parlay_e_confirm_dict(row),
     }
 
@@ -3883,16 +3799,21 @@ async def market_flow_parlay_e_confirm(
     payload: dict = Body(...),
     db: AsyncSession = Depends(get_db),
 ):
-    """方案E 人工确认并落库（每日 1 条）：确认一个进球场（23/34 复式）+ 当日方案D方向腿（前端随方案D输出提交）。
+    """方案E 人工确认并落库（每日 1 条单关进球数）：确认一个进球场（动态双选 12/23/34）。
 
-    payload: {date, match_id, leg_type('23'|'34'), dir?: {match_id, match_num, league_name,
-              home_team, away_team, kickoff_time, pick, odds, p_hat, source}}
+    payload: {date, match_id, leg_type('12'|'23'|'34')}
     """
     date = payload.get("date")
     match_id = payload.get("match_id")
     leg_type = payload.get("leg_type")
-    if not date or not match_id or leg_type not in ("23", "34"):
-        return _err("date/match_id/leg_type(23|34) required", 400)
+    if not date or not match_id or not leg_type:
+        return _err("date/match_id/leg_type required", 400)
+    try:
+        nums = [int(c) for c in str(leg_type)]
+    except ValueError:
+        return _err("leg_type 必须是 {1,2,3,4} 中 2 档的组合（如 23）", 400)
+    if len(nums) != 2 or any(n not in (1, 2, 3, 4) for n in nums):
+        return _err("leg_type 必须是 {1,2,3,4} 中 2 档的组合（如 23）", 400)
     try:
         d0 = datetime.fromisoformat(date)
     except ValueError:
@@ -3921,18 +3842,13 @@ async def market_flow_parlay_e_confirm(
         .order_by(JczqPlayOddsSnapshot.snapshot_time.desc()).limit(1)
     )).scalar_one_or_none()
     t = _parlay_e_parse_ttg(snap)
-    nums = [2, 3] if leg_type == "23" else [3, 4]
     po = _parlay_e_pick_odds(t, nums)
     if len(po) < 2:
-        return _err(f"该场缺少 {leg_type} 复式所需赔率（{'+'.join(str(n) for n in nums)} 两档），无法确认", 400)
+        return _err(f"该场缺少 {''.join(str(n) for n in nums)} 双选所需赔率，无法确认", 400)
     ip = _parlay_e_implied(t)
     p_hat = round(sum(ip.get(k, 0) for k in nums), 4) if ip else 0.0
 
-    # 2) 方向腿快照（可选；来自方案D当日 dir 腿）
-    dr = payload.get("dir") or {}
-    dir_odds = dr.get("odds")
-
-    # 3) upsert（按比赛日唯一）
+    # 2) upsert（按比赛日唯一）
     row = (await db.execute(
         select(ParlayEConfirm).where(ParlayEConfirm.pick_date == d0.date())
     )).scalar_one_or_none()
@@ -3948,136 +3864,47 @@ async def market_flow_parlay_e_confirm(
     row.leg_type = leg_type
     row.goal_pick_odds = po
     row.goal_p_hat = p_hat
-    # —— 方向腿 match_id：服务端权威解析（前端提交的 dir.match_id 不可信，曾因同开球时间误配）——
-    resolved_dir_id = None
-    if dr.get("home_team") and dr.get("away_team"):
-        wstart = d0.replace(hour=12, minute=0, second=0, microsecond=0)
-        wend = wstart + timedelta(days=1)
-        q = (select(Match.id)
-             .join(League, League.id == Match.league_id)
-             .join(HT, HT.id == Match.home_team_id)
-             .join(AT, AT.id == Match.away_team_id)
-             .where(Match.kickoff_time >= wstart, Match.kickoff_time < wend,
-                    League.name_zh == dr.get("league_name"),
-                    HT.name_zh == dr.get("home_team"), AT.name_zh == dr.get("away_team")))
-        cand = (await db.execute(q)).scalars().all()
-        if len(cand) == 1:
-            resolved_dir_id = cand[0]
-        elif len(cand) > 1 and dr.get("match_num"):
-            cand2 = (await db.execute(q.where(Match.match_num == dr["match_num"]))).scalars().all()
-            if len(cand2) == 1:
-                resolved_dir_id = cand2[0]
-    row.dir_match_id = resolved_dir_id
-    parlay_odds_max = None
-    if resolved_dir_id and dir_odds:
-        high_goal_odd = max(float(po[str(n)]) for n in nums)
-        parlay_odds_max = round(high_goal_odd * float(dir_odds), 4)
-    row.dir_match_num = dr.get("match_num")
-    row.dir_league_name = dr.get("league_name")
-    row.dir_home_team = dr.get("home_team")
-    row.dir_away_team = dr.get("away_team")
-    dk = dr.get("kickoff_time")
-    row.dir_kickoff_time = datetime.fromisoformat(dk) if isinstance(dk, str) else dk
-    row.dir_pick = dr.get("pick")
-    row.dir_odds = float(dir_odds) if dir_odds else None
-    row.dir_p_hat = float(dr["p_hat"]) if dr.get("p_hat") is not None else None
-    row.dir_source = dr.get("source")
-    row.parlay_odds_max = parlay_odds_max
     await db.commit()
     await db.refresh(row)
     return {"success": True, "message": f"方案E已确认：{h_name} vs {a_name} 打{leg_type}球",
             "confirm": _parlay_e_confirm_dict(row)}
 
 
-def _parlay_e_outcome(m):
-    if m is None or m.home_score is None or m.away_score is None:
-        return None
-    return "home" if m.home_score > m.away_score else "away" if m.home_score < m.away_score else "draw"
-
-
-def _parlay_e_half_dir(m):
-    if m is None or not isinstance(m.half_home_score, int) or not isinstance(m.half_away_score, int):
-        return None
-    if m.half_home_score > m.half_away_score:
-        return "home"
-    if m.half_home_score < m.half_away_score:
-        return "away"
-    return "draw"
-
-
 @router.get("/predictions/parlay-e/history")
 async def market_flow_parlay_e_history(db: AsyncSession = Depends(get_db)):
-    """方案E 已确认记录结算统计（只读）：进球腿(23/34复式) / 方案D方向腿 / 2串1 分项命中与 ROI。
+    """方案E 已确认记录结算统计（只读）：单关进球数（动态双选 12/23/34）命中与 ROI。
 
-    口径：进球腿命中 = 实际总进球 ∈ 所选两档；方向腿 = 主/客/平按全场，胜胜/负负按半场+全场同向；
-    2串1 复式注数=2（进球两档各 1 注 × 方向单注）；返奖 = 命中档赔率 × 方向腿赔率。
+    口径：命中 = 实际总进球 ∈ 所选两档；注数=2（两档各 1 注）；返奖 = 命中档实际赔率。
     """
     rows = (await db.execute(
         select(ParlayEConfirm).order_by(ParlayEConfirm.pick_date.desc())
     )).scalars().all()
-    ids = set()
-    for r in rows:
-        if r.match_id:
-            ids.add(r.match_id)
-        if r.dir_match_id:
-            ids.add(r.dir_match_id)
+    ids = {r.match_id for r in rows if r.match_id}
     matches = {}
     if ids:
         mq = await db.execute(select(Match).where(Match.id.in_(ids)))
         matches = {m.id: m for m in mq.scalars()}
 
-    _ZH_OUT = {"主": "home", "客": "away", "平": "draw"}
     out_rows = []
-    n_goal_settled = n_goal_hit = 0
-    n_dir_verified = n_dir_hit = 0
-    n_combo = n_combo_hit = 0
+    n_settled = n_hit = 0
     total_stake = 0.0
     total_payout = 0.0
     for r in rows:
         g = matches.get(r.match_id)
-        dgm = matches.get(r.dir_match_id) if r.dir_match_id else None
-        nums = [2, 3] if r.leg_type == "23" else [3, 4]
-        # 进球腿
-        goal_act = None
-        goal_settled = g is not None and g.home_score is not None and g.away_score is not None
-        if goal_settled:
-            goal_act = g.home_score + g.away_score
-        goal_hit = bool(goal_settled and goal_act in nums)
-        # 方向腿（主/客/平 全场；胜胜/负负 半场+全场同向）
-        dir_hit = None
-        dir_verified = False
-        if r.dir_pick and dgm is not None:
-            fo = _parlay_e_outcome(dgm)
-            if r.dir_pick in _ZH_OUT:
-                dir_verified = fo is not None
-                if dir_verified:
-                    dir_hit = (fo == _ZH_OUT[r.dir_pick])
-            elif r.dir_pick in ("胜胜", "负负"):
-                ho = _parlay_e_half_dir(dgm)
-                want = "home" if r.dir_pick == "胜胜" else "away"
-                dir_verified = (fo is not None and ho is not None)
-                if dir_verified:
-                    dir_hit = (ho == want and fo == want)
-        combo_hit = None
+        nums = [int(c) for c in r.leg_type]
+        settled = g is not None and g.home_score is not None and g.away_score is not None
+        act = (g.home_score + g.away_score) if settled else None
+        hit = bool(settled and act in nums)
         payout = None
-        if goal_settled and dir_verified:
-            combo_hit = bool(goal_hit and dir_hit)
-        if goal_settled:
-            n_goal_settled += 1
-            n_goal_hit += 1 if goal_hit else 0
-        if dir_verified:
-            n_dir_verified += 1
-            n_dir_hit += 1 if dir_hit else 0
-        if goal_settled and dir_verified:
-            n_combo += 1
-            stake = 2.0  # 进球两档复式
-            total_stake += stake
-            if goal_hit and dir_hit:
-                n_combo_hit += 1
+        if settled:
+            n_settled += 1
+            total_stake += 2.0  # 双选两档各 1 注
+            if hit:
+                n_hit += 1
                 po = r.goal_pick_odds or {}
-                odd_k = po.get(str(goal_act))
-                if odd_k and r.dir_odds:
-                    payout = float(odd_k) * float(r.dir_odds)
+                odd_k = po.get(str(act))
+                if odd_k:
+                    payout = float(odd_k)
                     total_payout += payout
         out_rows.append({
             "pick_date": r.pick_date.isoformat(),
@@ -4086,29 +3913,15 @@ async def market_flow_parlay_e_history(db: AsyncSession = Depends(get_db)):
                 "match_id": r.match_id, "match_num": r.match_num, "league_name": r.league_name,
                 "home_team": r.home_team, "away_team": r.away_team,
                 "pick_odds": r.goal_pick_odds, "nums": nums,
-                "settled": goal_settled, "act": goal_act,
-                "hit": goal_hit if goal_settled else None,
+                "settled": settled, "act": act,
+                "hit": hit if settled else None,
             },
-            "dir": None if not r.dir_pick else {
-                "match_id": r.dir_match_id, "match_num": r.dir_match_num,
-                "league_name": r.dir_league_name, "home_team": r.dir_home_team,
-                "away_team": r.dir_away_team, "pick": r.dir_pick, "odds": r.dir_odds,
-                "source": r.dir_source,
-                "verified": dir_verified, "hit": dir_hit,
-            },
-            "combo_hit": combo_hit,
-            "parlay_odds_max": r.parlay_odds_max,
-            "stake": 2.0 if (goal_settled and dir_verified) else None,
             "payout": payout,
         })
     stats = {
         "confirm_n": len(rows),
-        "goal_settled_n": n_goal_settled, "goal_hit_n": n_goal_hit,
-        "goal_p_hit": round(n_goal_hit / n_goal_settled, 4) if n_goal_settled else None,
-        "dir_verified_n": n_dir_verified, "dir_hit_n": n_dir_hit,
-        "dir_p_hit": round(n_dir_hit / n_dir_verified, 4) if n_dir_verified else None,
-        "combo_n": n_combo, "combo_hit_n": n_combo_hit,
-        "combo_p_hit": round(n_combo_hit / n_combo, 4) if n_combo else None,
+        "settled_n": n_settled, "hit_n": n_hit,
+        "p_hit": round(n_hit / n_settled, 4) if n_settled else None,
         "total_stake": round(total_stake, 1),
         "total_payout": round(total_payout, 2),
         "roi": round(total_payout / total_stake, 4) if total_stake else None,

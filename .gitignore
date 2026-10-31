@@ -10,3 +10,4 @@ venv/
 *.log
 mlruns/
 .trae/*
+.trae-html-share-packages/

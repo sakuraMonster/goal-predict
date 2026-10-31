@@ -374,7 +374,7 @@ async def get_football_math(match_id: int, db: AsyncSession = Depends(get_db)):
         r = await db.execute(
             select(TeamSeasonStats)
             .where(TeamSeasonStats.team_id == team_id, TeamSeasonStats.played.isnot(None), TeamSeasonStats.played > 0)
-            .order_by(TeamSeasonStats.played.desc())
+            .order_by(TeamSeasonStats.season.desc())
             .limit(1)
         )
         return r.scalar_one_or_none()

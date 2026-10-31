@@ -11,6 +11,7 @@ from app.db.database import async_session
 from app.db.models import Match, Team, League, TeamSeasonStats, HeadToHead
 from app.collector.sportmonks.client import SportMonksClient
 from app.predictor.features_a import FeatureEngineerA
+from app.predictor.features_b import FeatureEngineerB
 from app.predictor.models.model_a import ModelA
 from app.predictor.models.model_b import ModelB
 from sqlalchemy import select, delete, update, func
@@ -154,7 +155,7 @@ async def retrain():
         
         lc = Counter(m.league_id for m in matches)
         print(f"\n=== 全量样本 {len(matches)} 场 ===")
-        for lid in sorted(lc): print(f"  league_id={lid}: {lc[lid]} 场")
+        for lid in sorted((k for k in lc if k is not None)): print(f"  league_id={lid}: {lc[lid]} 场")
         
         # 计算 TeamSeasonStats
         sdict = {}
@@ -242,8 +243,10 @@ async def retrain():
         # 提取特征
         print("\n提取特征...")
         eng = FeatureEngineerA(db)
+        eng_b = FeatureEngineerB(db)
         Xl, yw, yg = [], [], []
         Xh, yh = [], []  # 让球模型专用：仅含真实让球线的比赛
+        Xb = []  # 模型 B：进球数专属子集
         for i, m in enumerate(matches):
             if (i+1)%1000==0: print(f"  {i+1}/{len(matches)}")
             try:
@@ -258,6 +261,11 @@ async def retrain():
                     adj = m.home_score + m.handicap_line
                     Xh.append(f)
                     yh.append(0 if adj>m.away_score else 1 if adj==m.away_score else 2)
+                # 模型 B：进球数专属子集（与生产推理 FeatureEngineerB 同源，保证训练/推理一致）
+                fb = await eng_b.extract_features(m.id)
+                if fb.empty:
+                    raise ValueError(f"match_id={m.id} 模型B特征提取返回空 DataFrame")
+                Xb.append(fb[FeatureEngineerB.GOALS_FEATURE_COLS])
             except Exception as e:
                 print(f"\n  ⛔ 特征提取失败 match_id={m.id} ({m.home_team_name} vs {m.away_team_name}): {e}")
                 raise  # 立即中断训练
@@ -278,18 +286,9 @@ async def retrain():
         print(f"有效: {len(X)}, 维度: {X.shape[1]}, 主={wc[0]}平={wc[1]}客={wc[2]}基线={wc[0]/len(yw):.3f}")
         print(f"让球样本: {len(Xh)} (胜平负样本: {len(X)})")
         
-        # ── L3 偏离度特征：市场隐含概率 vs 纯数据模型概率 ──
-        # 核心思路：市场赔率反映博彩公司综合判断，纯数据模型反映历史规律，
-        # 两者的偏离度揭示市场是否存在系统性偏差，是让球预测的关键增量信号。
-        # 
-        # 注意：仅用于让球模型（Xh），胜平负模型保持原有特征集，
-        # 避免 base model 的过拟合偏差污染 1X2 预测准确率。
         from sklearn.metrics import accuracy_score
-        odds_cols = [c for c in X.columns if c.startswith("odds_")]
-        base_cols = [c for c in X.columns if c not in odds_cols]
-        mp_cols = ["odds_market_home_prob", "odds_market_draw_prob", "odds_market_away_prob"]
-        
-        # Model A - 胜平负模型（不含偏离度，避免噪声）
+
+        # Model A - 胜平负模型
         print("\nModel A...")
         ma = ModelA()
         ma.model_wl = lgb.LGBMClassifier(
@@ -298,30 +297,11 @@ async def retrain():
             random_state=42, verbose=-1
         )
         ma.model_wl.fit(X[:sp], yw[:sp])
-        
-        # 让球模型：使用 L3 偏离度增强
+
+        # 让球模型：与胜平负模型同特征集（与推理侧 FeatureEngineerA 输出维度一致）
         if len(Xh) >= 100:
-            print("\n计算 L3 偏离度特征（让球模型专用）...")
+            print("\n让球模型（与胜平负同特征集）...")
             Xh_pd = pd.concat(Xh).fillna(0.0)
-            
-            # Stage 1: 训练轻量级纯数据模型（低复杂度防过拟合）
-            base_model = lgb.LGBMClassifier(
-                objective="multiclass", num_class=3,
-                n_estimators=60, learning_rate=0.03, max_depth=4,
-                min_child_samples=50, reg_alpha=0.1, reg_lambda=0.1,
-                random_state=42, verbose=-1
-            )
-            base_model.fit(Xh_pd[base_cols], yh)  # 让球全集训练base（用于特征工程）
-            bh_probs = base_model.predict_proba(Xh_pd[base_cols])
-            mh_probs = Xh_pd[mp_cols].values
-            dh = mh_probs - bh_probs
-            
-            Xh_pd["hcp_dev_home"] = dh[:, 0]
-            Xh_pd["hcp_dev_draw"] = dh[:, 1]
-            Xh_pd["hcp_dev_away"] = dh[:, 2]
-            Xh_pd["hcp_dev_magnitude"] = np.abs(dh).sum(axis=1) / 3
-            print(f"  偏离度特征已添加 → 让球模型维度: {Xh_pd.shape[1]}")
-            
             yh_arr = np.array(yh)
             sh = int(len(Xh_pd) * 0.8)
             ma.model_hcp = lgb.LGBMClassifier(
@@ -338,12 +318,16 @@ async def retrain():
         aw = accuracy_score(yw[sp:], ma.model_wl.predict(X[sp:]))
         print(f"  胜平负: {aw:.4f} 让球: {ah:.4f}")
         
-        # Model B
+        # Model B（进球数专属子集 + 独立标准化，训练/推理特征工程一致）
         print("Model B...")
+        Xb = pd.concat(Xb).fillna(0.0)
+        scaler_b = StandardScaler()
+        Xb_scaled = scaler_b.fit_transform(Xb)
+        Xb_scaled = pd.DataFrame(Xb_scaled, columns=Xb.columns)
         mk = yg[:sp] > 0
-        mb = ModelB(); mb.train(X[:sp][mk], yg[:sp][mk])
-        mae = np.abs(yg[sp:] - mb.model.predict(X[sp:])).mean()
-        print(f"  进球MAE: {mae:.4f}")
+        mb = ModelB(); mb.train(Xb_scaled[:sp][mk], yg[:sp][mk])
+        mae = np.abs(yg[sp:] - mb.model.predict(Xb_scaled[sp:])).mean()
+        print(f"  进球MAE: {mae:.4f} (子集{len(FeatureEngineerB.GOALS_FEATURE_COLS)}维)")
         
         joblib.dump(ma.model_wl, os.path.join(MODEL_DIR,"model_a_wl.pkl"))
         if ma.model_hcp:
@@ -354,7 +338,7 @@ async def retrain():
             shutil.copy2(os.path.join(MODEL_DIR,"model_a_wl.pkl"), os.path.join(MODEL_DIR,"model_a_hcp.pkl"))
             print("  让球模型: 样本不足，使用胜平负模型替代")
         joblib.dump(mb.model, os.path.join(MODEL_DIR,"model_b.pkl"))
-        joblib.dump(scaler, os.path.join(MODEL_DIR,"model_b_scaler.pkl"))
+        joblib.dump(scaler_b, os.path.join(MODEL_DIR,"model_b_scaler.pkl"))
         
         # V4.1: 批量预测移至独立脚本执行（避免 SM API 调用拖慢训练）
         # 训练完成后运行 _batch_predict_fast.py 单独做预测

@@ -342,27 +342,27 @@ class ColdPickRecord(Base):
 
 
 class ParlayEConfirm(Base):
-    """方案E 人工确认快照（每日 1 条：确认的进球场 + 当日方案D方向腿 → 2串1）
+    """方案E 人工确认快照（每日 1 条：单关进球数双选）
 
-    进球注为竞彩总进球复式（23 = 买 {2,3} 两档；34 = 买 {3,4} 两档）。
-    方向腿快照来自方案D当日输出（parlay-d 的 dir 腿），只做引用不改方案D逻辑。
+    单关 = 竞彩总进球双选复式（从 {1,2,3,4} 取隐含最高的 2 档，动态 12/23/34）。
+    dir_* 系列字段为旧版「进球场×方案D方向腿 2串1」遗留，现已不再使用（保留列避免迁移）。
     """
     __tablename__ = "parlay_e_confirms"
     __table_args__ = (UniqueConstraint("pick_date", name="uq_parlay_e_pick_date"),)
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     pick_date = Column(Date, nullable=False, index=True, comment="比赛日（竞彩 12:00 口径）")
-    # —— 确认的进球场（方案E 进球腿） ——
+    # —— 确认的进球场（方案E 单关进球腿） ——
     match_id = Column(Integer, ForeignKey("matches.id"), nullable=False, index=True)
     match_num = Column(String(50))
     league_name = Column(String(100))
     home_team = Column(String(100))
     away_team = Column(String(100))
     kickoff_time = Column(DateTime)
-    leg_type = Column(String(10), nullable=False, comment="23=总进球2∪3复式, 34=3∪4复式")
+    leg_type = Column(String(10), nullable=False, comment="双选档位，如 '23'=2∪3, '12'=1∪2, '34'=3∪4")
     goal_pick_odds = Column(JSON, comment="{档位: 赔率}，如 {2:3.9, 3:3.6}")
     goal_p_hat = Column(Float, comment="所选两档隐含概率和")
-    # —— 当日方案D方向腿（快照引用） ——
+    # —— 旧版方向腿字段（已弃用，保留列避免迁移） ——
     dir_match_id = Column(Integer)
     dir_match_num = Column(String(50))
     dir_league_name = Column(String(100))

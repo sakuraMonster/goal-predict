@@ -26,9 +26,10 @@ class ModelB:
                 self._feature_names = json.load(f)
         
         self.model = joblib.load(model_path) if os.path.exists(model_path) else None
-        self.scaler = None
-        # 注意：当前模型训练时不使用 StandardScaler（train() 直接用原始特征 fit PoissonRegressor）
-        # model_b_scaler.pkl 是旧版本遗留文件，维度不匹配，不可用
+        # V4.14: 修复训练/推理标准化不一致 —— full_retrain 训练时先用 StandardScaler
+        # 标准化特征再 fit PoissonRegressor，推理必须用同一 scaler 还原，否则 λ 系统性错位。
+        # 重训后 model_b_scaler.pkl 与 model_b_features.json 维度一致，可安全加载。
+        self.scaler = joblib.load(scaler_path) if os.path.exists(scaler_path) else None
         
         # V4.11: Zero-Inflated 组件
         self.zero_model = joblib.load(ZERO_MODEL_PATH) if os.path.exists(ZERO_MODEL_PATH) else None

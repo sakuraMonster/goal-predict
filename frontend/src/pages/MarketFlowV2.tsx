@@ -1724,7 +1724,7 @@ function ParlayView() {
         </div>
         {/* 方案切换 tab：固定第二行，各子方案视图位置一致 */}
         <div className="flex gap-0.5 bg-white rounded p-0.5 border border-border text-[11px] w-fit flex-wrap">
-          {([["all", "方案A·全方向"], ["d", "方案D·进球半全场"], ["dir", "方案C·方向二串一"], ["e", "方案E·进球确认"], ["f", "终稿·人工确认"], ["g", "方案G·半平×方向"]] as const).map(([k, label]) => (
+          {([["all", "方案A·全方向"], ["d", "方案D·进球半全场"], ["dir", "方案C·方向二串一"], ["e", "方案E·单关进球"], ["f", "终稿·人工确认"], ["g", "方案G·半平×方向"]] as const).map(([k, label]) => (
             <span key={k} className={`px-2 py-0.5 rounded cursor-pointer ${subTab === k ? "bg-amber text-white font-semibold" : "text-ink-muted"}`}
               onClick={() => setSubTab(k)}>{label}</span>
           ))}

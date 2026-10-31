@@ -30,6 +30,38 @@ class FeatureEngineerB(BaseDataFetcher):
     DEFAULT_CLEAN_SHEET_RATE = 0.2
     DEFAULT_XG = 0.0
     DEFAULT_PASSES = 0.0
+
+    # ============================================================
+    # 进球数专属特征子集（Model B 训练/推理统一）
+    # 从完整 191 维特征中筛出与「总进球数 λ」直接相关的列，
+    # 剔除胜负方向特征（1X2 赔率/让球/h2h胜负/欧战/排名/动机/庄家意图等）
+    # ============================================================
+    GOALS_FEATURE_COLS = [
+        # xG/xGA 预期进失球（核心锚点）
+        "home_xG", "home_xGA", "away_xG", "away_xGA", "xG_diff",
+        # 实际进失球场均（基本面）
+        "home_goals_avg", "home_goals_against_avg", "away_goals_avg", "away_goals_against_avg", "goals_avg_diff",
+        # 近6/10场进球（近期状态）
+        "home_gf_avg_6", "home_ga_avg_6", "away_gf_avg_6", "away_ga_avg_6",
+        "home_gf_avg_10", "home_ga_avg_10", "away_gf_avg_10", "away_ga_avg_10",
+        # 零封（防守极端信号）
+        "home_clean_sheet_rate",
+        # 背离（finishing 能力，正负拆分）
+        "home_off_div_pos", "home_off_div_neg", "home_def_div_pos", "home_def_div_neg",
+        "away_off_div_pos", "away_off_div_neg", "away_def_div_pos", "away_def_div_neg",
+        # 传球（控球风格，弱信号）
+        "home_avg_passes", "away_avg_passes", "passes_diff",
+        # 市场盘口（OU 最强市场信号）
+        "goal_line_market", "over_odds_current", "under_odds_current",
+        "over_odds_movement", "under_odds_movement",
+        "goal_line_change", "goal_line_shift", "goal_line_drop_from_peak", "goal_line_volatility",
+        "goal_line_max", "goal_line_min",
+        # 市场隐含概率（可换算 λ 先验）
+        "odds_market_home_prob", "odds_market_draw_prob", "odds_market_away_prob",
+        # 联赛上下文（跨联赛校准）
+        "league_id", "league_avg_total_goals",
+    ]
+
     POINTS_PER_WIN = 3
     POINTS_PER_DRAW = 1
     DENOM_MIN = 0.01

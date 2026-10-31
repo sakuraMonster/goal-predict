@@ -46,7 +46,13 @@ class ModelA:
 
         probs_wl = self.model_wl.predict_proba(features)[0]
         probs_wl = self._calibrate(probs_wl)
-        probs_hcp = self.model_hcp.predict_proba(features)[0] if self.model_hcp else probs_wl
+        if self.model_hcp is not None:
+            try:
+                probs_hcp = self.model_hcp.predict_proba(features)[0]
+            except Exception:
+                probs_hcp = probs_wl
+        else:
+            probs_hcp = probs_wl
         probs_hcp = self._calibrate(probs_hcp)
 
         return {

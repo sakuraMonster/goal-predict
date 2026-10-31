@@ -32,24 +32,32 @@ class SyncPipeline:
     MARKET_HANDICAP = 6    # 亚盘让球 - Asian Handicap
     MARKET_OVER_UNDER = 80 # 大小球 - Goals Over/Under
 
-    # 常见博彩公司 ID → 中文名（SportMonks bookmaker_id）
+    # 常见博彩公司 ID → 名称（SportMonks bookmaker_id，以官方 API 返回为准）
+    # 注意：此前多处映射错误（23 实为 Unibet 非 Pinnacle、29 实为 WilliamHill 等），
+    # 会污染 odds_snapshots.bookmaker 进而影响价值分析锐利盘选庄。
     BOOKMAKER_NAMES = {
         1: "10Bet",
         2: "bet365",
-        5: "威廉希尔",
+        5: "888Sport",
         9: "Betfair",
-        11: "立博",
         12: "BetVictor",
-        14: "Bwin",
+        13: "Coral",
+        14: "Dafabet",
         16: "Marathonbet",
         20: "Pinnacle",
-        23: "Pinnacle",
-        29: "澳门",
+        23: "Unibet",
+        26: "Betsson",
+        27: "Interwetten",
+        28: "bwin",
+        29: "WilliamHill",
+        32: "Ladbrokes",
         34: "Sbo",
         35: "1xbet",
-        38: "皇冠",
-        44: "易胜博",
-        47: "12BET",
+        38: "CloudBet",
+        57: "Cashpoint",
+        58: "MansionBet",
+        64: "MelBet",
+        66: "Macauslot",
     }
 
     def __init__(self):
@@ -220,11 +228,11 @@ class SyncPipeline:
             async with async_session() as db:
                 from sqlalchemy.orm import joinedload
 
-                # 获取未匹配的赛事（含关联的 Team）；排除已标记 cancelled 的场次
+                # 获取未匹配的赛事（含关联的 Team / League）；排除已标记 cancelled 的场次
                 # （SM 数据源未收录的比赛标记 cancelled 后不再重复尝试匹配）
                 result = await db.execute(
                     select(Match)
-                    .options(joinedload(Match.home_team), joinedload(Match.away_team))
+                    .options(joinedload(Match.home_team), joinedload(Match.away_team), joinedload(Match.league))
                     .where(
                         Match.sportmonks_fixture_id.is_(None),
                         Match.status == "scheduled",
@@ -388,6 +396,24 @@ class SyncPipeline:
                         variants.append(raw)
                     return variants
 
+                def _league_ok(match, fx) -> bool:
+                    """联赛一致性校验：竞彩 Match 与 SportMonks fixture 联赛一致才返回 True。
+
+                    优先用 League.sportmonks_id 精确比对，缺失时回退英文/中文名包含匹配。
+                    任一联赛信息缺失时不拦截（保守），避免误杀正确匹配。
+                    """
+                    jc = match.league
+                    fl = fx.get("league") if isinstance(fx.get("league"), dict) else None
+                    if jc is None or fl is None:
+                        return True
+                    if jc.sportmonks_id and fl.get("id"):
+                        return int(jc.sportmonks_id) == int(fl.get("id"))
+                    jc_ln = _normalize_name(jc.name_en or "") or _normalize_name(jc.name_zh or "")
+                    sm_ln = _normalize_name(fl.get("name") or "")
+                    if jc_ln and sm_ln:
+                        return jc_ln in sm_ln or sm_ln in jc_ln
+                    return True
+
                 for date_str, day_matches in date_groups.items():
                     d = datetime.strptime(date_str, "%Y-%m-%d")
 
@@ -400,7 +426,7 @@ class SyncPipeline:
                         query_dates.append(query_date)
                         try:
                             day_fixtures = await self.sm.get_fixtures_by_date(
-                                query_date, includes="participants"
+                                query_date, includes="participants;league"
                             )
                             sm_fixtures.extend(day_fixtures)
                         except Exception as e:
@@ -439,6 +465,9 @@ class SyncPipeline:
                                     continue
                                 pids = {p.get("id") for p in participants if isinstance(p, dict)}
                                 if home_sm_id in pids and away_sm_id in pids:
+                                    # 联赛一致性校验：避免跨赛事误配（德国杯 vs 德甲）
+                                    if not _league_ok(match, fx):
+                                        continue
                                     fx_id = fx["id"]
                                     # 用 meta.location 判断方向（SM 不保证 participants[0] 一定是主队）
                                     has_location = False
@@ -629,10 +658,10 @@ class SyncPipeline:
                                 date_from = (d - timedelta(days=10)).strftime("%Y-%m-%d")
                                 date_to = (d + timedelta(days=10)).strftime("%Y-%m-%d")
                                 extra = await self.sm.get_fixtures_between_for_team(
-                                    date_from, date_to, home_sm_id, includes="participants"
+                                    date_from, date_to, home_sm_id, includes="participants;league"
                                 )
                                 extra += await self.sm.get_fixtures_between_for_team(
-                                    date_from, date_to, away_sm_id, includes="participants"
+                                    date_from, date_to, away_sm_id, includes="participants;league"
                                 )
                                 if extra:
                                     seen = {f.get("id") for f in fixture_pool if f.get("id")}
@@ -663,6 +692,12 @@ class SyncPipeline:
                                             except (ValueError, TypeError):
                                                 fx_dt = None
                                             diff = abs((fx_dt - kickoff_utc).total_seconds()) if fx_dt else 10**18
+                                            # 日期校验：竞彩与 SportMonks 开赛时间差超过 1 天视为错场（如德国杯→德甲），跳过
+                                            if fx_dt is None or diff > 24 * 3600:
+                                                continue
+                                            # 联赛一致性校验：避免跨赛事误配（德国杯 vs 德甲）
+                                            if not _league_ok(match, fx):
+                                                continue
                                             if best is None or diff < best[0]:
                                                 best = (diff, fx, participants)
                                         if best:
@@ -795,13 +830,12 @@ class SyncPipeline:
                         bm_id = o.get("bookmaker_id", 0)
                         bookmaker_groups.setdefault(bm_id, []).append(o)
                         if bm_id not in bookmaker_names:
-                            # 优先从 API 返回的嵌套 bookmaker 对象中取 name
+                            # 优先用 API 返回的官方名称，其次本地映射兜底，最后退回 ID
                             bm_obj = o.get("bookmaker", {})
                             bm_api_name = bm_obj.get("name", "") if isinstance(bm_obj, dict) else ""
-                            # 其次用本地中文映射，最后退回 ID
                             bookmaker_names[bm_id] = (
-                                self.BOOKMAKER_NAMES.get(bm_id)
-                                or bm_api_name
+                                bm_api_name
+                                or self.BOOKMAKER_NAMES.get(bm_id)
                                 or str(bm_id)
                             )
 

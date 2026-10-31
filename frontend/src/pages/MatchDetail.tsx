@@ -511,7 +511,7 @@ export default function MatchDetail() {
     <div className="bg-parchment text-ink">
       {/* 顶部栏 */}
       <div className="flex items-center gap-3 px-5 py-2.5 bg-parchment-dark border-b border-border-dark font-body text-xs text-ink-muted">
-        <Link to="/" className="text-sm hover:text-moss">← 返回赛事列表</Link>
+        <Link to="/dashboard" className="text-sm hover:text-moss">← 返回赛事列表</Link>
         <span className="ml-auto">模型 {pred.model_version || "v0.1.0"} · 更新于 {pred.created_at?.slice(11,16) || "--"}</span>
       </div>
 

@@ -352,6 +352,35 @@ export default function ValueAnalysis() {
     return map;
   }, [labelStats]);
 
+  // 规则标签按优选结果分组（胜 / 负 / 平）
+  const labelGroups = useMemo(() => {
+    const groups = [
+      { key: "home", title: "胜", labels: [] as PredictionLabelStat[] },
+      { key: "away", title: "负", labels: [] as PredictionLabelStat[] },
+      { key: "draw", title: "平", labels: [] as PredictionLabelStat[] },
+    ];
+    const other: PredictionLabelStat[] = [];
+    (labelStats?.labels ?? []).forEach((s) => {
+      if (s.label.endsWith("-胜")) groups[0].labels.push(s);
+      else if (s.label.endsWith("-负")) groups[1].labels.push(s);
+      else if (s.label.endsWith("-平")) groups[2].labels.push(s);
+      else other.push(s);
+    });
+    if (other.length) groups.push({ key: "other", title: "其他", labels: other });
+    return groups.filter((g) => g.labels.length > 0);
+  }, [labelStats]);
+
+  // 选中规则的实际赛果统计（胜平负 / 让球胜平负）
+  const labelMatchesStats = useMemo(() => {
+    const had = { home: 0, draw: 0, away: 0 };
+    const hhad = { home: 0, draw: 0, away: 0 };
+    (labelMatches?.matches ?? []).forEach((mm) => {
+      if (mm.actual in had) had[mm.actual as "home" | "draw" | "away"]++;
+      if (mm.hhad) hhad[mm.hhad]++;
+    });
+    return { had, hhad };
+  }, [labelMatches]);
+
   // 排序后的比赛列表（default：保持接口 kickoff 顺序；hitrate：按规则命中率降序，无预测置底）
   const sortedMatches = useMemo(() => {
     const list = [...(data?.matches ?? [])];
@@ -451,23 +480,30 @@ export default function ValueAnalysis() {
                   近 {labelStats.days} 天 · 合计 {labelStats.total_hit}/{labelStats.total_n}（{fmtPct(labelStats.total_rate)}）
                 </span>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {labelStats.labels.map((s) => {
-                  const isSelected = selectedLabel === s.label;
-                  return (
-                    <button
-                      key={s.label}
-                      onClick={() => setSelectedLabel(isSelected ? null : s.label)}
-                      className={`inline-flex items-center gap-1.5 px-2 py-1 rounded border text-xs transition-colors ${
-                        s.n === 0 ? "border-border opacity-50" : "border-moss/20"
-                      } ${isSelected ? "bg-moss border-moss" : "bg-white hover:bg-highlight/30"}`}
-                    >
-                      <span className={`font-medium ${isSelected ? "text-white" : "text-ink"}`}>{s.label}</span>
-                      <span className={isSelected ? "text-white/80" : "text-ink-muted"}>{s.hit}/{s.n}</span>
-                      <span className={`font-semibold ${isSelected ? "text-white" : rateColor(s.rate)}`}>{fmtPct(s.rate)}</span>
-                    </button>
-                  );
-                })}
+              <div className="space-y-3">
+                {labelGroups.map((g) => (
+                  <div key={g.key}>
+                    <div className="text-xs font-semibold text-ink-muted mb-1.5">{g.title}</div>
+                    <div className="flex flex-wrap gap-2">
+                      {g.labels.map((s) => {
+                        const isSelected = selectedLabel === s.label;
+                        return (
+                          <button
+                            key={s.label}
+                            onClick={() => setSelectedLabel(isSelected ? null : s.label)}
+                            className={`inline-flex items-center gap-1.5 px-2 py-1 rounded border text-xs transition-colors ${
+                              s.n === 0 ? "border-border opacity-50" : "border-moss/20"
+                            } ${isSelected ? "bg-moss border-moss" : "bg-white hover:bg-highlight/30"}`}
+                          >
+                            <span className={`font-medium ${isSelected ? "text-white" : "text-ink"}`}>{s.label}</span>
+                            <span className={isSelected ? "text-white/80" : "text-ink-muted"}>{s.hit}/{s.n}</span>
+                            <span className={`font-semibold ${isSelected ? "text-white" : rateColor(s.rate)}`}>{fmtPct(s.rate)}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}
@@ -527,6 +563,19 @@ export default function ValueAnalysis() {
                 <>
                   <div className="text-xs text-ink-muted mb-3">
                     近 {labelMatches.days} 天 · {labelMatches.hit}/{labelMatches.n}（{fmtPct(labelMatches.rate)}）
+                  </div>
+                  <div className="bg-parchment-dark rounded px-3 py-2 mb-3">
+                    <div className="text-xs font-semibold text-ink mb-1">实际赛果统计</div>
+                    <div className="flex gap-3 text-xs">
+                      <span className="text-ink-muted">胜 <b className="text-ink">{labelMatchesStats.had.home}</b></span>
+                      <span className="text-ink-muted">平 <b className="text-ink">{labelMatchesStats.had.draw}</b></span>
+                      <span className="text-ink-muted">负 <b className="text-ink">{labelMatchesStats.had.away}</b></span>
+                    </div>
+                    <div className="flex gap-3 text-xs mt-1 text-ink-muted">
+                      <span>让胜 <b>{labelMatchesStats.hhad.home}</b></span>
+                      <span>让平 <b>{labelMatchesStats.hhad.draw}</b></span>
+                      <span>让负 <b>{labelMatchesStats.hhad.away}</b></span>
+                    </div>
                   </div>
                   {labelMatches.matches.length === 0 ? (
                     <p className="text-xs text-ink-muted">该规则近30天无已结算场次。</p>

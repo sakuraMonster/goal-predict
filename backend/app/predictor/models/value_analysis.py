@@ -82,6 +82,11 @@ FAVORITE_LOSS_DRAW_HOME_HI = 2.60
 # 平赔 3.5~4.0 → 平+让平（保持）；平赔 >=4.0 → 让胜+让平。
 BALANCED_DRAW_LOW_DRAW = 3.50
 BALANCED_DRAW_HIGH_DRAW = 4.00
+# 初盘口径专用（mode="open"）：客让-负 按平赔拆分（<4.0 → 让胜+让平；>=4.0 → 让负+让胜）。
+OPEN_FAVORITE_LOSS_DRAW_SPLIT = 4.00
+# 初盘口径专用（mode="open"）：主让1.4~1.6-负 按平赔拆分（<4.5 → 胜；4.5~5.0 → 让胜+让平；>5.0 → 让负）。
+OPEN_FAV_COVER_DRAW_LOW = 4.50
+OPEN_FAV_COVER_DRAW_HIGH = 5.00
 
 # 预测提取规则标签（固定顺序，用于命中率统计与前端展示）。
 # 顺序：方向类（正路/冷门）在前，平类（均衡盘/深盘）在后。
@@ -99,8 +104,13 @@ PREDICTION_LABEL_ORDER = [
     "客让<1.5-负",
     "客让2.3~2.6-负",
     "客让-负",
+    "客让平赔<4.0-负",
+    "客让平赔≥4.0-负",
     "主让<1.4-负",
     "主让1.4~1.6-负",
+    "主让1.4~1.6平赔<4.5-负",
+    "主让1.4~1.6平赔4.5~5.0-负",
+    "主让1.4~1.6平赔>5.0-负",
     "主让1.6~1.8-负",
     "主让1.8~2.0-负",
     "主让≥2.0-负",
@@ -487,7 +497,7 @@ def _pick(market: str, outcome: str, label: str) -> dict:
     return {"market": market, "outcome": outcome, "label": label}
 
 
-def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True) -> Optional[dict]:
+def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True, mode: str = "close") -> Optional[dict]:
     """从价值分析 1X2 预测（best_side = home/draw/away）提取投注预测（胜平负 + 让球胜平负）。
 
     规则（用户口径，用锐利盘 1X2 赔率定义让球方与深盘，不依赖让球线）：
@@ -509,6 +519,7 @@ def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True) -> Optional[
     if best_side not in ("home", "draw", "away"):
         return None
 
+    is_open = (mode == "open")
     fav = _fav_from_1x2(sharp_1x2)
     fav_odds = _to_f((sharp_1x2 or {}).get(fav)) if fav else None
     draw_odds = _to_f((sharp_1x2 or {}).get("draw"))
@@ -677,13 +688,17 @@ def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True) -> Optional[
             if fav_odds is not None and fav_odds < UPSET_WIN_DRAW_LOSS_LO:
                 # 客让 1.5~2.0
                 if draw_odds is not None and draw_odds >= UPSET_WIN_HIGH_DRAW:
-                    # 平赔>=4.0 → 让胜
+                    # 平赔>=4.0 → 让胜（初盘口径：让胜 + 让负）
                     return {
                         "side": "home",
                         "mode": "upset_win_mid_highdraw",
                         "fav": fav,
                         "label": "客让1.5~2.0平赔≥4.0-胜",
-                        "picks": [_pick("hhad", "home", "让胜")],
+                        "picks": (
+                            [_pick("hhad", "home", "让胜"), _pick("hhad", "away", "让负")]
+                            if is_open
+                            else [_pick("hhad", "home", "让胜")]
+                        ),
                     }
                 # 平赔 3.5~4.0 → 让负 + 平
                 return {
@@ -710,16 +725,20 @@ def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True) -> Optional[
                             _pick("had", "away", "负"),
                         ],
                     }
-                # 平赔 3.5~4.0 → 平 + 让平
+                # 平赔 3.5~4.0 → 平 + 让平（初盘口径：胜 + 负）
                 return {
                     "side": "home",
                     "mode": "upset_win_mid_push",
                     "fav": fav,
                     "label": "客让2.3~2.6平赔3.5~4.0-胜",
-                    "picks": [
-                        _pick("had", "draw", "平"),
-                        _pick("hhad", "draw", "让平"),
-                    ],
+                    "picks": (
+                        [_pick("had", "home", "胜"), _pick("had", "away", "负")]
+                        if is_open
+                        else [
+                            _pick("had", "draw", "平"),
+                            _pick("hhad", "draw", "让平"),
+                        ]
+                    ),
                 }
             # 客让 >=2.6 → 平 + 负（主胜概率极低，实际赛果均为平或负）
             return {
@@ -789,8 +808,38 @@ def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True) -> Optional[
                     _pick("hhad", "away", "让负"),
                 ],
             }
-        # 主让 1.4~1.6 → 让胜
+        # 主让 1.4~1.6 → 让胜（初盘口径：按平赔拆分子规则）
         if fav_odds is not None and FAV_COVER_LO <= fav_odds < FAV_COVER_HI:
+            if is_open and draw_odds is not None:
+                if draw_odds < OPEN_FAV_COVER_DRAW_LOW:
+                    # 平赔 <4.5 → 胜
+                    return {
+                        "side": "away",
+                        "mode": "fav_cover_open_low",
+                        "fav": fav,
+                        "label": "主让1.4~1.6平赔<4.5-负",
+                        "picks": [_pick("had", "home", "胜")],
+                    }
+                if draw_odds <= OPEN_FAV_COVER_DRAW_HIGH:
+                    # 平赔 4.5~5.0 → 让胜 + 让平
+                    return {
+                        "side": "away",
+                        "mode": "fav_cover_open_mid",
+                        "fav": fav,
+                        "label": "主让1.4~1.6平赔4.5~5.0-负",
+                        "picks": [
+                            _pick("hhad", "home", "让胜"),
+                            _pick("hhad", "draw", "让平"),
+                        ],
+                    }
+                # 平赔 >5.0 → 让负
+                return {
+                    "side": "away",
+                    "mode": "fav_cover_open_high",
+                    "fav": fav,
+                    "label": "主让1.4~1.6平赔>5.0-负",
+                    "picks": [_pick("hhad", "away", "让负")],
+                }
             return {
                 "side": "away",
                 "mode": "fav_cover",
@@ -810,17 +859,21 @@ def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True) -> Optional[
                     _pick("had", "away", "负"),
                 ],
             }
-        # 主让 1.8~2.0 → 胜 + 平（主队不败）
+        # 主让 1.8~2.0 → 胜 + 平（主队不败；初盘口径：让负 + 让胜）
         if fav_odds is not None and UPSET_LOSS_MID_LO <= fav_odds < UPSET_LOSS_MID_HI:
             return {
                 "side": "away",
                 "mode": "upset_loss_mid",
                 "fav": fav,
                 "label": "主让1.8~2.0-负",
-                "picks": [
-                    _pick("had", "home", "胜"),
-                    _pick("had", "draw", "平"),
-                ],
+                "picks": (
+                    [_pick("hhad", "away", "让负"), _pick("hhad", "home", "让胜")]
+                    if is_open
+                    else [
+                        _pick("had", "home", "胜"),
+                        _pick("had", "draw", "平"),
+                    ]
+                ),
             }
         # 主让 >=2.0 → 让平 + 平
         if fav_odds is not None and fav_odds >= FAV_DRAW_LO:
@@ -854,19 +907,48 @@ def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True) -> Optional[
                 _pick("hhad", "away", "让负"),
             ],
         }
-    # 客让 2.3~2.6 → 胜 + 平（客队高赔赢不了，主队不败）
+    # 客让 2.3~2.6 → 胜 + 平（客队高赔赢不了，主队不败；初盘口径：平 + 负）
     if fav_odds is not None and FAVORITE_LOSS_DRAW_HOME_LO <= fav_odds < FAVORITE_LOSS_DRAW_HOME_HI:
         return {
             "side": "away",
             "mode": "favorite_loss_draw_home",
             "fav": fav,
             "label": "客让2.3~2.6-负",
-            "picks": [
-                _pick("had", "home", "胜"),
-                _pick("had", "draw", "平"),
-            ],
+            "picks": (
+                [_pick("had", "draw", "平"), _pick("had", "away", "负")]
+                if is_open
+                else [
+                    _pick("had", "home", "胜"),
+                    _pick("had", "draw", "平"),
+                ]
+            ),
         }
     # 正路的负（客让其余：1.5~2.0 待区分、2.0~2.3、≥2.6）→ 负
+    # 初盘口径：按平赔拆分子规则
+    if is_open and draw_odds is not None:
+        if draw_odds < OPEN_FAVORITE_LOSS_DRAW_SPLIT:
+            # 平赔 <4.0 → 让胜 + 让平
+            return {
+                "side": "away",
+                "mode": "favorite_loss_open_low",
+                "fav": fav,
+                "label": "客让平赔<4.0-负",
+                "picks": [
+                    _pick("hhad", "home", "让胜"),
+                    _pick("hhad", "draw", "让平"),
+                ],
+            }
+        # 平赔 >=4.0 → 让负 + 让胜
+        return {
+            "side": "away",
+            "mode": "favorite_loss_open_high",
+            "fav": fav,
+            "label": "客让平赔≥4.0-负",
+            "picks": [
+                _pick("hhad", "away", "让负"),
+                _pick("hhad", "home", "让胜"),
+            ],
+        }
     return {
         "side": "away",
         "mode": "favorite_loss",
@@ -902,7 +984,7 @@ def prediction_open_from_analysis(analysis) -> Optional[dict]:
         return None
     handicap = (analysis.get("markets") or {}).get("handicap") or {}
     has_hhad = bool(handicap.get("jczq_odds"))
-    return extract_prediction(best_side, open_odds, has_hhad)
+    return extract_prediction(best_side, open_odds, has_hhad, mode="open")
 
 
 def actual_hhad(diff: int, hhad_line) -> Optional[str]:
@@ -1008,7 +1090,7 @@ def analyze_match(
         }
         prediction = extract_prediction(mv.get("best_side"), _odds_dict(sharp_1x2 or {}), bool(hhad))
         if open_odds:
-            prediction_open = extract_prediction(mv.get("best_side"), open_odds, bool(hhad))
+            prediction_open = extract_prediction(mv.get("best_side"), open_odds, bool(hhad), mode="open")
 
     # --- 让球：仅风险（竞彩让球=欧盘3-way -1，锐利盘=亚盘2-way，口径不对齐，无法直接估值）---
     if hhad:

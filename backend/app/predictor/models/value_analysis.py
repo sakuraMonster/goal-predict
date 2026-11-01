@@ -891,6 +891,20 @@ def prediction_from_analysis(analysis) -> Optional[dict]:
     return extract_prediction(best_side, sharp_1x2, has_hhad)
 
 
+def prediction_open_from_analysis(analysis) -> Optional[dict]:
+    """从已持久化 analysis_json 重建「初盘口径」预测提取结果（best_side 用尾盘冻结，sharp 用初盘 open_odds）。"""
+    if not isinstance(analysis, dict):
+        return None
+    m1 = (analysis.get("markets") or {}).get("1x2") or {}
+    best_side = (m1.get("value") or {}).get("best_side")
+    open_odds = m1.get("open_odds")
+    if not open_odds:
+        return None
+    handicap = (analysis.get("markets") or {}).get("handicap") or {}
+    has_hhad = bool(handicap.get("jczq_odds"))
+    return extract_prediction(best_side, open_odds, has_hhad)
+
+
 def actual_hhad(diff: int, hhad_line) -> Optional[str]:
     """实际让球胜平负：diff=主队净胜球(主-客)，hhad_line=让球线(负=主队让球)。
 
@@ -945,17 +959,19 @@ def analyze_match(
     sharp_ou_p_big: Optional[float] = None,
     sharp_ou_n_books: Optional[int] = None,
     jczq_early: Optional[dict] = None,
+    sharp_1x2_open: Optional[dict] = None,
 ) -> dict:
     """分析单场比赛的价值与风险。
 
     参数（均为 dict / 标量）：
       jczq         竞彩最新快照：{had:{home,draw,away}, hhad:{line,home,draw,away},
                      ttg:{0:..,1:..,...}, crs:{...}, hafu:{...}}
-      sharp_1x2    锐利盘 1X2：{home,draw,away}
+      sharp_1x2    锐利盘 1X2（尾盘）：{home,draw,away}
       sharp_ou_p_big   锐利盘大小球去水后 P大（2.5 线）
       sharp_ou_n_books 锐利盘大小球参与庄家数（用于基准可信度）
       jczq_early   竞彩最早快照（用于盘口漂移，可省）
-    返回 {markets: {...}, risk_summary: {...}, prediction: {...}|None}
+      sharp_1x2_open  锐利盘 1X2（初盘）：仅用于提取「初盘口径」预测（best_side 仍用尾盘）
+    返回 {markets: {...}, risk_summary: {...}, prediction: {...}|None, prediction_open: {...}|None}
     """
     jczq = jczq or {}
     had = _odds_dict(jczq.get("had"))
@@ -966,6 +982,7 @@ def analyze_match(
 
     markets: dict = {}
     prediction = None
+    prediction_open = None
 
     # --- 1X2 胜平负：价值 + 风险 ---
     if had:
@@ -980,14 +997,18 @@ def analyze_match(
         _cr = cold_risk_flag(had, sharp_1x2 or {})
         if _cr:
             flags.append(_cr)
+        open_odds = _odds_dict(sharp_1x2_open or {})
         markets["1x2"] = {
             "name": "胜平负",
             "jczq_odds": had,
             "sharp_odds": _odds_dict(sharp_1x2 or {}),
+            "open_odds": open_odds,
             "value": mv,
             "risk": assemble_risk(flags),
         }
         prediction = extract_prediction(mv.get("best_side"), _odds_dict(sharp_1x2 or {}), bool(hhad))
+        if open_odds:
+            prediction_open = extract_prediction(mv.get("best_side"), open_odds, bool(hhad))
 
     # --- 让球：仅风险（竞彩让球=欧盘3-way -1，锐利盘=亚盘2-way，口径不对齐，无法直接估值）---
     if hhad:
@@ -1050,7 +1071,7 @@ def analyze_match(
 
     # --- 汇总 ---
     risk_summary = _summarize(markets)
-    return {"markets": markets, "risk_summary": risk_summary, "prediction": prediction}
+    return {"markets": markets, "risk_summary": risk_summary, "prediction": prediction, "prediction_open": prediction_open}
 
 
 def _top_odds(odds: dict) -> Optional[float]:

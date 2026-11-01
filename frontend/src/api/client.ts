@@ -1058,6 +1058,7 @@ export interface ValueAnalysisItem {
     markets: Record<string, ValueMarket>;
     risk_summary: ValueRiskSummary;
     prediction?: ValuePrediction | null;
+    prediction_open?: ValuePrediction | null;
   } | null;
 }
 export interface ValueAnalysisResponse {

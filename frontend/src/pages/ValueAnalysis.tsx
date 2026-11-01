@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   getValueAnalysis,
   computeValueAnalysis,
@@ -9,6 +9,7 @@ import {
   ValueMarket,
   ValueRiskFlag,
   MarketValue,
+  ValuePrediction,
   PredictionLabelStatsResponse,
   PredictionLabelStat,
   PredictionLabelMatchesResponse,
@@ -191,7 +192,7 @@ function RiskFlags({ flags }: { flags: ValueRiskFlag[] }) {
   );
 }
 
-function MatchCard({ item, labelStat }: { item: ValueAnalysisItem; labelStat?: PredictionLabelStat | null }) {
+function MatchCard({ item, labelStat, prediction }: { item: ValueAnalysisItem; labelStat?: PredictionLabelStat | null; prediction?: ValuePrediction | null }) {
   const [open, setOpen] = useState(false);
   const a = item.analysis;
   const kickoff = item.kickoff ? item.kickoff.slice(11, 16) : "";
@@ -212,12 +213,12 @@ function MatchCard({ item, labelStat }: { item: ValueAnalysisItem; labelStat?: P
           </span>
           <span className="text-xs text-ink-muted shrink-0">{kickoff}</span>
           {oneX2 && <VerdictBadge verdict={oneX2.value.verdict} />}
-          {a?.prediction && (
+          {prediction && (
             <span className="text-xs font-semibold px-2 py-0.5 rounded bg-moss/10 text-moss border border-moss/20 whitespace-nowrap">
-              规则：{a.prediction.label}
+              规则：{prediction.label}
             </span>
           )}
-          {a?.prediction && labelStat && (
+          {prediction && labelStat && (
             <span className="text-xs font-medium px-2 py-0.5 rounded bg-white border border-border whitespace-nowrap">
               命中 {labelStat.hit}/{labelStat.n}{" "}
               <span className={rateColor(labelStat.rate)}>{fmtPct(labelStat.rate)}</span>
@@ -243,12 +244,12 @@ function MatchCard({ item, labelStat }: { item: ValueAnalysisItem; labelStat?: P
       {open && a && (
         <div className="px-4 pb-4 space-y-3 border-t border-border pt-3">
           {/* 预测信息提取 */}
-          {a.prediction && (
+          {prediction && (
             <div className="text-xs rounded px-3 py-2 bg-moss/5 border border-moss/20 flex items-center gap-2 flex-wrap">
               <span className="font-semibold text-ink">预测提取</span>
-              <span className="font-semibold text-moss">{a.prediction.label}</span>
-              {a.prediction.picks.length > 0 && (
-                <span className="text-ink-muted">（{a.prediction.picks.map((p) => p.label).join(" + ")}）</span>
+              <span className="font-semibold text-moss">{prediction.label}</span>
+              {prediction.picks.length > 0 && (
+                <span className="text-ink-muted">（{prediction.picks.map((p) => p.label).join(" + ")}）</span>
               )}
             </div>
           )}
@@ -297,6 +298,7 @@ export default function ValueAnalysis() {
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
   const [labelMatches, setLabelMatches] = useState<PredictionLabelMatchesResponse | null>(null);
   const [labelMatchesLoading, setLabelMatchesLoading] = useState(false);
+  const [oddsMode, setOddsMode] = useState<"close" | "open">("close");
 
   useEffect(() => {
     let alive = true;
@@ -352,6 +354,13 @@ export default function ValueAnalysis() {
     return map;
   }, [labelStats]);
 
+  // 当前口径（初盘/尾盘）下的预测提取
+  const getEffPrediction = useCallback((m: ValueAnalysisItem) => {
+    return oddsMode === "open"
+      ? (m.analysis?.prediction_open ?? m.analysis?.prediction)
+      : m.analysis?.prediction;
+  }, [oddsMode]);
+
   // 规则标签按优选结果分组（胜 / 负 / 平）
   const labelGroups = useMemo(() => {
     const groups = [
@@ -386,13 +395,13 @@ export default function ValueAnalysis() {
     const list = [...(data?.matches ?? [])];
     if (sortMode === "hitrate") {
       const rateOf = (m: ValueAnalysisItem): number | null => {
-        const label = m.analysis?.prediction?.label;
+        const label = getEffPrediction(m)?.label;
         return label ? (labelRateMap.get(label)?.rate ?? null) : null;
       };
       list.sort((a, b) => (rateOf(b) ?? -1) - (rateOf(a) ?? -1));
     }
     return list;
-  }, [data, sortMode, labelRateMap]);
+  }, [data, sortMode, labelRateMap, getEffPrediction]);
 
   // 按比赛周期分组（保持排序后的顺序）
   const groups = useMemo(() => {
@@ -452,22 +461,38 @@ export default function ValueAnalysis() {
         <div className="flex gap-6 items-start">
           <div className="flex-1 min-w-0">
             {data && (
-            <div className="flex gap-4 mb-5 text-sm">
-              <div className="bg-white border border-border rounded-lg px-4 py-2">
-                <span className="text-ink-muted">总场次 </span>
-                <span className="font-semibold text-ink">{data.total}</span>
+            <div className="flex items-center justify-between gap-4 mb-5 text-sm">
+              <div className="flex gap-4">
+                <div className="bg-white border border-border rounded-lg px-4 py-2">
+                  <span className="text-ink-muted">总场次 </span>
+                  <span className="font-semibold text-ink">{data.total}</span>
+                </div>
+                <div className="bg-white border border-border rounded-lg px-4 py-2">
+                  <span className="text-ink-muted">有价值场次 </span>
+                  <span className={`font-semibold ${data.value_match_count > 0 ? "text-emerald-600" : "text-ink"}`}>
+                    {data.value_match_count}
+                  </span>
+                </div>
+                <div className="bg-white border border-border rounded-lg px-4 py-2">
+                  <span className="text-ink-muted">已计算 </span>
+                  <span className={`font-semibold ${data.computed_count === data.total ? "text-emerald-600" : "text-amber-600"}`}>
+                    {data.computed_count} / {data.total}
+                  </span>
+                </div>
               </div>
-              <div className="bg-white border border-border rounded-lg px-4 py-2">
-                <span className="text-ink-muted">有价值场次 </span>
-                <span className={`font-semibold ${data.value_match_count > 0 ? "text-emerald-600" : "text-ink"}`}>
-                  {data.value_match_count}
-                </span>
-              </div>
-              <div className="bg-white border border-border rounded-lg px-4 py-2">
-                <span className="text-ink-muted">已计算 </span>
-                <span className={`font-semibold ${data.computed_count === data.total ? "text-emerald-600" : "text-amber-600"}`}>
-                  {data.computed_count} / {data.total}
-                </span>
+              <div className="inline-flex rounded border border-border overflow-hidden text-xs shrink-0">
+                <button
+                  onClick={() => setOddsMode("close")}
+                  className={`px-3 py-1.5 ${oddsMode === "close" ? "bg-moss text-white" : "bg-white text-ink-muted hover:bg-highlight/30"}`}
+                >
+                  尾盘
+                </button>
+                <button
+                  onClick={() => setOddsMode("open")}
+                  className={`px-3 py-1.5 ${oddsMode === "open" ? "bg-moss text-white" : "bg-white text-ink-muted hover:bg-highlight/30"}`}
+                >
+                  初盘
+                </button>
               </div>
             </div>
           )}
@@ -539,13 +564,17 @@ export default function ValueAnalysis() {
                     <span className="text-xs text-ink-muted">{matches.length} 场</span>
                   </div>
                   <div className="space-y-2">
-                    {matches.map((m) => (
-                      <MatchCard
-                        key={m.match_id}
-                        item={m}
-                        labelStat={m.analysis?.prediction?.label ? labelRateMap.get(m.analysis.prediction.label) : null}
-                      />
-                    ))}
+                    {matches.map((m) => {
+                      const pred = getEffPrediction(m);
+                      return (
+                        <MatchCard
+                          key={m.match_id}
+                          item={m}
+                          prediction={pred}
+                          labelStat={pred?.label ? labelRateMap.get(pred.label) : null}
+                        />
+                      );
+                    })}
                   </div>
                 </div>
               ))}

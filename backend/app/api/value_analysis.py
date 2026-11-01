@@ -25,6 +25,7 @@ from app.predictor.models.value_analysis import (
     analyze_match,
     hit_prediction,
     prediction_from_analysis,
+    prediction_open_from_analysis,
 )
 
 router = APIRouter(prefix="/api/value-analysis", tags=["value_analysis"])
@@ -53,10 +54,11 @@ async def _jczq_map(db: AsyncSession, match_ids: list[int], desc: bool = True) -
     return {int(s.match_id): s for s in rows}
 
 
-async def _sharp_1x2_map(db: AsyncSession, match_ids: list[int]) -> dict[int, dict]:
-    """批量取每场锐利盘最新 1X2（3-way 基准）：Pinnacle 优先，缺失降级 bet365。
+async def _sharp_1x2_map(db: AsyncSession, match_ids: list[int], desc: bool = True) -> dict[int, dict]:
+    """批量取每场锐利盘 1X2（3-way 基准）：Pinnacle 优先，缺失降级 bet365。
 
     Buchdahl 口径：Pinnacle 是最锐的 3-way 基准（接纳锐利玩家而非封杀），bet365 作为兜底。
+    desc=True 取最新快照（尾盘）；desc=False 取最早快照（初盘）。
     """
     if not match_ids:
         return {}
@@ -72,7 +74,10 @@ async def _sharp_1x2_map(db: AsyncSession, match_ids: list[int]) -> dict[int, di
                 OddsSnapshot.away_win.is_not(None),
             )
             .distinct(OddsSnapshot.match_id)
-            .order_by(OddsSnapshot.match_id.asc(), OddsSnapshot.snapshot_time.desc())
+            .order_by(
+                OddsSnapshot.match_id.asc(),
+                OddsSnapshot.snapshot_time.desc() if desc else OddsSnapshot.snapshot_time.asc(),
+            )
         )
         rows = (await db.execute(stmt)).all()
         return {int(mid): {"home": float(h), "draw": float(d), "away": float(a)} for mid, h, d, a in rows}
@@ -116,7 +121,8 @@ async def _compute_range_items(db, start, end):
     mids = [int(m.id) for m, *_ in mrows]
     latest_jczq = await _jczq_map(db, mids, desc=True)
     earliest_jczq = await _jczq_map(db, mids, desc=False)
-    sharp_1x2_map = await _sharp_1x2_map(db, mids)
+    sharp_1x2_map = await _sharp_1x2_map(db, mids, desc=True)
+    sharp_1x2_open_map = await _sharp_1x2_map(db, mids, desc=False)
     ou_map = await _sm_ou_rows(db, mids)
 
     items = []
@@ -135,6 +141,7 @@ async def _compute_range_items(db, start, end):
                 sharp_ou_p_big=ou["p_big"] if ou else None,
                 sharp_ou_n_books=ou["n_books"] if ou else None,
                 jczq_early=jczq_early,
+                sharp_1x2_open=sharp_1x2_open_map.get(mid),
             )
         items.append({
             "match_id": mid,
@@ -270,7 +277,7 @@ async def backfill_prediction(
     only_missing: bool = Query(False, description="仅回填缺失 prediction 的快照（已存在则跳过）"),
     db: AsyncSession = Depends(get_db),
 ):
-    """回填预测提取：从已持久化 analysis_json（冻结口径）重建 prediction 并写回。
+    """回填预测提取：从已持久化 analysis_json（冻结口径）重建 prediction / prediction_open 并写回。
 
     预测提取基于冻结在 analysis_json 内的 1X2 best_side / HAD 赔率 / 让球赔率，
     无需回源赔率快照，避免历史漂移。
@@ -286,8 +293,11 @@ async def backfill_prediction(
             with_prediction += 1
             continue
         pred = prediction_from_analysis(analysis)
+        pred_open = prediction_open_from_analysis(analysis)
         new_analysis = dict(analysis)
         new_analysis["prediction"] = pred
+        if pred_open is not None:
+            new_analysis["prediction_open"] = pred_open
         s.analysis_json = new_analysis
         if pred is not None:
             with_prediction += 1

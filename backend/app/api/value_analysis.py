@@ -525,13 +525,16 @@ async def value_analysis_history(
 @router.get("/prediction-label-stats")
 async def prediction_label_stats(
     days: int = Query(30, description="回溯天数（默认近 30 天，1~365）"),
+    mode: str = Query("close", description="口径：close=尾盘，open=初盘"),
     db: AsyncSession = Depends(get_db),
 ):
     """规则标签命中率统计：近 N 天已结算场次，按预测提取规则标签分组统计命中率。
 
     命中口径与 /history 的 pred 一致（双选任一命中），赛果更新后本接口现算自动刷新。
+    mode=open 时按初盘口径（prediction_open）统计。
     """
     days = max(1, min(days, 365))
+    open_mode = (mode == "open")
     today = datetime.now(_BEIJING).date()
     start_day = today - timedelta(days=days - 1)
     start_ts = datetime.combine(start_day, datetime.min.time()) + timedelta(hours=12)
@@ -564,9 +567,14 @@ async def prediction_label_stats(
         analysis = snap_map.get(mid)
         if not isinstance(analysis, dict):
             continue
-        prediction = analysis.get("prediction")
-        if not isinstance(prediction, dict):
-            prediction = prediction_from_analysis(analysis)
+        if open_mode:
+            prediction = analysis.get("prediction_open")
+            if not isinstance(prediction, dict):
+                prediction = prediction_open_from_analysis(analysis)
+        else:
+            prediction = analysis.get("prediction")
+            if not isinstance(prediction, dict):
+                prediction = prediction_from_analysis(analysis)
         if not isinstance(prediction, dict):
             continue
         hhad_line = jczq_map.get(mid).hhad_line if jczq_map.get(mid) else None

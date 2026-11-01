@@ -1021,6 +1021,7 @@ export interface ValueMarket {
   name: string;
   jczq_odds?: Record<string, number>;
   sharp_odds?: Record<string, number>;
+  open_odds?: Record<string, number>;
   jczq_p_big?: number | null;
   sharp_p_big?: number | null;
   value: MarketValue;
@@ -1156,7 +1157,7 @@ export interface PredictionLabelStatsResponse {
   total_rate: number | null;
   labels: PredictionLabelStat[];
 }
-export const getPredictionLabelStats = (params?: { days?: number }) =>
+export const getPredictionLabelStats = (params?: { days?: number; mode?: "close" | "open" }) =>
   api.get("/value-analysis/prediction-label-stats", { params }).then((r) => r.data as PredictionLabelStatsResponse);
 
 export interface PredictionLabelMatch {

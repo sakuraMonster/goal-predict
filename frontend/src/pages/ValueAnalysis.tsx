@@ -100,9 +100,9 @@ function viewpoint2(item: ValueAnalysisItem): string {
 }
 
 // 1X2 赔率/概率/EV 表格
-function MarketTable({ market }: { market: ValueMarket }) {
+function MarketTable({ market, oddsMode }: { market: ValueMarket; oddsMode: "close" | "open" }) {
   const outcomes = market.value.outcomes;
-  const sharp = market.sharp_odds ?? {};
+  const sharp = oddsMode === "open" ? (market.open_odds ?? {}) : (market.sharp_odds ?? {});
   if (!outcomes) return null;
   // 固定顺序：主胜 → 平 → 客胜（避免 JSONB 持久化后键序被打乱成 away/draw/home）
   const keys = ["home", "draw", "away"].filter((k) => k in outcomes);
@@ -192,7 +192,7 @@ function RiskFlags({ flags }: { flags: ValueRiskFlag[] }) {
   );
 }
 
-function MatchCard({ item, labelStat, prediction }: { item: ValueAnalysisItem; labelStat?: PredictionLabelStat | null; prediction?: ValuePrediction | null }) {
+function MatchCard({ item, labelStat, prediction, oddsMode }: { item: ValueAnalysisItem; labelStat?: PredictionLabelStat | null; prediction?: ValuePrediction | null; oddsMode: "close" | "open" }) {
   const [open, setOpen] = useState(false);
   const a = item.analysis;
   const kickoff = item.kickoff ? item.kickoff.slice(11, 16) : "";
@@ -264,7 +264,7 @@ function MatchCard({ item, labelStat, prediction }: { item: ValueAnalysisItem; l
           {oneX2?.value?.outcomes && (
             <div>
               <h4 className="text-xs font-semibold text-ink-muted mb-1.5">胜平负</h4>
-              <MarketTable market={oneX2} />
+              <MarketTable market={oneX2} oddsMode={oddsMode} />
               <RiskFlags flags={oneX2.risk.flags} />
             </div>
           )}
@@ -302,11 +302,11 @@ export default function ValueAnalysis() {
 
   useEffect(() => {
     let alive = true;
-    getPredictionLabelStats({ days: 30 })
+    getPredictionLabelStats({ days: 30, mode: oddsMode })
       .then((d) => { if (alive) setLabelStats(d); })
       .catch(() => {});
     return () => { alive = false; };
-  }, []);
+  }, [oddsMode]);
 
   useEffect(() => {
     if (!selectedLabel) {
@@ -572,6 +572,7 @@ export default function ValueAnalysis() {
                           item={m}
                           prediction={pred}
                           labelStat={pred?.label ? labelRateMap.get(pred.label) : null}
+                          oddsMode={oddsMode}
                         />
                       );
                     })}

@@ -862,7 +862,7 @@ def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True, mode: str = 
                 "label": "主让1.4~1.6-负",
                 "picks": [_pick("hhad", "home", "让胜")],
             }
-        # 主让 1.6~1.8 → 尾盘：让平 + 负；初盘：平 + 让平
+        # 主让 1.6~1.8 → 尾盘：让平 + 负；初盘：让胜 + 让平
         if fav_odds is not None and FAV_PUSH_LO <= fav_odds < FAV_PUSH_HI:
             return {
                 "side": "away",
@@ -870,7 +870,7 @@ def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True, mode: str = 
                 "fav": fav,
                 "label": "主让1.6~1.8-负",
                 "picks": (
-                    [_pick("had", "draw", "平"), _pick("hhad", "draw", "让平")]
+                    [_pick("hhad", "home", "让胜"), _pick("hhad", "draw", "让平")]
                     if is_open
                     else [
                         _pick("hhad", "draw", "让平"),

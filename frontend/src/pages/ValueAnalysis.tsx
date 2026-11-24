@@ -302,7 +302,7 @@ export default function ValueAnalysis() {
   const [selectedLabel, setSelectedLabel] = useState<string | null>(null);
   const [labelMatches, setLabelMatches] = useState<PredictionLabelMatchesResponse | null>(null);
   const [labelMatchesLoading, setLabelMatchesLoading] = useState(false);
-  const [oddsMode, setOddsMode] = useState<"close" | "open">("close");
+  const [oddsMode, setOddsMode] = useState<"close" | "open">("open");
   const { toast } = useToast();
 
   const copyLabelName = useCallback(async (text: string) => {

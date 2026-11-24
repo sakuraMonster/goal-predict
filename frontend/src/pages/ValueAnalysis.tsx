@@ -219,6 +219,9 @@ function MatchCard({ item, labelStat, prediction, oddsMode }: { item: ValueAnaly
               规则：{prediction.label}
             </span>
           )}
+          {oddsMode === "open" && a && !prediction && (
+            <span className="text-xs text-ink-muted whitespace-nowrap">无初盘预测</span>
+          )}
           {prediction && labelStat && (
             <span className="text-xs font-medium px-2 py-0.5 rounded bg-white border border-border whitespace-nowrap">
               命中 {labelStat.hit}/{labelStat.n}{" "}
@@ -382,8 +385,8 @@ export default function ValueAnalysis() {
   // 当前口径（初盘/尾盘）下的预测提取
   const getEffPrediction = useCallback((m: ValueAnalysisItem) => {
     return oddsMode === "open"
-      ? (m.analysis?.prediction_open ?? m.analysis?.prediction)
-      : m.analysis?.prediction;
+      ? (m.analysis?.prediction_open ?? null)
+      : (m.analysis?.prediction ?? null);
   }, [oddsMode]);
 
   // 规则标签按优选结果分组（胜 / 负 / 平）

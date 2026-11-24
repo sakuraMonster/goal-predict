@@ -124,6 +124,8 @@ PREDICTION_LABEL_ORDER = [
     "客让2.0~2.3-平",
     "主让平赔<3.5-平",
     "主让平赔>=4.0-平",
+    "均衡盘-平·主热",
+    "均衡盘-平·客热",
     "均衡盘-平",
     "无盘-胜",
     "无盘-平",
@@ -632,7 +634,31 @@ def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True, mode: str = 
                         ]
                     ),
                 }
-            # 主让平赔 3.5~4.0 / 客让 / 无让球方 → 平 + 让平
+            # 均衡盘：初盘按 fav 方向拆成两个标签；尾盘保持 平 + 让平
+            if is_open:
+                if fav == "away":
+                    # 客热：客队不败（平或客胜2+；漏客胜1球）
+                    return {
+                        "side": "draw",
+                        "mode": "balanced_draw_away",
+                        "fav": fav,
+                        "label": "均衡盘-平·客热",
+                        "picks": [
+                            _pick("had", "draw", "平"),
+                            _pick("hhad", "away", "让负"),
+                        ],
+                    }
+                # 主热（或无明确 fav）：主队不败
+                return {
+                    "side": "draw",
+                    "mode": "balanced_draw_home",
+                    "fav": fav,
+                    "label": "均衡盘-平·主热",
+                    "picks": [
+                        _pick("had", "home", "胜"),
+                        _pick("had", "draw", "平"),
+                    ],
+                }
             return {
                 "side": "draw",
                 "mode": "balanced_draw",

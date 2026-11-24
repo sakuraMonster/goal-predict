@@ -397,7 +397,7 @@ export default function ValueAnalysis() {
     (labelStats?.labels ?? []).forEach((s) => {
       if (s.label.endsWith("-胜")) groups[0].labels.push(s);
       else if (s.label.endsWith("-负")) groups[1].labels.push(s);
-      else if (s.label.endsWith("-平")) groups[2].labels.push(s);
+      else if (s.label.endsWith("-平") || s.label.startsWith("均衡盘-平·")) groups[2].labels.push(s);
       else other.push(s);
     });
     if (other.length) groups.push({ key: "other", title: "其他", labels: other });

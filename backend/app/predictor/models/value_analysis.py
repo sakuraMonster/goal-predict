@@ -688,17 +688,16 @@ def extract_prediction(best_side, sharp_1x2, has_hhad: bool = True, mode: str = 
             if fav_odds is not None and fav_odds < UPSET_WIN_DRAW_LOSS_LO:
                 # 客让 1.5~2.0
                 if draw_odds is not None and draw_odds >= UPSET_WIN_HIGH_DRAW:
-                    # 平赔>=4.0 → 让胜（初盘口径：让胜 + 让负）
+                    # 平赔>=4.0 → 让胜 + 让负（覆盖主队不败与客队净胜2+；尾盘/初盘统一）
                     return {
                         "side": "home",
                         "mode": "upset_win_mid_highdraw",
                         "fav": fav,
                         "label": "客让1.5~2.0平赔≥4.0-胜",
-                        "picks": (
-                            [_pick("hhad", "home", "让胜"), _pick("hhad", "away", "让负")]
-                            if is_open
-                            else [_pick("hhad", "home", "让胜")]
-                        ),
+                        "picks": [
+                            _pick("hhad", "home", "让胜"),
+                            _pick("hhad", "away", "让负"),
+                        ],
                     }
                 # 平赔 3.5~4.0 → 平 + 让平（覆盖平局与客胜1球；实测 24 场由 12 中升至 17 中）
                 return {

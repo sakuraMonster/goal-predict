@@ -193,7 +193,7 @@ function RiskFlags({ flags }: { flags: ValueRiskFlag[] }) {
   );
 }
 
-function MatchCard({ item, labelStat, prediction, oddsMode }: { item: ValueAnalysisItem; labelStat?: PredictionLabelStat | null; prediction?: ValuePrediction | null; oddsMode: "close" | "open" }) {
+function MatchCard({ item, labelStat, prediction, oddsMode, onSelectLabel }: { item: ValueAnalysisItem; labelStat?: PredictionLabelStat | null; prediction?: ValuePrediction | null; oddsMode: "close" | "open"; onSelectLabel: (label: string) => void }) {
   const [open, setOpen] = useState(false);
   const a = item.analysis;
   const kickoff = item.kickoff ? item.kickoff.slice(11, 16) : "";
@@ -215,7 +215,20 @@ function MatchCard({ item, labelStat, prediction, oddsMode }: { item: ValueAnaly
           <span className="text-xs text-ink-muted shrink-0">{kickoff}</span>
           {oneX2 && <VerdictBadge verdict={oneX2.value.verdict} />}
           {prediction && (
-            <span className="text-xs font-semibold px-2 py-0.5 rounded bg-moss/10 text-moss border border-moss/20 whitespace-nowrap">
+            <span
+              role="button"
+              tabIndex={0}
+              title="查看该规则标签的场次明细"
+              onClick={(e) => { e.stopPropagation(); onSelectLabel(prediction.label); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  onSelectLabel(prediction.label);
+                }
+              }}
+              className="text-xs font-semibold px-2 py-0.5 rounded bg-moss/10 text-moss border border-moss/20 whitespace-nowrap cursor-pointer hover:bg-moss/20 hover:underline"
+            >
               规则：{prediction.label}
             </span>
           )}
@@ -614,6 +627,7 @@ export default function ValueAnalysis() {
                           prediction={pred}
                           labelStat={pred?.label ? labelRateMap.get(pred.label) : null}
                           oddsMode={oddsMode}
+                          onSelectLabel={setSelectedLabel}
                         />
                       );
                     })}

@@ -1177,12 +1177,13 @@ export interface PredictionLabelMatch {
 export interface PredictionLabelMatchesResponse {
   label: string;
   days: number;
+  mode?: "close" | "open";
   n: number;
   hit: number;
   rate: number | null;
   matches: PredictionLabelMatch[];
 }
-export const getPredictionLabelMatches = (params: { label: string; days?: number }) =>
+export const getPredictionLabelMatches = (params: { label: string; days?: number; mode?: "close" | "open" }) =>
   api.get("/value-analysis/prediction-label-matches", { params }).then((r) => r.data as PredictionLabelMatchesResponse);
 
 export default api;

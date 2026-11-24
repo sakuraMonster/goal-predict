@@ -612,12 +612,15 @@ async def prediction_label_stats(
 async def prediction_label_matches(
     label: str = Query(..., description="规则标签"),
     days: int = Query(180, description="回溯天数（默认近 180 天，1~365）"),
+    mode: str = Query("close", description="口径：close=尾盘，open=初盘"),
     db: AsyncSession = Depends(get_db),
 ):
     """规则标签下近 N 天赛事明细（含实际赛果）。
 
-    命中口径与 /history 的 pred 一致（双选任一命中），赛果更新后本接口现算自动刷新。
+    mode 决定使用 prediction（尾盘）还是 prediction_open（初盘）；
+    命中口径与对应档位的 /prediction-label-stats 一致（双选任一命中）。
     """
+    open_mode = (mode == "open")
     days = max(1, min(days, 365))
     today = datetime.now(_BEIJING).date()
     start_day = today - timedelta(days=days - 1)
@@ -661,9 +664,14 @@ async def prediction_label_matches(
         analysis = snap_map.get(mid)
         if not isinstance(analysis, dict):
             continue
-        prediction = analysis.get("prediction")
-        if not isinstance(prediction, dict):
-            prediction = prediction_from_analysis(analysis)
+        if open_mode:
+            prediction = analysis.get("prediction_open")
+            if not isinstance(prediction, dict):
+                prediction = prediction_open_from_analysis(analysis)
+        else:
+            prediction = analysis.get("prediction")
+            if not isinstance(prediction, dict):
+                prediction = prediction_from_analysis(analysis)
         if not isinstance(prediction, dict):
             continue
         if (prediction.get("label") or "未知") != label:
@@ -695,6 +703,7 @@ async def prediction_label_matches(
     return {
         "label": label,
         "days": days,
+        "mode": "open" if open_mode else "close",
         "n": n,
         "hit": hit,
         "rate": _rate(hit, n),

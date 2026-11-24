@@ -15,6 +15,7 @@ import {
   PredictionLabelMatchesResponse,
 } from "../api/client";
 import ValueHistory from "./ValueHistory";
+import { useToast } from "../components/Toast";
 
 const SIDE_ZH: Record<string, string> = { home: "主胜", draw: "平", away: "客胜" };
 const HHAD_ZH: Record<string, string> = { home: "让胜", draw: "让平", away: "让负" };
@@ -299,6 +300,30 @@ export default function ValueAnalysis() {
   const [labelMatches, setLabelMatches] = useState<PredictionLabelMatchesResponse | null>(null);
   const [labelMatchesLoading, setLabelMatchesLoading] = useState(false);
   const [oddsMode, setOddsMode] = useState<"close" | "open">("close");
+  const { toast } = useToast();
+
+  const copyLabelName = useCallback(async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast(`已复制：${text}`, "success");
+      return;
+    } catch {
+      // 剪贴板 API 不可用时的兜底
+    }
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      toast(`已复制：${text}`, "success");
+    } catch {
+      toast("复制失败，请手动选择文本", "error");
+    }
+  }, [toast]);
 
   useEffect(() => {
     let alive = true;
@@ -315,12 +340,12 @@ export default function ValueAnalysis() {
     }
     let alive = true;
     setLabelMatchesLoading(true);
-    getPredictionLabelMatches({ label: selectedLabel, days: 180 })
+    getPredictionLabelMatches({ label: selectedLabel, days: 180, mode: oddsMode })
       .then((d) => { if (alive) setLabelMatches(d); })
       .catch(() => { if (alive) setLabelMatches(null); })
       .finally(() => { if (alive) setLabelMatchesLoading(false); });
     return () => { alive = false; };
-  }, [selectedLabel]);
+  }, [selectedLabel, oddsMode]);
 
   useEffect(() => {
     let alive = true;
@@ -502,7 +527,7 @@ export default function ValueAnalysis() {
               <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
                 <h3 className="text-sm font-semibold text-ink">规则标签命中率</h3>
                 <span className="text-xs text-ink-muted">
-                  近 {labelStats.days} 天 · 合计 {labelStats.total_hit}/{labelStats.total_n}（{fmtPct(labelStats.total_rate)}）
+                  近 {labelStats.days} 天 · {oddsMode === "open" ? "初盘" : "尾盘"} · 合计 {labelStats.total_hit}/{labelStats.total_n}（{fmtPct(labelStats.total_rate)}）
                 </span>
               </div>
               <div className="space-y-3">
@@ -513,17 +538,30 @@ export default function ValueAnalysis() {
                       {g.labels.map((s) => {
                         const isSelected = selectedLabel === s.label;
                         return (
-                          <button
+                          <span
                             key={s.label}
-                            onClick={() => setSelectedLabel(isSelected ? null : s.label)}
-                            className={`inline-flex items-center gap-1.5 px-2 py-1 rounded border text-xs transition-colors ${
-                              s.n === 0 ? "border-border opacity-50" : "border-moss/20"
-                            } ${isSelected ? "bg-moss border-moss" : "bg-white hover:bg-highlight/30"}`}
+                            className={`inline-flex items-stretch rounded border text-xs overflow-hidden transition-colors ${
+                              s.n === 0 ? "border-border opacity-50" : isSelected ? "border-moss bg-moss" : "border-moss/20 bg-white"
+                            }`}
                           >
-                            <span className={`font-medium ${isSelected ? "text-white" : "text-ink"}`}>{s.label}</span>
-                            <span className={isSelected ? "text-white/80" : "text-ink-muted"}>{s.hit}/{s.n}</span>
-                            <span className={`font-semibold ${isSelected ? "text-white" : rateColor(s.rate)}`}>{fmtPct(s.rate)}</span>
-                          </button>
+                            <button
+                              onClick={() => setSelectedLabel(isSelected ? null : s.label)}
+                              className={`inline-flex items-center gap-1.5 px-2 py-1 ${isSelected ? "" : "hover:bg-highlight/30"}`}
+                            >
+                              <span className={`font-medium ${isSelected ? "text-white" : "text-ink"}`}>{s.label}</span>
+                              <span className={isSelected ? "text-white/80" : "text-ink-muted"}>{s.hit}/{s.n}</span>
+                              <span className={`font-semibold ${isSelected ? "text-white" : rateColor(s.rate)}`}>{fmtPct(s.rate)}</span>
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); copyLabelName(s.label); }}
+                              title="复制规则名"
+                              className={`px-1.5 border-l text-[11px] leading-none ${
+                                isSelected ? "border-white/30 text-white/80 hover:bg-white/10" : "border-border text-ink-muted hover:bg-highlight/40"
+                              }`}
+                            >
+                              ⧉
+                            </button>
+                          </span>
                         );
                       })}
                     </div>
@@ -596,13 +634,20 @@ export default function ValueAnalysis() {
                     </option>
                   ))}
                 </select>
+                <button
+                  onClick={() => copyLabelName(selectedLabel)}
+                  title="复制规则名"
+                  className="text-xs text-ink-muted hover:text-ink shrink-0"
+                >
+                  ⧉
+                </button>
                 <button onClick={() => setSelectedLabel(null)} className="text-xs text-ink-muted hover:text-ink shrink-0">✕</button>
               </div>
               {labelMatchesLoading && <p className="text-xs text-ink-muted">加载中…</p>}
               {!labelMatchesLoading && labelMatches && (
                 <>
                   <div className="text-xs text-ink-muted mb-3">
-                    近 {labelMatches.days} 天 · {labelMatches.hit}/{labelMatches.n}（{fmtPct(labelMatches.rate)}）
+                    近 {labelMatches.days} 天 · {labelMatches.mode === "open" ? "初盘" : "尾盘"} · {labelMatches.hit}/{labelMatches.n}（{fmtPct(labelMatches.rate)}）
                   </div>
                   <div className="bg-parchment-dark rounded px-3 py-2 mb-3">
                     <div className="text-xs font-semibold text-ink mb-1">实际赛果统计</div>
@@ -618,7 +663,7 @@ export default function ValueAnalysis() {
                     </div>
                   </div>
                   {labelMatches.matches.length === 0 ? (
-                    <p className="text-xs text-ink-muted">该规则近30天无已结算场次。</p>
+                    <p className="text-xs text-ink-muted">该规则近 {labelMatches.days} 天无已结算场次。</p>
                   ) : (
                     <ul className="space-y-2.5">
                       {labelMatches.matches.map((mm, i) => (

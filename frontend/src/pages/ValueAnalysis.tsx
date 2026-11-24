@@ -302,7 +302,7 @@ export default function ValueAnalysis() {
 
   useEffect(() => {
     let alive = true;
-    getPredictionLabelStats({ days: 30, mode: oddsMode })
+    getPredictionLabelStats({ days: 180, mode: oddsMode })
       .then((d) => { if (alive) setLabelStats(d); })
       .catch(() => {});
     return () => { alive = false; };
@@ -315,7 +315,7 @@ export default function ValueAnalysis() {
     }
     let alive = true;
     setLabelMatchesLoading(true);
-    getPredictionLabelMatches({ label: selectedLabel, days: 30 })
+    getPredictionLabelMatches({ label: selectedLabel, days: 180 })
       .then((d) => { if (alive) setLabelMatches(d); })
       .catch(() => { if (alive) setLabelMatches(null); })
       .finally(() => { if (alive) setLabelMatchesLoading(false); });

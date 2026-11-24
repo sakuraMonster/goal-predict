@@ -524,7 +524,7 @@ async def value_analysis_history(
 
 @router.get("/prediction-label-stats")
 async def prediction_label_stats(
-    days: int = Query(30, description="回溯天数（默认近 30 天，1~365）"),
+    days: int = Query(180, description="回溯天数（默认近 180 天，1~365）"),
     mode: str = Query("close", description="口径：close=尾盘，open=初盘"),
     db: AsyncSession = Depends(get_db),
 ):
@@ -611,7 +611,7 @@ async def prediction_label_stats(
 @router.get("/prediction-label-matches")
 async def prediction_label_matches(
     label: str = Query(..., description="规则标签"),
-    days: int = Query(30, description="回溯天数（默认近 30 天，1~365）"),
+    days: int = Query(180, description="回溯天数（默认近 180 天，1~365）"),
     db: AsyncSession = Depends(get_db),
 ):
     """规则标签下近 N 天赛事明细（含实际赛果）。
